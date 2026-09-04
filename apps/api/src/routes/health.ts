@@ -1,4 +1,6 @@
-import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { Router } from 'express';
 import { sql } from 'drizzle-orm';
@@ -17,8 +19,27 @@ import { keys, redis } from '../lib/redis.js';
  */
 export const router = Router();
 
-const requireJson = createRequire(import.meta.url);
-const { version: VERSION } = requireJson('../../package.json') as { version: string };
+/** Bundled output lives in `apps/api/dist/`; source lives in `apps/api/src/routes/`. */
+const readAppVersion = (): string => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    join(here, '../package.json'),
+    join(here, '../../package.json'),
+    join(process.cwd(), 'apps/api/package.json'),
+    join(process.cwd(), 'package.json'),
+  ];
+  for (const path of candidates) {
+    try {
+      const pkg = JSON.parse(readFileSync(path, 'utf8')) as { version?: string };
+      if (typeof pkg.version === 'string') return pkg.version;
+    } catch {
+      // try the next layout
+    }
+  }
+  return 'unknown';
+};
+
+const VERSION = readAppVersion();
 
 router.get('/api/health/live', (_req, res) => {
   res.status(200).json({ status: 'ok' });
