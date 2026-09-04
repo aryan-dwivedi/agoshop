@@ -39,10 +39,8 @@ RUN npm run build --workspace @shop/web
 
 FROM node:24-bookworm-slim
 
-COPY --from=caddy:2.10.2-alpine /usr/bin/caddy /usr/bin/caddy
-
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends espeak-ng ffmpeg curl ca-certificates \
+  && apt-get install -y --no-install-recommends espeak-ng ffmpeg curl ca-certificates nginx \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -74,7 +72,7 @@ COPY scripts scripts
 COPY --from=build /app/apps/web/dist/customer /srv/customer
 COPY --from=build /app/apps/web/dist/seller /srv/seller
 COPY --from=build /app/apps/web/dist/support /srv/support
-COPY infra/Caddyfile /etc/caddy/Caddyfile
+COPY infra/nginx.free.conf /etc/nginx/nginx.free.conf
 COPY infra/start-free.sh /usr/local/bin/start-free.sh
 RUN chmod +x /usr/local/bin/start-free.sh
 

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Single-container process supervisor for Render's free web tier.
-# API already mounts AI hot-path routes; Caddy fans out SSE to a local replica.
+# API already mounts AI hot-path routes; nginx fans out SSE to a local replica.
 set -eu
 
 API_PORT=8787
@@ -37,10 +37,6 @@ sse_pid=$!
 node apps/worker/dist/index.js &
 worker_pid=$!
 
-export API_UPSTREAM="127.0.0.1:${API_PORT}"
-export SSE_UPSTREAM="127.0.0.1:${SSE_PORT}"
-export AI_UPSTREAM="127.0.0.1:${API_PORT}"
-
 terminate() {
   kill "$api_pid" "$sse_pid" "$worker_pid" 2>/dev/null || true
   wait "$api_pid" "$sse_pid" "$worker_pid" 2>/dev/null || true
@@ -48,5 +44,8 @@ terminate() {
 
 trap terminate INT TERM
 
-# Caddy is PID 1 so Render's health checks and graceful shutdown hit the edge.
-exec caddy run --config /etc/caddy/Caddyfile
+LISTEN_PORT="${PORT:-10000}"
+sed "s/__LISTEN_PORT__/${LISTEN_PORT}/g" /etc/nginx/nginx.free.conf > /tmp/nginx.free.conf
+
+# nginx stays in the foreground so Render health checks hit the edge.
+exec nginx -c /tmp/nginx.free.conf -g 'daemon off;'
