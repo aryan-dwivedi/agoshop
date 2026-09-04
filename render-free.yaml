@@ -1,0 +1,112 @@
+# Render Blueprint for the free tier.
+# One public web service runs API, SSE, worker, and the static edge in a single
+# container. Postgres and Key Value use Render's free datastore plans.
+#
+# Limitations vs render.yaml (paid):
+# - Services spin down after ~15 minutes of inactivity (cold starts ~1 minute).
+# - Free Postgres expires 30 days after creation (upgrade to keep data).
+# - No persistent disk; session recordings are ephemeral.
+# - 512 MB RAM: voice AI / TTS may be slow on first use.
+services:
+  - type: web
+    runtime: docker
+    name: agoshop
+    region: singapore
+    plan: free
+    dockerfilePath: ./infra/Dockerfile.free
+    dockerContext: .
+    healthCheckPath: /api/health/live
+    preDeployCommand: node apps/api/dist/db-push.js
+    initialDeployHook: node apps/api/dist/db-seed.js
+    envVars:
+      - fromGroup: agoshop-runtime-free
+      - key: DATABASE_URL
+        fromDatabase:
+          name: agoshop-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: agoshop-redis
+          property: connectionString
+      - key: PUBLIC_API_URL
+        fromService:
+          type: web
+          name: agoshop
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: WEB_ORIGIN
+        fromService:
+          type: web
+          name: agoshop
+          envVarKey: RENDER_EXTERNAL_URL
+
+  - type: keyvalue
+    name: agoshop-redis
+    region: singapore
+    plan: free
+    ipAllowList: []
+    maxmemoryPolicy: allkeys-lru
+    persistenceMode: off
+
+databases:
+  - name: agoshop-db
+    region: singapore
+    plan: free
+    databaseName: agoshop
+    user: agoshop
+    postgresMajorVersion: '16'
+    ipAllowList: []
+
+envVarGroups:
+  - name: agoshop-runtime-free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY_HOPS
+        value: '1'
+      - key: SESSION_COOKIE_SECRET
+        generateValue: true
+      - key: CONVO_LLM_SHARED_SECRET
+        generateValue: true
+      - key: AGORA_APP_ID
+        sync: false
+      - key: AGORA_APP_CERTIFICATE
+        sync: false
+      - key: AGORA_CUSTOMER_ID
+        sync: false
+      - key: AGORA_CUSTOMER_SECRET
+        sync: false
+      - key: AGORA_WEBHOOK_SECRET
+        sync: false
+      - key: LLM_PROVIDER
+        value: openrouter
+      - key: LLM_BASE_URL
+        value: https://openrouter.ai/api/v1
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        value: openai/gpt-4o-mini
+      - key: CONVOAI_ENABLED
+        value: 'true'
+      - key: CONVOAI_LLM_MODE
+        value: custom
+      - key: CONVOAI_ASR_CREDENTIAL_MODE
+        value: byok
+      - key: CONVOAI_TTS_CREDENTIAL_MODE
+        value: byok
+      - key: RECORDING_PROVIDER
+        value: browser
+      - key: RECORDING_LOCAL_DIR
+        value: /tmp/recordings
+      - key: RECORDING_LOCAL_FILE_PURGE
+        value: 'true'
+      - key: SEARCH_PROVIDER
+        value: postgres
+      - key: CHECKOUT_MODE
+        value: async
+      - key: PRIVACY_MODE
+        value: standard
+      - key: PII_REDACTION
+        value: 'true'
+      - key: PG_POOL_MAX
+        value: '5'

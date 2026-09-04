@@ -129,6 +129,33 @@ persistent recording disk cannot run as a reliable complete stack on Render's fr
 tier. The AI service uses the larger `standard` plan for the local speech model; the
 other application services use `starter`.
 
+### Deploy on Render (free tier)
+
+[`render-free.yaml`](render-free.yaml) collapses the stack into **one free web
+service** plus free Postgres and free Key Value. API, SSE, worker, and the static
+edge all run in a single container (`infra/Dockerfile.free`).
+
+1. Push this repository to GitHub.
+2. In Render, choose **New → Blueprint** and select **`render-free.yaml`** (not
+   `render.yaml`).
+3. When prompted, supply the Agora credentials and `LLM_API_KEY` (`sync: false` in
+   the Blueprint). `PUBLIC_API_URL` and `WEB_ORIGIN` are wired from
+   `RENDER_EXTERNAL_URL` automatically.
+4. Apply the Blueprint. The first deploy runs migrations and seeds the demo catalog.
+
+**Free-tier limits to expect:**
+
+| Limit | Effect |
+| ----- | ------ |
+| Spin-down after ~15 min idle | First request after idle can take ~1 minute |
+| Postgres expires after 30 days | Upgrade the database before expiry to keep data |
+| 512 MB RAM, no persistent disk | Voice TTS loads on demand and may be slow; recordings are ephemeral |
+| No private services / workers | Everything runs in-process in the one web container |
+
+After deploy, open `https://<your-service>.onrender.com/` and log in with the demo
+accounts below. Point Agora's custom-LLM callback at
+`https://<your-service>.onrender.com` (no ngrok needed).
+
 ### The second replica
 
 `npm run dev` starts one API. To run the two-replica topology the load test measures:
