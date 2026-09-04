@@ -134,7 +134,7 @@ const authorized = (header: string | undefined): boolean => {
   return timingSafeEqual(Buffer.from(presented), Buffer.from(expected));
 };
 
-if (env.NODE_ENV !== 'test') {
+if (env.NODE_ENV !== 'test' && env.TTS_WARMUP_AT_BOOT) {
   void warmSpeechModel()
     .then(() => logger.info('tts neural model ready'))
     .catch((err: unknown) => logger.error({ err }, 'tts neural model warmup failed'));

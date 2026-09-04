@@ -5,6 +5,8 @@ set -eu
 
 API_PORT=8787
 SSE_PORT=8789
+# Render injects PORT=10000 for the public edge; child services use fixed ports.
+EDGE_PORT="${PORT:-10000}"
 
 mkdir -p /tmp/recordings
 
@@ -28,14 +30,31 @@ else
   node apps/api/dist/db-seed.js
 fi
 
-PORT="$API_PORT" node apps/api/dist/index.js &
+env PORT="$API_PORT" node apps/api/dist/index.js &
 api_pid=$!
 
-PORT="$SSE_PORT" node apps/sse-gateway/dist/index.js &
+env PORT="$SSE_PORT" node apps/sse-gateway/dist/index.js &
 sse_pid=$!
 
 node apps/worker/dist/index.js &
 worker_pid=$!
+
+echo "Waiting for API on port ${API_PORT}..."
+ready=0
+attempt=0
+while [ "$attempt" -lt 90 ]; do
+  if curl -fsS "http://127.0.0.1:${API_PORT}/api/health/live" >/dev/null 2>&1; then
+    ready=1
+    break
+  fi
+  attempt=$((attempt + 1))
+  sleep 2
+done
+if [ "$ready" -ne 1 ]; then
+  echo "API did not become ready on port ${API_PORT}" >&2
+  exit 1
+fi
+echo "API ready."
 
 terminate() {
   kill "$api_pid" "$sse_pid" "$worker_pid" 2>/dev/null || true
@@ -44,8 +63,7 @@ terminate() {
 
 trap terminate INT TERM
 
-LISTEN_PORT="${PORT:-10000}"
-sed "s/__LISTEN_PORT__/${LISTEN_PORT}/g" /etc/nginx/nginx.free.conf > /tmp/nginx.free.conf
+sed "s/__LISTEN_PORT__/${EDGE_PORT}/g" /etc/nginx/nginx.free.conf > /tmp/nginx.free.conf
 
-# nginx stays in the foreground so Render health checks hit the edge.
+# nginx stays in the foreground on Render's PORT so health checks reach the edge.
 exec nginx -c /tmp/nginx.free.conf -g 'daemon off;'

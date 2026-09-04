@@ -156,6 +156,9 @@ const schema = z.object({
 
   /** Stub endpoints used by the side-service contract tests (A7). */
   AGORA_API_BASE: z.string().default('https://api.agora.io'),
+
+  /** Eager Kokoro load at boot; disable on memory-constrained hosts (Render free tier). */
+  TTS_WARMUP_AT_BOOT: bool.default('true'),
 });
 
 export type Env = z.infer<typeof schema>;

@@ -108,3 +108,7 @@ envVarGroups:
         value: 'true'
       - key: PG_POOL_MAX
         value: '5'
+      - key: TTS_WARMUP_AT_BOOT
+        value: 'false'
+      - key: NODE_OPTIONS
+        value: '--max-old-space-size=256'
