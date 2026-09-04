@@ -32,7 +32,10 @@ describe('ConvoAI speech handling', () => {
                     params?: { max_tokens?: number };
                 };
                 parameters: unknown;
-                tts?: { credential_mode?: string; params: { speed?: number } };
+                tts?: {
+                    credential_mode?: string;
+                    params: { voice_setting?: { speed?: number } };
+                };
                 turn_detection: unknown;
                 interruption: unknown;
                 advanced_features: { enable_tools?: boolean };
@@ -46,7 +49,10 @@ describe('ConvoAI speech handling', () => {
         expect(body.properties.advanced_features.enable_tools).toBe(true);
         expect(body.properties.llm.mcp_servers).toHaveLength(1);
         expect(body.properties.tts?.credential_mode).toBe('managed');
-        expect(body.properties.tts?.params).toMatchObject({ speed: 1.6 });
+        expect(body.properties.tts?.params).toMatchObject({
+            model: 'speech-2.8-turbo',
+            voice_setting: { speed: 1.6 },
+        });
         expect(body.properties.llm).toMatchObject({ params: { max_tokens: 160 } });
     });
     it('configures the MCP LLM with Agora-managed OpenAI credentials', () => {
@@ -64,9 +70,11 @@ describe('ConvoAI speech handling', () => {
             credential_mode: 'managed',
             vendor: 'minimax',
             params: {
-                voice: 'English_Reserved_Woman',
-                speed: 1.6,
-                language: 'en-IN',
+                model: 'speech-2.8-turbo',
+                voice_setting: {
+                    voice_id: 'English_captivating_female1',
+                    speed: 1.6,
+                },
             },
         });
     });

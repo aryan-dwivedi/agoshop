@@ -12,9 +12,11 @@ const BASE = 'https://api.agora.io/api/conversational-ai-agent/v2/projects';
 /** Agora managed TTS defaults — configured in the join body, not via app env vars. */
 const MANAGED_TTS = {
     vendor: 'minimax',
-    model: 'speech-02-turbo',
-    voice: 'English_Reserved_Woman',
+    url: 'wss://api.minimax.io/ws/v1/t2a_v2',
+    model: 'speech-2.8-turbo',
+    voiceId: 'English_captivating_female1',
     speed: 1.6,
+    sampleRate: 44100,
 } as const;
 export type ConvoAiJoinInput = {
     conversationId: string;
@@ -27,14 +29,19 @@ export type ConvoAiJoinInput = {
     signature: string;
     expires: number;
 };
-export const buildConvoAiTtsBlock = (language: string): Record<string, unknown> => ({
+export const buildConvoAiTtsBlock = (_language: string): Record<string, unknown> => ({
     vendor: MANAGED_TTS.vendor,
     credential_mode: 'managed',
     params: {
+        url: MANAGED_TTS.url,
         model: MANAGED_TTS.model,
-        voice: MANAGED_TTS.voice,
-        language,
-        speed: MANAGED_TTS.speed,
+        voice_setting: {
+            voice_id: MANAGED_TTS.voiceId,
+            speed: MANAGED_TTS.speed,
+        },
+        audio_setting: {
+            sample_rate: MANAGED_TTS.sampleRate,
+        },
     },
 });
 export const buildConvoAiJoinBody = (input: ConvoAiJoinInput): Record<string, unknown> => {

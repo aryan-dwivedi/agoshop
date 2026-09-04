@@ -301,7 +301,7 @@ Voice is **fully Agora-managed** for speech I/O; commerce stays in our stack.
 1. **ASR** — ARES transcribes the shopper in the private `ai-<conversationId>` RTC channel.
 2. **LLM** — Agora's managed OpenAI-compatible model (`AGORA_MANAGED_LLM_MODEL`, default `gpt-4o-mini`) plans and calls tools.
 3. **Tools** — ConvoAI reaches `${PUBLIC_API_URL}/mcp` (streamable HTTP MCP). Per-conversation HMAC headers scope every tool call to one shopper session. Tool handlers live in `@shop/ai` and read/write Postgres — the catalog never enters an Agora prompt.
-4. **TTS** — Agora managed TTS (MiniMax `speech-02-turbo` by default, set in `packages/agora/src/convoai.ts`, not env vars) speaks the reply back into the RTC channel.
+4. **TTS** — Agora managed TTS (MiniMax `speech-2.8-turbo` by default, set in `packages/agora/src/convoai.ts`, not env vars) speaks the reply back into the RTC channel.
 
 Text chat (degraded mode when voice is unavailable) uses `LLM_PROVIDER` + `LLM_API_KEY` against the same tool handlers in-process — no Agora agent required.
 
