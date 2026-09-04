@@ -1,4 +1,5 @@
 import type { Surface } from '@shop/shared';
+
 export const BROWSE_ASSISTANT_EXAMPLES = [
     'Find the best deals for me',
     'Help me pick a gift under ₹5,000',

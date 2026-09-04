@@ -1,14 +1,14 @@
 {
-  "name": "@shop/shared",
-  "private": true,
-  "version": "1.0.0",
-  "type": "module",
-  "main": "./src/index.ts",
-  "exports": {
-    ".": "./src/index.ts",
-    "./*": "./src/*"
-  },
-  "dependencies": {
-    "zod": "^3.24.1"
-  }
+    "name": "@shop/shared",
+    "private": true,
+    "version": "1.0.0",
+    "type": "module",
+    "main": "./src/index.ts",
+    "exports": {
+        ".": "./src/index.ts",
+        "./*": "./src/*"
+    },
+    "dependencies": {
+        "zod": "^3.24.1"
+    }
 }

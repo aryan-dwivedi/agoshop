@@ -1,4 +1,3 @@
-# Stateless AI replicas: custom-LLM callbacks (text → Agora managed TTS).
 FROM node:24-bookworm-slim AS build
 
 RUN apt-get update \

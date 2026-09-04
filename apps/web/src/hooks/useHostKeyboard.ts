@@ -1,6 +1,22 @@
-import { useEffect, type RefObject } from 'react';
 import type { HoldToConfirmHandle } from '../components/HoldToConfirm';
-export const useHostKeyboard = ({ enabled, endHoldRef, pinSlot, onPinClear, toggleMic, toggleCamera, onPricePanelToggle, onPollPanelToggle, onCaptionsToggle, onKeyMapToggle, onKeyMapClose, onPanelsClose, }: {
+import type { RefObject } from 'react';
+
+import { useEffect } from 'react';
+
+export const useHostKeyboard = ({
+    enabled,
+    endHoldRef,
+    pinSlot,
+    onPinClear,
+    toggleMic,
+    toggleCamera,
+    onPricePanelToggle,
+    onPollPanelToggle,
+    onCaptionsToggle,
+    onKeyMapToggle,
+    onKeyMapClose,
+    onPanelsClose,
+}: {
     enabled: boolean;
     endHoldRef: RefObject<HoldToConfirmHandle>;
     pinSlot: (index: number) => void;
@@ -15,19 +31,19 @@ export const useHostKeyboard = ({ enabled, endHoldRef, pinSlot, onPinClear, togg
     onPanelsClose: () => void;
 }): void => {
     useEffect(() => {
-        if (!enabled)
-            return;
+        if (!enabled) return;
         const onKeyDown = (event: KeyboardEvent): void => {
             const target = event.target as HTMLElement | null;
-            if (target !== null &&
+            if (
+                target !== null &&
                 (target.isContentEditable ||
                     target.tagName === 'INPUT' ||
                     target.tagName === 'TEXTAREA' ||
-                    target.tagName === 'SELECT')) {
+                    target.tagName === 'SELECT')
+            ) {
                 return;
             }
-            if (event.metaKey || event.ctrlKey || event.altKey)
-                return;
+            if (event.metaKey || event.ctrlKey || event.altKey) return;
             if (event.key === '?') {
                 event.preventDefault();
                 onKeyMapToggle();

@@ -1,5 +1,7 @@
 import { Router } from 'express';
-import { handleMcpRequest } from '../mcp/server.js';
+
+import { handleMcpRequest } from '@shop/ai/mcp/server.js';
+
 export const mcpRouter = Router();
 mcpRouter.post('/mcp', (req, res) => {
     handleMcpRequest(req, res).catch((err: unknown) => {

@@ -1,6 +1,9 @@
-import { Router } from 'express';
 import type { AppConfig } from '@shop/shared';
-import { env, features } from '../env.js';
+
+import { Router } from 'express';
+
+import { env, features } from '@shop/platform/env.js';
+
 export const router = Router();
 router.get('/api/config', (_req, res) => {
     const config: AppConfig = {

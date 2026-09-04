@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+
 import { LANGUAGE_AUTO, detectLanguage, resolveSpokenLanguage } from './language.js';
+
 const SUPPORTED = ['en-US', 'hi-IN', 'es-ES'] as const;
 describe('detectLanguage', () => {
     it('reads the writing system when there is one', () => {
@@ -29,10 +31,12 @@ describe('resolveSpokenLanguage', () => {
         expect(resolveSpokenLanguage('hi-IN', SUPPORTED, { locale: 'es-ES' })).toBe('hi-IN');
     });
     it('prefers what the shopper has already typed over their browser locale', () => {
-        expect(resolveSpokenLanguage(LANGUAGE_AUTO, SUPPORTED, {
-            text: '¿Cuánto cuesta?',
-            locale: 'en-US',
-        })).toBe('es-ES');
+        expect(
+            resolveSpokenLanguage(LANGUAGE_AUTO, SUPPORTED, {
+                text: '¿Cuánto cuesta?',
+                locale: 'en-US',
+            }),
+        ).toBe('es-ES');
     });
     it('falls back to the browser locale, matching on base language', () => {
         expect(resolveSpokenLanguage(LANGUAGE_AUTO, SUPPORTED, { locale: 'hi-IN' })).toBe('hi-IN');

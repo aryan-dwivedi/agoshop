@@ -1,0 +1,71 @@
+import { randomUUID } from 'node:crypto';
+import { setTimeout as sleep } from 'node:timers/promises';
+
+import { logger } from '@shop/platform/lib/logger.js';
+
+export const PREAUTH_DELAY_MS = 200;
+export type PaymentCard = {
+    number: string;
+    expiry?: string;
+    cvv?: string;
+    name?: string;
+};
+export type PreauthorizeInput = {
+    method: string;
+    amountMinorUnits: number;
+    card?: PaymentCard | null;
+};
+export type PreauthorizeResult =
+    | {
+          ok: true;
+          paymentRef: string;
+      }
+    | {
+          ok: false;
+          reason: 'card_declined' | 'invalid_amount' | 'card_required';
+      };
+const CARD_METHODS: Record<string, true> = { card: true, emi: true };
+export const preauthorize = async (input: PreauthorizeInput): Promise<PreauthorizeResult> => {
+    await sleep(PREAUTH_DELAY_MS);
+    if (!Number.isInteger(input.amountMinorUnits) || input.amountMinorUnits <= 0) {
+        return { ok: false, reason: 'invalid_amount' };
+    }
+    const digits = input.card?.number?.replace(/\D/g, '') ?? '';
+    if (CARD_METHODS[input.method]) {
+        if (digits.length < 12) return { ok: false, reason: 'card_required' };
+    }
+    if (digits.endsWith('0000')) return { ok: false, reason: 'card_declined' };
+    const paymentRef = `mockpay_${randomUUID()}`;
+    logger.info(
+        {
+            paymentRef,
+            method: input.method,
+            amountMinorUnits: input.amountMinorUnits,
+        },
+        'mock pre-authorization granted (no external call)',
+    );
+    return { ok: true, paymentRef };
+};
+export const voidPreauthorization = async (paymentRef: string): Promise<void> => {
+    logger.info({ paymentRef }, 'mock pre-authorization voided (no external call)');
+    await Promise.resolve();
+};
+export const authorize = preauthorize;
+export type CaptureResult =
+    | {
+          ok: true;
+          captureRef: string;
+      }
+    | {
+          ok: false;
+          reason: 'capture_failed' | 'not_authorized';
+      };
+export const capture = async (paymentRef: string): Promise<CaptureResult> => {
+    await sleep(50);
+    if (!paymentRef.startsWith('mockpay_')) {
+        return { ok: false, reason: 'not_authorized' };
+    }
+    const captureRef = `${paymentRef}_cap`;
+    logger.info({ paymentRef, captureRef }, 'mock payment captured (no external call)');
+    return { ok: true, captureRef };
+};

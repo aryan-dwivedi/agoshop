@@ -1,17 +1,21 @@
 {
-  "name": "@shop/domain-live",
-  "private": true,
-  "version": "1.0.0",
-  "type": "module",
-  "exports": {
-    ".": "./src/index.ts",
-    "./sessions": "./src/sessions.ts",
-    "./chat": "./src/chat.ts",
-    "./reactions": "./src/reactions.ts"
-  },
-  "dependencies": {
-    "@shop/api": "*",
-    "@shop/db": "*",
-    "@shop/shared": "*"
-  }
+    "name": "@shop/domain-live",
+    "private": true,
+    "version": "1.0.0",
+    "type": "module",
+    "exports": {
+        ".": "./src/index.ts",
+        "./sessions": "./src/sessions.ts",
+        "./chat": "./src/chat.ts",
+        "./reactions": "./src/reactions.ts",
+        "./*": "./src/*"
+    },
+    "dependencies": {
+        "@shop/agora": "*",
+        "@shop/db": "*",
+        "@shop/domain-commerce": "*",
+        "@shop/platform": "*",
+        "@shop/shared": "*",
+        "drizzle-orm": "^0.38.3"
+    }
 }

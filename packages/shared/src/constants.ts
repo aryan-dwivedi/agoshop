@@ -2,12 +2,14 @@ export const DEFAULT_CHAT_SERVICE_ACCOUNT = 'chat-service';
 export const rtmAccountForUser = (userId: string): string => `user-${userId}`;
 export const liveChannelForSlug = (slug: string): string => `live-${slug}`;
 export const aiChannelForConversation = (conversationId: string): string => `ai-${conversationId}`;
-export const chatShardChannel = (slug: string, shardIndex: number): string => `chat-${slug}-${shardIndex}`;
+export const chatShardChannel = (slug: string, shardIndex: number): string =>
+    `chat-${slug}-${shardIndex}`;
 export const MAX_CHAT_SHARDS = 49;
 export const SAMPLE_VOD_FALLBACK_URL = '/media/recordings/sample-session.mp4';
 export const SAMPLE_HLS_FALLBACK_URL = '/media/recordings/simulated-origin/index.m3u8';
 export const SAMPLE_LIVE_SOURCE_URL = '/media/recordings/live-source.mp4';
 export const liveSourceForSlug = (slug: string): string => `/media/recordings/live-${slug}.mp4`;
-export const simulatedHlsForSlug = (slug: string): string => `/media/recordings/simulated-origin/${slug}/index.m3u8`;
+export const simulatedHlsForSlug = (slug: string): string =>
+    `/media/recordings/simulated-origin/${slug}/index.m3u8`;
 export const sessionCoverForSlug = (slug: string): string => `/media/recordings/covers/${slug}.jpg`;
 export const CURRENCY = 'INR';

@@ -6,115 +6,101 @@
 # - Services spin down after ~15 minutes of inactivity (cold starts ~1 minute).
 # - Free Postgres expires 30 days after creation (upgrade to keep data).
 # - No persistent disk; session recordings are ephemeral.
-# - 512 MB RAM: voice uses Agora managed TTS (no local speech stack).
+# - 512 MB RAM: voice uses Agora managed TTS (no Kokoro in-process).
 services:
-  - type: web
-    runtime: docker
-    name: agoshop
-    region: singapore
-    plan: free
-    dockerfilePath: ./infra/Dockerfile.free
-    dockerContext: .
-    healthCheckPath: /api/health/live
-    envVars:
-      - fromGroup: agoshop-runtime-free
-      - key: DATABASE_URL
-        fromDatabase:
-          name: agoshop-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: agoshop-redis
-          property: connectionString
-      - key: PUBLIC_API_URL
-        fromService:
-          type: web
-          name: agoshop
-          envVarKey: RENDER_EXTERNAL_URL
-      - key: WEB_ORIGIN
-        fromService:
-          type: web
-          name: agoshop
-          envVarKey: RENDER_EXTERNAL_URL
+    - type: web
+      runtime: docker
+      name: agoshop
+      region: singapore
+      plan: free
+      dockerfilePath: ./infra/Dockerfile.free
+      dockerContext: .
+      healthCheckPath: /api/health/live
+      envVars:
+          - fromGroup: agoshop-runtime-free
+          - key: DATABASE_URL
+            fromDatabase:
+                name: agoshop-db
+                property: connectionString
+          - key: REDIS_URL
+            fromService:
+                type: keyvalue
+                name: agoshop-redis
+                property: connectionString
+          - key: PUBLIC_API_URL
+            fromService:
+                type: web
+                name: agoshop
+                envVarKey: RENDER_EXTERNAL_URL
+          - key: WEB_ORIGIN
+            fromService:
+                type: web
+                name: agoshop
+                envVarKey: RENDER_EXTERNAL_URL
 
-  - type: keyvalue
-    name: agoshop-redis
-    region: singapore
-    plan: free
-    ipAllowList: []
-    maxmemoryPolicy: allkeys-lru
-    persistenceMode: off
+    - type: keyvalue
+      name: agoshop-redis
+      region: singapore
+      plan: free
+      ipAllowList: []
+      maxmemoryPolicy: allkeys-lru
+      persistenceMode: off
 
 databases:
-  - name: agoshop-db
-    region: singapore
-    plan: free
-    databaseName: agoshop
-    user: agoshop
-    postgresMajorVersion: '16'
-    ipAllowList: []
+    - name: agoshop-db
+      region: singapore
+      plan: free
+      databaseName: agoshop
+      user: agoshop
+      postgresMajorVersion: '16'
+      ipAllowList: []
 
 envVarGroups:
-  - name: agoshop-runtime-free
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: TRUST_PROXY_HOPS
-        value: '1'
-      - key: SESSION_COOKIE_SECRET
-        generateValue: true
-      - key: CONVO_LLM_SHARED_SECRET
-        generateValue: true
-      - key: AGORA_APP_ID
-        sync: false
-      - key: AGORA_APP_CERTIFICATE
-        sync: false
-      - key: AGORA_CUSTOMER_ID
-        sync: false
-      - key: AGORA_CUSTOMER_SECRET
-        sync: false
-      - key: AGORA_WEBHOOK_SECRET
-        sync: false
+    - name: agoshop-runtime-free
+      envVars:
+          - key: NODE_ENV
+            value: production
+          - key: TRUST_PROXY_HOPS
+            value: '1'
+          - key: SESSION_COOKIE_SECRET
+            generateValue: true
+          - key: CONVO_LLM_SHARED_SECRET
+            generateValue: true
+          - key: AGORA_APP_ID
+            sync: false
+          - key: AGORA_APP_CERTIFICATE
+            sync: false
+          - key: AGORA_CUSTOMER_ID
+            sync: false
+          - key: AGORA_CUSTOMER_SECRET
+            sync: false
+          - key: AGORA_WEBHOOK_SECRET
+            sync: false
       - key: LLM_PROVIDER
-        value: openrouter
-      - key: LLM_BASE_URL
-        value: https://openrouter.ai/api/v1
-      - key: LLM_API_KEY
-        sync: false
-      - key: LLM_MODEL
-        value: inclusionai/ling-3.0-flash-fin:free
+        value: mock
       - key: CONVOAI_ENABLED
         value: 'true'
-      - key: CONVOAI_LLM_MODE
-        value: custom
-      - key: CONVOAI_ASR_CREDENTIAL_MODE
-        value: byok
       - key: CONVOAI_TTS_VENDOR
-        value: elevenlabs
-      - key: CONVOAI_TTS_MODEL
-        value: eleven_multilingual_v2
+        value: minimax
+      - key: AGORA_MANAGED_LLM_MODEL
+        value: gpt-4o-mini
       - key: CONVOAI_TTS_VOICE
-        value: 21m00Tcm4TlvDq8ikWAM
-      - key: ELEVENLABS_API_KEY
-        sync: false
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: RECORDING_PROVIDER
-        value: browser
-      - key: RECORDING_LOCAL_DIR
-        value: /tmp/recordings
-      - key: RECORDING_LOCAL_FILE_PURGE
-        value: 'true'
-      - key: SEARCH_PROVIDER
-        value: postgres
-      - key: CHECKOUT_MODE
-        value: async
-      - key: PRIVACY_MODE
-        value: standard
-      - key: PII_REDACTION
-        value: 'true'
-      - key: PG_POOL_MAX
-        value: '5'
-      - key: NODE_OPTIONS
-        value: '--max-old-space-size=256'
+        value: English_Reserved_Woman
+          - key: RECORDING_PROVIDER
+            value: browser
+          - key: RECORDING_LOCAL_DIR
+            value: /tmp/recordings
+          - key: RECORDING_LOCAL_FILE_PURGE
+            value: 'true'
+          - key: SEARCH_PROVIDER
+            value: postgres
+          - key: CHECKOUT_MODE
+            value: async
+          - key: PRIVACY_MODE
+            value: standard
+          - key: PII_REDACTION
+            value: 'true'
+          - key: PG_POOL_MAX
+            value: '5'
+          - key: NODE_OPTIONS
+            value: '--max-old-space-size=256'

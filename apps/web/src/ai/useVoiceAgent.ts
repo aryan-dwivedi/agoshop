@@ -1,14 +1,39 @@
-import { AgoraVoiceAI, AgoraVoiceAIEvents, AgentState, MessageType, TranscriptHelperMode, TurnStatus, type RTCEngine, type RTMEngine, } from 'agora-agent-client-toolkit';
-import AgoraRTC, { type IAgoraRTCClient, type IAgoraRTCRemoteUser, type IMicrophoneAudioTrack, type IRemoteAudioTrack, } from 'agora-rtc-sdk-ng';
+import type { UseTextAssistResult } from './useTextAssist';
+import type { AiProductCard, CreateConversationDto, ServerEvent, Surface } from '@shop/shared';
+import type { AgentState, RTCEngine, RTMEngine } from 'agora-agent-client-toolkit';
+import type {
+    IAgoraRTCClient,
+    IAgoraRTCRemoteUser,
+    IMicrophoneAudioTrack,
+    IRemoteAudioTrack,
+} from 'agora-rtc-sdk-ng';
+
+import {
+    AgoraVoiceAI,
+    AgoraVoiceAIEvents,
+    MessageType,
+    TranscriptHelperMode,
+    TurnStatus,
+} from 'agora-agent-client-toolkit';
+import AgoraRTC from 'agora-rtc-sdk-ng';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { aiChannelForConversation, EVENTS, LANGUAGE_AUTO, resolveSpokenLanguage, type AiProductCard, type CreateConversationDto, type ServerEvent, type Surface, } from '@shop/shared';
-import { api, ApiError } from '../lib/api';
+
+import {
+    EVENTS,
+    LANGUAGE_AUTO,
+    aiChannelForConversation,
+    resolveSpokenLanguage,
+} from '@shop/shared';
+
+import { ApiError, api } from '../lib/api';
 import { useServerEvents } from '../lib/useServerEvents';
 import { useRtm } from '../realtime/RtmProvider';
 import { useSession } from '../state/session';
-import { useTextAssist, type UseTextAssistResult } from './useTextAssist';
+import { useTextAssist } from './useTextAssist';
 import { orderVoiceTranscript, voiceTranscriptKey } from './voiceTranscript';
-export type VoiceAgentPhase = 'idle' | 'starting' | 'active' | 'stopping' | 'human_waiting' | 'human_active' | 'error';
+
+export type VoiceAgentPhase =
+    'idle' | 'starting' | 'active' | 'stopping' | 'human_waiting' | 'human_active' | 'error';
 export type VoiceAgentMode = 'text' | 'voice';
 export type AssistantLine = {
     key: string;
@@ -33,14 +58,15 @@ const VOICE_BUSY = "Voice is busy right now — keep typing and I'll answer.";
 const VOICE_FAILED = "Voice didn't connect — keep typing and I'll answer.";
 const VOICE_DROPPED = "Voice dropped — keep typing and I'll answer.";
 const ACTION_FAILED = "That didn't go through — try again.";
-const CONVOAI_CATALOG_FAILURE = "couldn't reach the catalog";
 const TOOL_PROTOCOL_PREFIX = '<tool_call>';
 export const isToolProtocolText = (text: string): boolean => {
     const normalized = text.trimStart().toLowerCase();
-    return (normalized.length > 0 &&
+    return (
+        normalized.length > 0 &&
         (TOOL_PROTOCOL_PREFIX.startsWith(normalized) ||
             normalized.startsWith(TOOL_PROTOCOL_PREFIX) ||
-            normalized.startsWith('</tool_call>')));
+            normalized.startsWith('</tool_call>'))
+    );
 };
 const HEARTBEAT_MS = 30000;
 const DUCKED_VOLUME = 15;
@@ -77,7 +103,6 @@ export const useVoiceAgent = (opts: {
     rtmRef.current = rtm;
     const duckRef = useRef<IRemoteAudioTrack | null>(duckTrack ?? null);
     const sessionRef = useRef<ActiveSession | null>(null);
-    const llmFallbackAttemptedRef = useRef(false);
     const contextRef = useRef({ surface, liveSessionId, productId });
     const supportAudioRef = useRef<IRemoteAudioTrack | null>(null);
     const supportUidRef = useRef<number | null>(null);
@@ -104,34 +129,42 @@ export const useVoiceAgent = (opts: {
     supportedRef.current = supportedLanguages;
     const lastUserTextRef = useRef<string | null>(null);
     const textCountRef = useRef(0);
-    const resolveLanguage = useCallback((): string => resolveSpokenLanguage(languageRef.current, supportedRef.current, {
-        text: lastUserTextRef.current,
-        locale: languageRef.current === LANGUAGE_AUTO && user && !user.isGuest && user.preferredLanguage
-            ? user.preferredLanguage
-            : navigator.language,
-    }), [user]);
+    const resolveLanguage = useCallback(
+        (): string =>
+            resolveSpokenLanguage(languageRef.current, supportedRef.current, {
+                text: lastUserTextRef.current,
+                locale:
+                    languageRef.current === LANGUAGE_AUTO &&
+                    user &&
+                    !user.isGuest &&
+                    user.preferredLanguage
+                        ? user.preferredLanguage
+                        : navigator.language,
+            }),
+        [user],
+    );
     const pendingTextCreateRef = useRef<Promise<string> | null>(null);
     const ensureTextConversation = useCallback(async (): Promise<string> => {
         const existing = conversationIdRef.current;
-        if (existing)
-            return existing;
+        if (existing) return existing;
         const inFlight = pendingTextCreateRef.current;
-        if (inFlight)
-            return inFlight;
+        if (inFlight) return inFlight;
         const create = (async (): Promise<string> => {
             try {
-                const conversation = await api.post<CreateConversationDto>('/api/ai/conversations', {
-                    surface: contextRef.current.surface,
-                    liveSessionId: contextRef.current.liveSessionId ?? null,
-                    productId: contextRef.current.productId ?? null,
-                    language: languageRef.current,
-                    transport: 'text',
-                });
+                const conversation = await api.post<CreateConversationDto>(
+                    '/api/ai/conversations',
+                    {
+                        surface: contextRef.current.surface,
+                        liveSessionId: contextRef.current.liveSessionId ?? null,
+                        productId: contextRef.current.productId ?? null,
+                        language: languageRef.current,
+                        transport: 'text',
+                    },
+                );
                 conversationIdRef.current = conversation.conversationId;
                 setConversationId(conversation.conversationId);
                 return conversation.conversationId;
-            }
-            finally {
+            } finally {
                 pendingTextCreateRef.current = null;
             }
         })();
@@ -157,16 +190,13 @@ export const useVoiceAgent = (opts: {
     spokenLanguageRef.current = spokenLanguage;
     const textTurnCount = textAssist.messages.length;
     useEffect(() => {
-        if (textTurnCount > 0)
-            setError(null);
+        if (textTurnCount > 0) setError(null);
     }, [textTurnCount]);
     useEffect(() => {
         const previous = duckRef.current;
-        if (previous && previous !== duckTrack)
-            previous.setVolume(FULL_VOLUME);
+        if (previous && previous !== duckTrack) previous.setVolume(FULL_VOLUME);
         duckRef.current = duckTrack ?? null;
-        if (duckTrack && sessionRef.current)
-            duckTrack.setVolume(DUCKED_VOLUME);
+        if (duckTrack && sessionRef.current) duckTrack.setVolume(DUCKED_VOLUME);
     }, [duckTrack]);
     const teardownMedia = useCallback(async (): Promise<void> => {
         const active = sessionRef.current;
@@ -175,8 +205,7 @@ export const useVoiceAgent = (opts: {
         supportAudioRef.current = null;
         supportUidRef.current = null;
         setSupportAudioReady(false);
-        if (!active)
-            return;
+        if (!active) return;
         window.clearInterval(active.heartbeat);
         active.toolkit.removeAllEventListeners();
         active.toolkit.unsubscribe();
@@ -185,16 +214,12 @@ export const useVoiceAgent = (opts: {
         active.client.removeAllListeners();
         try {
             await active.client.unpublish([active.mic]);
-        }
-        catch {
-        }
+        } catch {}
         active.mic.stop();
         active.mic.close();
         try {
             await active.client.leave();
-        }
-        catch {
-        }
+        } catch {}
         duckRef.current?.setVolume(FULL_VOLUME);
     }, []);
     const stop = useCallback(async (): Promise<void> => {
@@ -204,9 +229,7 @@ export const useVoiceAgent = (opts: {
         if (id) {
             try {
                 await api.post(`/api/ai/conversations/${id}/stop`);
-            }
-            catch {
-            }
+            } catch {}
         }
         conversationIdRef.current = null;
         setConversationId(null);
@@ -217,8 +240,7 @@ export const useVoiceAgent = (opts: {
         setPhase('idle');
     }, [teardownMedia]);
     const start = useCallback(async (): Promise<void> => {
-        if (sessionRef.current || phase === 'starting')
-            return;
+        if (sessionRef.current || phase === 'starting') return;
         const appId = config?.agoraAppId;
         if (!appId) {
             setError(VOICE_UNAVAILABLE);
@@ -231,7 +253,6 @@ export const useVoiceAgent = (opts: {
         setHandoffNotice(null);
         setCapacityNotice(null);
         setVoiceLines([]);
-        llmFallbackAttemptedRef.current = false;
         setVoiceAnchor(textCountRef.current);
         const superseded = conversationIdRef.current;
         if (superseded) {
@@ -253,18 +274,21 @@ export const useVoiceAgent = (opts: {
             });
             conversationIdRef.current = conversation.conversationId;
             setConversationId(conversation.conversationId);
-            const channel = conversation.rtcChannel || aiChannelForConversation(conversation.conversationId);
+            const channel =
+                conversation.rtcChannel || aiChannelForConversation(conversation.conversationId);
             client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
             client.on('user-published', (remote: IAgoraRTCRemoteUser, mediaType) => {
-                if (mediaType !== 'audio')
-                    return;
+                if (mediaType !== 'audio') return;
                 void (async () => {
                     try {
                         await client?.subscribe(remote, 'audio');
                         const track = remote.audioTrack;
                         track?.play();
-                        if (track &&
-                            (phaseRef.current === 'human_waiting' || phaseRef.current === 'human_active')) {
+                        if (
+                            track &&
+                            (phaseRef.current === 'human_waiting' ||
+                                phaseRef.current === 'human_active')
+                        ) {
                             supportAudioRef.current = track;
                             setSupportAudioReady(true);
                         }
@@ -273,21 +297,26 @@ export const useVoiceAgent = (opts: {
                             setPhase('human_active');
                             setHandoffNotice('Support audio is connected. You can speak now.');
                         }
-                    }
-                    catch {
-                        if (phaseRef.current === 'human_waiting' || phaseRef.current === 'human_active') {
-                            setHandoffNotice('The support agent joined, but their audio could not play. Check your speaker volume and reconnect.');
-                        }
-                        else {
+                    } catch {
+                        if (
+                            phaseRef.current === 'human_waiting' ||
+                            phaseRef.current === 'human_active'
+                        ) {
+                            setHandoffNotice(
+                                'The support agent joined, but their audio could not play. Check your speaker volume and reconnect.',
+                            );
+                        } else {
                             setError(VOICE_DROPPED);
                         }
                     }
                 })();
             });
             client.on('user-unpublished', (remote, mediaType) => {
-                if (mediaType !== 'audio' ||
+                if (
+                    mediaType !== 'audio' ||
                     supportUidRef.current === null ||
-                    String(remote.uid) !== String(supportUidRef.current)) {
+                    String(remote.uid) !== String(supportUidRef.current)
+                ) {
                     return;
                 }
                 supportAudioRef.current = null;
@@ -297,8 +326,10 @@ export const useVoiceAgent = (opts: {
                 setHandoffNotice('Support audio paused. Reconnecting the agent…');
             });
             client.on('user-left', (remote) => {
-                if (supportUidRef.current === null ||
-                    String(remote.uid) !== String(supportUidRef.current)) {
+                if (
+                    supportUidRef.current === null ||
+                    String(remote.uid) !== String(supportUidRef.current)
+                ) {
                     return;
                 }
                 supportAudioRef.current = null;
@@ -317,39 +348,33 @@ export const useVoiceAgent = (opts: {
             await client.publish([mic]);
             releaseRtm = await rtmRef.current.subscribe(channel, () => undefined);
             const rtmClient = rtmRef.current.client;
-            if (!rtmClient)
-                throw new Error('rtm_unavailable');
+            if (!rtmClient) throw new Error('rtm_unavailable');
             toolkit = await AgoraVoiceAI.init({
                 rtcEngine: client as RTCEngine,
                 rtmEngine: rtmClient as RTMEngine,
                 renderMode: TranscriptHelperMode.TEXT,
             });
             toolkit.on(AgoraVoiceAIEvents.TRANSCRIPT_UPDATED, (transcription) => {
-                setVoiceLines(orderVoiceTranscript(transcription)
-                    .filter((item) => item.metadata?.object === MessageType.USER_TRANSCRIPTION ||
-                    !isToolProtocolText(item.text))
-                    .map((item) => ({
-                    key: voiceTranscriptKey(item),
-                    role: item.metadata?.object === MessageType.USER_TRANSCRIPTION ? 'user' : 'assistant',
-                    text: item.text,
-                    language: item.metadata?.language ?? spokenLanguageRef.current,
-                    final: item.status === TurnStatus.END,
-                    products: [],
-                    turnId: item.turn_id,
-                })));
-                const failed = transcription.some((item) => item.metadata?.object !== MessageType.USER_TRANSCRIPTION &&
-                    item.status === TurnStatus.END &&
-                    item.text.includes(CONVOAI_CATALOG_FAILURE));
-                const conversationId = conversationIdRef.current;
-                if (failed && conversationId && !llmFallbackAttemptedRef.current) {
-                    llmFallbackAttemptedRef.current = true;
-                    void api
-                        .post<{
-                        agentId: string;
-                        llmMode: string;
-                    }>(`/api/ai/conversations/${conversationId}/llm-fallback`)
-                        .catch(() => undefined);
-                }
+                setVoiceLines(
+                    orderVoiceTranscript(transcription)
+                        .filter(
+                            (item) =>
+                                item.metadata?.object === MessageType.USER_TRANSCRIPTION ||
+                                !isToolProtocolText(item.text),
+                        )
+                        .map((item) => ({
+                            key: voiceTranscriptKey(item),
+                            role:
+                                item.metadata?.object === MessageType.USER_TRANSCRIPTION
+                                    ? 'user'
+                                    : 'assistant',
+                            text: item.text,
+                            language: item.metadata?.language ?? spokenLanguageRef.current,
+                            final: item.status === TurnStatus.END,
+                            products: [],
+                            turnId: item.turn_id,
+                        })),
+                );
             });
             toolkit.on(AgoraVoiceAIEvents.AGENT_STATE_CHANGED, (_agentUserId, event) => {
                 setAgentState(event.state);
@@ -373,8 +398,7 @@ export const useVoiceAgent = (opts: {
             duckRef.current?.setVolume(DUCKED_VOLUME);
             setMicTrack(mic);
             setPhase('active');
-        }
-        catch (err) {
+        } catch (err) {
             if (toolkit) {
                 toolkit.removeAllEventListeners();
                 toolkit.unsubscribe();
@@ -386,16 +410,15 @@ export const useVoiceAgent = (opts: {
                 if (mic) {
                     try {
                         await client.unpublish([mic]);
-                    }
-                    catch {
-                    }
+                    } catch {}
                 }
                 await client.leave().catch(() => undefined);
             }
             mic?.stop();
             mic?.close();
             setMode('text');
-            const capacityExhausted = err instanceof ApiError && err.status === 503 && err.code === 'ai_capacity';
+            const capacityExhausted =
+                err instanceof ApiError && err.status === 503 && err.code === 'ai_capacity';
             if (capacityExhausted && conversation) {
                 setCapacityNotice(VOICE_BUSY);
                 setPhase('idle');
@@ -420,54 +443,63 @@ export const useVoiceAgent = (opts: {
         AgoraRTC.resumeAudioContext();
         supportAudioRef.current?.play();
     }, []);
-    const onSupportEvent = useCallback((event: ServerEvent) => {
-        if (event.event === EVENTS.supportEscalated) {
-            const data = event.data as {
-                conversationId?: string;
-            };
-            if (data.conversationId && data.conversationId !== conversationIdRef.current)
+    const onSupportEvent = useCallback(
+        (event: ServerEvent) => {
+            if (event.event === EVENTS.supportEscalated) {
+                const data = event.data as {
+                    conversationId?: string;
+                };
+                if (data.conversationId && data.conversationId !== conversationIdRef.current)
+                    return;
+                phaseRef.current = 'human_waiting';
+                setHandoffNotice(
+                    'Your request is in the support queue. Keep this window open and your microphone on.',
+                );
+                setPhase('human_waiting');
+                setAgentState(null);
                 return;
-            phaseRef.current = 'human_waiting';
-            setHandoffNotice('Your request is in the support queue. Keep this window open and your microphone on.');
-            setPhase('human_waiting');
-            setAgentState(null);
-            return;
-        }
-        if (event.event === EVENTS.supportAgentJoined) {
-            const data = event.data as {
-                conversationId?: string;
-                supportUid?: number;
-            };
-            if (data.conversationId && data.conversationId !== conversationIdRef.current)
-                return;
-            supportUidRef.current = data.supportUid ?? null;
-            if (phaseRef.current !== 'human_active') {
-                setHandoffNotice('A support agent joined. Connecting their audio…');
             }
-            return;
-        }
-        if (event.event === EVENTS.supportCallEnded) {
-            const data = event.data as {
-                conversationId?: string;
-            };
-            if (data.conversationId && data.conversationId !== conversationIdRef.current)
+            if (event.event === EVENTS.supportAgentJoined) {
+                const data = event.data as {
+                    conversationId?: string;
+                    supportUid?: number;
+                };
+                if (data.conversationId && data.conversationId !== conversationIdRef.current)
+                    return;
+                supportUidRef.current = data.supportUid ?? null;
+                if (phaseRef.current !== 'human_active') {
+                    setHandoffNotice('A support agent joined. Connecting their audio…');
+                }
                 return;
-            phaseRef.current = 'idle';
-            conversationIdRef.current = null;
-            setConversationId(null);
-            setMode('text');
-            setPhase('idle');
-            setAgentState(null);
-            setHandoffNotice('Your support call has ended. You can continue shopping or start a new chat.');
-            void teardownMedia();
-        }
-    }, [teardownMedia]);
-    useServerEvents({ enabled: conversationId !== null, onEvent: onSupportEvent });
+            }
+            if (event.event === EVENTS.supportCallEnded) {
+                const data = event.data as {
+                    conversationId?: string;
+                };
+                if (data.conversationId && data.conversationId !== conversationIdRef.current)
+                    return;
+                phaseRef.current = 'idle';
+                conversationIdRef.current = null;
+                setConversationId(null);
+                setMode('text');
+                setPhase('idle');
+                setAgentState(null);
+                setHandoffNotice(
+                    'Your support call has ended. You can continue shopping or start a new chat.',
+                );
+                void teardownMedia();
+            }
+        },
+        [teardownMedia],
+    );
+    useServerEvents({
+        enabled: conversationId !== null,
+        onEvent: onSupportEvent,
+    });
     useEffect(() => {
         const onBeforeUnload = (): void => {
             const active = sessionRef.current;
-            if (!active)
-                return;
+            if (!active) return;
             void fetch(`/api/ai/conversations/${active.conversationId}/stop`, {
                 method: 'POST',
                 credentials: 'include',
@@ -477,8 +509,7 @@ export const useVoiceAgent = (opts: {
         window.addEventListener('beforeunload', onBeforeUnload);
         return () => {
             window.removeEventListener('beforeunload', onBeforeUnload);
-            if (sessionRef.current)
-                void stopRef.current();
+            if (sessionRef.current) void stopRef.current();
         };
     }, []);
     const textLines: AssistantLine[] = textAssist.messages.map((message) => ({
@@ -490,9 +521,10 @@ export const useVoiceAgent = (opts: {
         products: message.products,
         turnId: null,
     }));
-    const lines: AssistantLine[] = voiceLines.length === 0
-        ? textLines
-        : [...textLines.slice(0, voiceAnchor), ...voiceLines, ...textLines.slice(voiceAnchor)];
+    const lines: AssistantLine[] =
+        voiceLines.length === 0
+            ? textLines
+            : [...textLines.slice(0, voiceAnchor), ...voiceLines, ...textLines.slice(voiceAnchor)];
     return {
         phase,
         mode,

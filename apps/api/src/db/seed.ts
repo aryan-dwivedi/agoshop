@@ -1,23 +1,39 @@
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+
 import bcrypt from 'bcryptjs';
 import { sql } from 'drizzle-orm';
-import { MAX_CHAT_SHARDS, SAMPLE_VOD_FALLBACK_URL, liveSourceForSlug, sessionCoverForSlug, } from '@shop/shared';
-import { env } from '../env.js';
-import { closeRedis, keys, redis } from '../lib/redis.js';
+
+import { env } from '@shop/platform/env.js';
+import { closeRedis, keys, redis } from '@shop/platform/lib/redis.js';
+import {
+    MAX_CHAT_SHARDS,
+    SAMPLE_VOD_FALLBACK_URL,
+    liveSourceForSlug,
+    sessionCoverForSlug,
+} from '@shop/shared';
+
 import { db, pool } from './client.js';
-import * as t from './schema.js';
 import { loadMarketplaceCatalog } from './marketplace-catalog.js';
+import * as t from './schema.js';
+
 const PASSWORD = 'demo1234';
 const MINUTE = 60000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 const now = Date.now();
 const at = (offsetMs: number): Date => new Date(now + offsetMs);
-const shardCountFor = (expectedPeakViewers: number): number => Math.min(Math.max(Math.ceil(expectedPeakViewers / env.RTM_CHAT_SHARD_TARGET), 1), MAX_CHAT_SHARDS);
-const shardIndexFor = (userId: string, chatShardCount: number): number => Number(BigInt(`0x${createHash('sha256').update(userId).digest('hex')}`) %
-    BigInt(Math.max(1, chatShardCount)));
+const shardCountFor = (expectedPeakViewers: number): number =>
+    Math.min(
+        Math.max(Math.ceil(expectedPeakViewers / env.RTM_CHAT_SHARD_TARGET), 1),
+        MAX_CHAT_SHARDS,
+    );
+const shardIndexFor = (userId: string, chatShardCount: number): number =>
+    Number(
+        BigInt(`0x${createHash('sha256').update(userId).digest('hex')}`) %
+            BigInt(Math.max(1, chatShardCount)),
+    );
 type SeedVariant = {
     sku: string;
     label: string;
@@ -73,7 +89,8 @@ const CATEGORIES: {
     {
         slug: 'jewellery',
         name: 'Jewellery',
-        imageUrl: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=900&q=80',
+        imageUrl:
+            'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=900&q=80',
     },
 ];
 const SELLERS: {
@@ -229,7 +246,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'pulse-audio',
         title: 'boAt Rockerz Plus 550',
         brand: 'boAt',
-        description: 'boAt Rockerz Plus 550 from boAt — finished in blue psyche. 50mm Drivers: Feel every beat with powerful 50mm drivers that pump out punchy audio. boAt Signature Sound brings rich bass and vibrant clarity to elevate music, movies, and more.',
+        description:
+            'boAt Rockerz Plus 550 from boAt — finished in blue psyche. 50mm Drivers: Feel every beat with powerful 50mm drivers that pump out punchy audio. boAt Signature Sound brings rich bass and vibrant clarity to elevate music, movies, and more.',
         highlights: [
             '50mm Drivers: Feel every beat with powerful 50mm drivers that pump out punchy audio. boAt Signature Sound brings rich bass and vibrant clarity to.',
             'Up to 100 Hours of Playback: Power through long playlists or back-to-back calls with up to 100 hours of battery life. Rockerz Plus 550 is built to.',
@@ -240,7 +258,8 @@ const PRODUCTS: SeedProduct[] = [
             Colour: 'Blue Psyche',
             'Headphone Jack': '3.5 mm Jack, Bluetooth',
             'Water Resistance Level': 'Water Resistant',
-            'Compatible Devices': 'Tablets, Desktops, Cellphones, Laptops, Smart Speaker, Television',
+            'Compatible Devices':
+                'Tablets, Desktops, Cellphones, Laptops, Smart Speaker, Television',
             'Ear Placement': 'Over Ear',
             'Form Factor': 'Over Ear',
             'Noise Control': 'Passive Noise Cancellation',
@@ -269,7 +288,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'pulse-audio',
         title: 'Sony WH-CH520 Wireless On-Ear',
         brand: 'Sony',
-        description: 'Sony WH-CH520 Wireless On-Ear from Sony — finished in taupe. With up to 50-hour battery life and quick charging, you’ll have enough power for multi-day road trips and long festival weekends.',
+        description:
+            'Sony WH-CH520 Wireless On-Ear from Sony — finished in taupe. With up to 50-hour battery life and quick charging, you’ll have enough power for multi-day road trips and long festival weekends.',
         highlights: [
             'With up to 50-hour battery life and quick charging, you’ll have enough power for multi-day road trips and long festival weekends.',
             'Great sound quality customizable to your music preference with EQ Custom on the Sony | Headphones Connect App.',
@@ -309,7 +329,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'pulse-audio',
         title: 'boAt Rockerz 512 ANC',
         brand: 'boAt',
-        description: 'boAt Rockerz 512 ANC from boAt — finished in cosmic black. 40mm Drivers: Experience dynamic sound with powerful 40mm drivers. From cinematic soundtracks to high-energy beats, the bass-heavy boAt Signature Sound ensures every moment hits hard.',
+        description:
+            'boAt Rockerz 512 ANC from boAt — finished in cosmic black. 40mm Drivers: Experience dynamic sound with powerful 40mm drivers. From cinematic soundtracks to high-energy beats, the bass-heavy boAt Signature Sound ensures every moment hits hard.',
         highlights: [
             '40dB Hybrid ANC: Dive into sound with the boAt Rockerz 512 ANC Bluetooth Headphones. Advanced hybrid Active Noise Cancellation technology effectively.',
             '80 Hours of Playback: Keep the music flowing with an incredible 80-hour battery life. Whether you are jamming to your playlist or catching up with.',
@@ -387,7 +408,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'pulse-audio',
         title: 'Noise Airwave Max 5 ANC',
         brand: 'Noise',
-        description: 'Noise Airwave Max 5 ANC from Noise — finished in calm beige. Premium Sound Quality: High Fidelity Acoustics powered by a 40mm driver, delivering crisp, well-balanced, and immersive audio.',
+        description:
+            'Noise Airwave Max 5 ANC from Noise — finished in calm beige. Premium Sound Quality: High Fidelity Acoustics powered by a 40mm driver, delivering crisp, well-balanced, and immersive audio.',
         highlights: [
             'Premium Sound Quality: High Fidelity Acoustics powered by a 40mm driver, delivering crisp, well-balanced, and immersive audio.',
             'Adaptive Hybrid ANC: Intelligent noise cancellation up to 50dB, ensuring a truly distraction-free experience wherever you go.',
@@ -427,7 +449,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'pulse-audio',
         title: 'realme Buds T310 ANC Earbuds',
         brand: 'realme',
-        description: 'realme Buds T310 ANC Earbuds from realme — finished in vibrant black. 360° Spatial Audio Effect | 12.4mm Dynamic Bass Driver.',
+        description:
+            'realme Buds T310 ANC Earbuds from realme — finished in vibrant black. 360° Spatial Audio Effect | 12.4mm Dynamic Bass Driver.',
         highlights: [
             '360° Spatial Audio Effect | 12.4mm Dynamic Bass Driver',
             '46dB Hybrid Noise Cancellation | 45ms Ultra Low Latency 12.4mm Dynamic Bass Driver 40 Hours Total Playback| Fast Charge :10 Min of Charge =5Hrs Play.',
@@ -466,7 +489,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'pulse-audio',
         title: 'Boult Z40 Wireless Earbuds',
         brand: 'GOBOULT',
-        description: 'Boult Z40 Wireless Earbuds from GOBOULT — finished in blue. ✅ Sweat and Water Resistant: Built for an active lifestyle, the Z40 earbuds are sweat and water-resistant, making them durable enough for workouts, runs, and outdoor adventures.',
+        description:
+            'Boult Z40 Wireless Earbuds from GOBOULT — finished in blue. ✅ Sweat and Water Resistant: Built for an active lifestyle, the Z40 earbuds are sweat and water-resistant, making them durable enough for workouts, runs, and outdoor adventures.',
         highlights: [
             '✅ Zen ENC Mic for Clear Calls: Communicate with ease using the advanced Zen Environmental Noise Cancellation (ENC) mic. This technology reduces.',
             '✅ Low Latency Gaming Mode: The Z40 earbuds feature a low latency mode, designed to minimize audio delay, enhancing your gaming experience with.',
@@ -506,7 +530,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'pulse-audio',
         title: 'JBL Quantum 100M2 Gaming Headset',
         brand: 'JBL',
-        description: 'JBL Quantum 100M2 Gaming Headset from JBL — finished in black. JBL QuantumSOUND Signature: Tuned by JBL’s world-class audiologists, the 40mm drivers deliver immersive, precision audio—from subtle in-game cues to explosive action.',
+        description:
+            'JBL Quantum 100M2 Gaming Headset from JBL — finished in black. JBL QuantumSOUND Signature: Tuned by JBL’s world-class audiologists, the 40mm drivers deliver immersive, precision audio—from subtle in-game cues to explosive action.',
         highlights: [
             'JBL QuantumSOUND Signature: Tuned by JBL’s world-class audiologists, the 40mm drivers deliver immersive, precision audio—from subtle in-game cues to.',
             'Voice-Focus Boom Microphone: Detachable, Omnidirectional mic with mute functionality ensures crystal-clear communication during multiplayer sessions.',
@@ -546,7 +571,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'pulse-audio',
         title: 'HyperX Cloud Stinger 2 Core',
         brand: 'HyperX',
-        description: 'HyperX Cloud Stinger 2 Core from HyperX — finished in black. Crisp, clear in-game sound: Cloud Stinger 2 Core’s 40mm directional drivers are tuned to provide enhanced bass for impactful, immersive game audio.',
+        description:
+            'HyperX Cloud Stinger 2 Core from HyperX — finished in black. Crisp, clear in-game sound: Cloud Stinger 2 Core’s 40mm directional drivers are tuned to provide enhanced bass for impactful, immersive game audio.',
         highlights: [
             'DTS Headphone:X Spatial Audio*: Unlock accurate 3D audio spatialization and localization! The included activation code provides 2 years of DTS.',
             'Crisp, clear in-game sound: Cloud Stinger 2 Core’s 40mm directional drivers are tuned to provide enhanced bass for impactful, immersive game audio.',
@@ -586,7 +612,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'pulse-audio',
         title: 'OnePlus Bullets Wireless Z3',
         brand: 'OnePlus',
-        description: 'OnePlus Bullets Wireless Z3 from OnePlus — finished in mambo midnight. [Ultra-fasting 10 minutes charging gives 27 hours of music] Hassle free quick charging without worrying of the low battery. A full charge BWZ3 gives upto 36 hours of music playback.',
+        description:
+            'OnePlus Bullets Wireless Z3 from OnePlus — finished in mambo midnight. [Ultra-fasting 10 minutes charging gives 27 hours of music] Hassle free quick charging without worrying of the low battery. A full charge BWZ3 gives upto 36 hours of music playback.',
         highlights: [
             '[Ultra-fasting 10 minutes charging gives 27 hours of music] Hassle free quick charging without worrying of the low battery. A full charge BWZ3 gives.',
             '[Meet the ace of bass with 12.4mm large drivers] Experience deep, punchy bass and incredibly rich audio detail at every frequency with larger driver.',
@@ -625,7 +652,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'cellverse',
         title: 'Samsung Galaxy A56 5G',
         brand: 'Samsung',
-        description: 'Samsung Galaxy A56 5G from Samsung — 256 GB storage, finished in awesome olive. Samsung Experience - Get defense grade security with Samsung Knox, hassle free payments with Tap and Pay on Samsung Wallet and seamless experience with the latest One UI.',
+        description:
+            'Samsung Galaxy A56 5G from Samsung — 256 GB storage, finished in awesome olive. Samsung Experience - Get defense grade security with Samsung Knox, hassle free payments with Tap and Pay on Samsung Wallet and seamless experience with the latest One UI.',
         highlights: [
             '2 Days Battery Life - Stay connected longer with a battery designed to last up to 2 days, all packed in 7.4mm slim design. Paired with high-speed.',
             'Samsung Experience - Get defense grade security with Samsung Knox, hassle free payments with Tap and Pay on Samsung Wallet and seamless experience.',
@@ -665,7 +693,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'cellverse',
         title: 'Samsung Galaxy S24 FE 5G',
         brand: 'Samsung',
-        description: "Samsung Galaxy S24 FE 5G from Samsung — 128 GB storage, finished in graphite. Experience life boosting AI with Galaxy AI's quick and clever assistance.",
+        description:
+            "Samsung Galaxy S24 FE 5G from Samsung — 128 GB storage, finished in graphite. Experience life boosting AI with Galaxy AI's quick and clever assistance.",
         highlights: [
             "Experience life boosting AI with Galaxy AI's quick and clever assistance",
             'FHD+ Dynamic AMOLED 2X display for an immersive viewing experience',
@@ -705,7 +734,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'cellverse',
         title: 'OPPO F33 Pro 5G',
         brand: 'OPPO',
-        description: 'OPPO F33 Pro 5G from OPPO — 256 GB storage, finished in misty forest. 50MP + 50MP Cameras – Flagship-Level Imaging:Capture like a pro with a 50MP rear camera + 50MP front camera, delivering exceptional clarity for both photos and selfies.',
+        description:
+            'OPPO F33 Pro 5G from OPPO — 256 GB storage, finished in misty forest. 50MP + 50MP Cameras – Flagship-Level Imaging:Capture like a pro with a 50MP rear camera + 50MP front camera, delivering exceptional clarity for both photos and selfies.',
         highlights: [
             '50MP + 50MP Cameras – Flagship-Level Imaging:Capture like a pro with a 50MP rear camera + 50MP front camera, delivering exceptional clarity for both.',
             '80W SUPERVOOC Fast Charging – Lightning Fast Power: Get back to full power quickly with 80W SUPERVOOC charging, minimizing downtime and maximizing.',
@@ -745,7 +775,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'cellverse',
         title: 'Samsung Galaxy A35 5G',
         brand: 'Samsung',
-        description: 'Samsung Galaxy A35 5G from Samsung — 128 GB storage, finished in awesome lilac. Inch) Super AMOLED Display with 19.5:9 Aspect Ratio, FHD+ Resolution with 2340 x 1080 Pixels , 389 PPI with 16M Colors and 120Hz Refresh Rate, Corning Gorilla Glass Victus+.',
+        description:
+            'Samsung Galaxy A35 5G from Samsung — 128 GB storage, finished in awesome lilac. Inch) Super AMOLED Display with 19.5:9 Aspect Ratio, FHD+ Resolution with 2340 x 1080 Pixels , 389 PPI with 16M Colors and 120Hz Refresh Rate, Corning Gorilla Glass Victus+.',
         highlights: [
             'DISPLAY - 16.83 Centimeters (6.6&#34',
             'Inch) Super AMOLED Display with 19.5:9 Aspect Ratio, FHD+ Resolution with 2340 x 1080 Pixels , 389 PPI with 16M Colors and 120Hz Refresh Rate.',
@@ -785,7 +816,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'cellverse',
         title: 'Redmi 15 5G',
         brand: 'Redmi',
-        description: 'Redmi 15 5G from Redmi — 256 GB storage, finished in midnight black. Powerful Qualcomm Snapdragon 6s Gen 3 Processor.',
+        description:
+            'Redmi 15 5G from Redmi — 256 GB storage, finished in midnight black. Powerful Qualcomm Snapdragon 6s Gen 3 Processor.',
         highlights: [
             '33W Charging, 18W Reverse Charging',
             'Powerful Qualcomm Snapdragon 6s Gen 3 Processor',
@@ -865,7 +897,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'cellverse',
         title: 'Samsung Galaxy M36 5G',
         brand: 'Samsung',
-        description: 'Samsung Galaxy M36 5G from Samsung — 128 GB storage, finished in serene green. Monster design and durability - 7.7mm Sleek mobile with Upgraded Camera Deco and Plastic Back, Gorilla Glass Victus+ Protection on front, 4x Better Scratch Resistance, 2.0 m Fall Endurance.',
+        description:
+            'Samsung Galaxy M36 5G from Samsung — 128 GB storage, finished in serene green. Monster design and durability - 7.7mm Sleek mobile with Upgraded Camera Deco and Plastic Back, Gorilla Glass Victus+ Protection on front, 4x Better Scratch Resistance, 2.0 m Fall Endurance.',
         highlights: [
             'Monster design and durability - 7.7mm Sleek mobile with Upgraded Camera Deco and Plastic Back, Gorilla Glass Victus+ Protection on front, 4x Better.',
             'Monster display - 6.7” Bigger Display, Super AMOLED Display with Vision Booster, Slimmer Bezels. Enjoy an immersive viewing experience even in bright.',
@@ -905,7 +938,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'cellverse',
         title: 'realme P4R 5G',
         brand: 'realme',
-        description: 'realme P4R 5G from realme — 128 GB storage, finished in silver glare. MASSIVE 8000mAh BATTERY: The realme P4R 5G is equipped with a huge 8000mAh battery, offering up to 12 hours of stable gaming and 7 years of long battery life.',
+        description:
+            'realme P4R 5G from realme — 128 GB storage, finished in silver glare. MASSIVE 8000mAh BATTERY: The realme P4R 5G is equipped with a huge 8000mAh battery, offering up to 12 hours of stable gaming and 7 years of long battery life.',
         highlights: [
             'MASSIVE 8000mAh BATTERY: The realme P4R 5G is equipped with a huge 8000mAh battery, offering up to 12 hours of stable gaming and 7 years of long.',
             '6 GB RAM with 128 GB storage',
@@ -945,7 +979,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'cellverse',
         title: 'Motorola G67 Power 5G',
         brand: 'Motorola',
-        description: 'Motorola G67 Power 5G from Motorola — 128 GB storage, finished in pantone cilantro. Unique Design: Eye-catching Pantone Cilantro color with a sleek, modern finish that adds a fresh and stylish touch.',
+        description:
+            'Motorola G67 Power 5G from Motorola — 128 GB storage, finished in pantone cilantro. Unique Design: Eye-catching Pantone Cilantro color with a sleek, modern finish that adds a fresh and stylish touch.',
         highlights: [
             'Unique Design: Eye-catching Pantone Cilantro color with a sleek, modern finish that adds a fresh and stylish touch.',
             '8 GB RAM with 128 GB storage',
@@ -985,7 +1020,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'cellverse',
         title: 'Redmi Note 15 SE 5G',
         brand: 'Redmi',
-        description: 'Redmi Note 15 SE 5G from Redmi — 128 GB storage, finished in crimson reserve. 5G CONNECTIVITY: The Redmi Note 15 SE 5G supports next-generation 5G networks, ensuring fast and reliable connectivity for seamless browsing, streaming, and communication.',
+        description:
+            'Redmi Note 15 SE 5G from Redmi — 128 GB storage, finished in crimson reserve. 5G CONNECTIVITY: The Redmi Note 15 SE 5G supports next-generation 5G networks, ensuring fast and reliable connectivity for seamless browsing, streaming, and communication.',
         highlights: [
             '5G CONNECTIVITY: The Redmi Note 15 SE 5G supports next-generation 5G networks, ensuring fast and reliable connectivity for seamless browsing.',
             'POWERFUL PERFORMANCE: Equipped with 6GB RAM and 128GB internal storage, this smartphone handles multitasking, gaming, and everyday tasks with ease.',
@@ -1025,7 +1061,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'casa-nido',
         title: 'Purezento Rustic Ceramic Bud Vases (Set of 3)',
         brand: 'PUREZENTO',
-        description: 'Purezento Rustic Ceramic Bud Vases (Set of 3) from PUREZENTO — finished in bud.',
+        description:
+            'Purezento Rustic Ceramic Bud Vases (Set of 3) from PUREZENTO — finished in bud.',
         highlights: [
             'Bottle silhouette',
             'Flowers theme',
@@ -1065,7 +1102,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'casa-nido',
         title: 'ExclusiveLane Dainty Flowers Mango Wood LED Lamp',
         brand: 'ExclusiveLane',
-        description: 'ExclusiveLane Dainty Flowers Mango Wood LED Lamp from ExclusiveLane — finished in shade: off-white with green hand-painting, base: dark brown & green. Handcrafted, Handcarved & Hand-Painted By Indian Artisans.',
+        description:
+            'ExclusiveLane Dainty Flowers Mango Wood LED Lamp from ExclusiveLane — finished in shade: off-white with green hand-painting, base: dark brown & green. Handcrafted, Handcarved & Hand-Painted By Indian Artisans.',
         highlights: [
             'Handcrafted, Handcarved & Hand-Painted By Indian Artisans.',
             'Inspired from the small flowering weeds that usually grow on their own in small gardens, fields, lawns or roadsides.Depicts a table lamp with small.',
@@ -1092,7 +1130,9 @@ const PRODUCTS: SeedProduct[] = [
             {
                 sku: 'EXCDAIFLOLAM-STD',
                 label: 'SHADE: Off-White With Green Hand-Painting, BASE: Dark Brown & Green',
-                attrs: { colour: 'SHADE: Off-White With Green Hand-Painting, BASE: Dark Brown & Green' },
+                attrs: {
+                    colour: 'SHADE: Off-White With Green Hand-Painting, BASE: Dark Brown & Green',
+                },
                 priceMinorUnits: 169900,
                 mrpMinorUnits: 324900,
                 stock: 51,
@@ -1105,7 +1145,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'casa-nido',
         title: 'Homesake Luxe Cone Gold Table Lamp',
         brand: 'Homesake',
-        description: 'Homesake Luxe Cone Gold Table Lamp from Homesake — finished in jute cylinder.',
+        description:
+            'Homesake Luxe Cone Gold Table Lamp from Homesake — finished in jute cylinder.',
         highlights: [
             '𝗖𝗢𝗡𝗘 𝗚𝗢𝗟𝗗 𝗧𝗔𝗕𝗟𝗘 𝗟𝗔𝗠𝗣: Features a polished metal gold finish cone-shaped base paired with a soft beige fabric drum shade for a.',
             '𝗗𝗜𝗠𝗘𝗡𝗦𝗜𝗢𝗡𝗦: Total height 41.9 cm, base width 7.6 cm, base height 21.5 cm, shade diameter 17.7 cm, and shade height 19 cm. Perfect for daily.',
@@ -1144,7 +1185,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'casa-nido',
         title: 'Textured Ceramic Plant Pots with Saucers (Set of 3)',
         brand: 'GardenZeek',
-        description: "Textured Ceramic Plant Pots with Saucers (Set of 3) from GardenZeek — finished in grey. Size - Large：6.7''D X 5. 5''H , Medium ：5.5''D X 4.2''H , Small ：4.2''D X 3.3''H.",
+        description:
+            "Textured Ceramic Plant Pots with Saucers (Set of 3) from GardenZeek — finished in grey. Size - Large：6.7''D X 5. 5''H , Medium ：5.5''D X 4.2''H , Small ：4.2''D X 3.3''H.",
         highlights: [
             'Material - Sturdy ceramic flower pots',
             "Size - Large：6.7''D X 5. 5''H , Medium ：5.5''D X 4.2''H , Small ：4.2''D X 3.3''H",
@@ -1184,7 +1226,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'casa-nido',
         title: 'ExclusiveLane Indigo Vines Table Planters (Set of 2)',
         brand: 'ExclusiveLane',
-        description: 'ExclusiveLane Indigo Vines Table Planters (Set of 2) from ExclusiveLane — finished in white, indigo and orange, size Set Of 2. Ideal to be used for planting your favourite plants.',
+        description:
+            'ExclusiveLane Indigo Vines Table Planters (Set of 2) from ExclusiveLane — finished in white, indigo and orange, size Set Of 2. Ideal to be used for planting your favourite plants.',
         highlights: [
             'Handmade in India by artisans.',
             'Ideal to be used for planting your favourite plants.',
@@ -1224,7 +1267,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'casa-nido',
         title: 'Artsense Golden Wishtree Wall Painting',
         brand: 'Artsense',
-        description: 'Artsense Golden Wishtree Wall Painting from Artsense — finished in multicolor, size 30 inches.',
+        description:
+            'Artsense Golden Wishtree Wall Painting from Artsense — finished in multicolor, size 30 inches.',
         highlights: ['Polished finish', 'Rectangular silhouette', 'Nature theme', 'Size 30 inches'],
         specs: {
             Colour: 'Multicolor',
@@ -1259,7 +1303,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'casa-nido',
         title: 'Hothouse Framed Flower Wall Art',
         brand: 'HOTHOUSE',
-        description: 'Hothouse Framed Flower Wall Art from HOTHOUSE — finished in art 2, size 13X17 INCH. QUALITY : The artwork is printed on 300 GSM thick paper with high quality printer and vibrant colors, to give it rich look.',
+        description:
+            'Hothouse Framed Flower Wall Art from HOTHOUSE — finished in art 2, size 13X17 INCH. QUALITY : The artwork is printed on 300 GSM thick paper with high quality printer and vibrant colors, to give it rich look.',
         highlights: [
             'QUALITY : The artwork is printed on 300 GSM thick paper with high quality printer and vibrant colors, to give it rich look.',
             'Frame Material Type: Engineered Wood',
@@ -1298,7 +1343,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'casa-nido',
         title: 'Vintage Metal Wall Clock',
         brand: 'MACODECO',
-        description: 'Vintage Metal Wall Clock from MACODECO — finished in golden, size Small. This decorative wall clock for the bedroom is crafted with precision, serving as both a functional clock and a beautiful piece of metal wall art for the living room.',
+        description:
+            'Vintage Metal Wall Clock from MACODECO — finished in golden, size Small. This decorative wall clock for the bedroom is crafted with precision, serving as both a functional clock and a beautiful piece of metal wall art for the living room.',
         highlights: [
             'This decorative wall clock for the bedroom is crafted with precision, serving as both a functional clock and a beautiful piece of metal wall art for.',
             'Perfect as a wall clock for the bedroom, this vintage clock combines traditional aesthetics with contemporary design, making it a versatile addition.',
@@ -1338,7 +1384,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'casa-nido',
         title: 'Funterest Gold Leaf Metal Wall Decor (Set of 3)',
         brand: 'FUNTEREST',
-        description: 'Funterest Gold Leaf Metal Wall Decor (Set of 3) from FUNTEREST — finished in gold wall art set of 3, size 11.8 X 17.7 In. BEAUTIFUL METAL ART WALL DECOR: This wall art for living room size 45 x 30 cm / 17.7 high&#34.',
+        description:
+            'Funterest Gold Leaf Metal Wall Decor (Set of 3) from FUNTEREST — finished in gold wall art set of 3, size 11.8 X 17.7 In. BEAUTIFUL METAL ART WALL DECOR: This wall art for living room size 45 x 30 cm / 17.7 high&#34.',
         highlights: [
             'BEAUTIFUL METAL ART WALL DECOR: This wall art for living room size 45 x 30 cm / 17.7 high&#34',
             'EXCELLENT QUANLITY: Gold metal wall decor is beautiful in appearance, bright colors and luster, handmade from durable iron metal materials, high.',
@@ -1378,7 +1425,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'casa-nido',
         title: "Livin'luxe Tree of Life Framed Canvas",
         brand: "Livin'luxe",
-        description: "Livin'luxe Tree of Life Framed Canvas from Livin'luxe — finished in color22, size 60L x 60W cm. WITH FRAME: Our Canvas Paintings Are Wooden Framed which will give Elegant Look to your Room.",
+        description:
+            "Livin'luxe Tree of Life Framed Canvas from Livin'luxe — finished in color22, size 60L x 60W cm. WITH FRAME: Our Canvas Paintings Are Wooden Framed which will give Elegant Look to your Room.",
         highlights: [
             'WITH FRAME: Our Canvas Paintings Are Wooden Framed which will give Elegant Look to your Room.',
             'LUXURIOUS & ELEGANT: Give a spectacular new look to your home with this digitally printed framed Canvas Painting',
@@ -1889,7 +1937,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'flexfit',
         title: 'adidas Vacfast Running Shoes',
         brand: 'adidas',
-        description: 'adidas Vacfast Running Shoes from adidas — finished in cblack/ftwwht/lgsogr/lingrn.',
+        description:
+            'adidas Vacfast Running Shoes from adidas — finished in cblack/ftwwht/lgsogr/lingrn.',
         highlights: ['Rubber sole', 'Lace-Up closure', 'Not Water Resistant', 'Sport theme'],
         specs: {
             Colour: 'CBLACK/FTWWHT/LGSOGR/LINGRN',
@@ -2066,7 +2115,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'flexfit',
         title: 'Symactive 6 mm Anti-Skid Yoga Mat',
         brand: 'Amazon Brand - Symactive',
-        description: 'Symactive 6 mm Anti-Skid Yoga Mat from Amazon Brand - Symactive — finished in army green. All-Purpose: Use this mat for Yoga, pilates, stretching and strengthening exercises. It is suitable for both men and women.',
+        description:
+            'Symactive 6 mm Anti-Skid Yoga Mat from Amazon Brand - Symactive — finished in army green. All-Purpose: Use this mat for Yoga, pilates, stretching and strengthening exercises. It is suitable for both men and women.',
         highlights: [
             'All-Purpose: Use this mat for Yoga, pilates, stretching and strengthening exercises. It is suitable for both men and women.',
             'Skin-safe and eco-friendly: It is made from premium EVA and LDPE foam, and is free from PVC, silicone, latex, lead, phthalates, and other harmful.',
@@ -2106,7 +2156,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'flexfit',
         title: 'Symactive 20 kg Adjustable Dumbbell Set',
         brand: 'Amazon Brand - Symactive',
-        description: 'Symactive 20 kg Adjustable Dumbbell Set from Amazon Brand - Symactive — finished in red-black. In-box Contents: In-Box Contents: 20 kg of PVC weight (3 kg x 4 = 12 kg, 2 kg x 4 = 8 kg), 2 x 14 inch dumbbell rods with nuts.',
+        description:
+            'Symactive 20 kg Adjustable Dumbbell Set from Amazon Brand - Symactive — finished in red-black. In-box Contents: In-Box Contents: 20 kg of PVC weight (3 kg x 4 = 12 kg, 2 kg x 4 = 8 kg), 2 x 14 inch dumbbell rods with nuts.',
         highlights: [
             'In-box Contents: In-Box Contents: 20 kg of PVC weight (3 kg x 4 = 12 kg, 2 kg x 4 = 8 kg), 2 x 14 inch dumbbell rods with nuts',
             'Highly durable and long lasting.',
@@ -2146,7 +2197,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'flexfit',
         title: 'Milton Thermosteel Flip Lid 1 L Flask',
         brand: 'MILTON',
-        description: 'Milton Thermosteel Flip Lid 1 L Flask from MILTON — finished in silver - flip lid, 1000 Milliliters. #1 WATER BOTTLES BRAND : Join the club, choose the premium brand and elevate your style with Milton.',
+        description:
+            'Milton Thermosteel Flip Lid 1 L Flask from MILTON — finished in silver - flip lid, 1000 Milliliters. #1 WATER BOTTLES BRAND : Join the club, choose the premium brand and elevate your style with Milton.',
         highlights: [
             '#1 WATER BOTTLES BRAND : Join the club, choose the premium brand and elevate your style with Milton.',
             '50 YEARS OF INDIAN INNOVATION : Milton Water Bottle 1 litre has Double walled Vacuum Insulated technology that keeps beverages Hot or Cold for 24.',
@@ -2186,7 +2238,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'flexfit',
         title: 'PUMA Convertible Gym Bag V4',
         brand: 'PUMA',
-        description: 'PUMA Convertible Gym Bag V4 from PUMA — finished in black, 10 Liters, size M.',
+        description:
+            'PUMA Convertible Gym Bag V4 from PUMA — finished in black, 10 Liters, size M.',
         highlights: ['Zipper closure', '10 Liters capacity', 'Size M', 'Weighs 200 Grams'],
         specs: {
             Colour: 'Black',
@@ -2221,7 +2274,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'flexfit',
         title: 'Burnlab 6-in-1 Weight Training Kit',
         brand: 'BURNLAB',
-        description: 'Burnlab 6-in-1 Weight Training Kit from BURNLAB — finished in black. Long-lasting: The new and adjustable weight design from burnlab allows you to increase the weight over time without having to buy new weights.',
+        description:
+            'Burnlab 6-in-1 Weight Training Kit from BURNLAB — finished in black. Long-lasting: The new and adjustable weight design from burnlab allows you to increase the weight over time without having to buy new weights.',
         highlights: [
             'Long-lasting: The new and adjustable weight design from burnlab allows you to increase the weight over time without having to buy new weights.',
             'New safety measures: Diamond knurled grip allows for a secure and non-slip grip, thickened nuts ensure that no weights fall and the anti-slip design.',
@@ -2261,7 +2315,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'flexfit',
         title: 'Aristocrat Power 52 cm Gym Duffle',
         brand: 'Aristrocrat',
-        description: 'Aristocrat Power 52 cm Gym Duffle from Aristrocrat — finished in black, size 28 X 27.5 X 52 CM.',
+        description:
+            'Aristocrat Power 52 cm Gym Duffle from Aristrocrat — finished in black, size 28 X 27.5 X 52 CM.',
         highlights: ['Zipper closure', 'Size 28 X 27.5 X 52 CM', 'Weighs 760 Grams'],
         specs: {
             Colour: 'Black',
@@ -2296,7 +2351,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'glow-atelier',
         title: 'Minimalist 16% Vitamin C Face Serum',
         brand: 'Minimalist',
-        description: 'Minimalist 16% Vitamin C Face Serum from Minimalist — 20 Millilitres bottle. 1️⃣ High-Potency 16% Vitamin C Serum Featuring a stable Vitamin C derivative (Ethyl Ascorbic Acid) formulated for maximum brightness and radiance without losing potency.',
+        description:
+            'Minimalist 16% Vitamin C Face Serum from Minimalist — 20 Millilitres bottle. 1️⃣ High-Potency 16% Vitamin C Serum Featuring a stable Vitamin C derivative (Ethyl Ascorbic Acid) formulated for maximum brightness and radiance without losing potency.',
         highlights: [
             '1️⃣ High-Potency 16% Vitamin C Serum Featuring a stable Vitamin C derivative (Ethyl Ascorbic Acid) formulated for maximum brightness and radiance.',
             '2️⃣ Enhanced with Vitamin E & Ferulic Acid Antioxidant superblend boosts protection from environmental stress and enhances skin glow.',
@@ -2336,7 +2392,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'glow-atelier',
         title: 'The Derma Co 15% Vitamin C Face Serum',
         brand: 'The Derma Co',
-        description: 'The Derma Co 15% Vitamin C Face Serum from The Derma Co. WHO IS IT SUITABLE FOR? Dark spots, pigmentation and dull skin? This serum is for you!',
+        description:
+            'The Derma Co 15% Vitamin C Face Serum from The Derma Co. WHO IS IT SUITABLE FOR? Dark spots, pigmentation and dull skin? This serum is for you!',
         highlights: [
             'Brightens Skin & Enhances Glow Safe and effective, the 15% Vitamin C Serum brightens your complexion by fading dark spots and boosting radiance. With.',
             'WHO IS IT SUITABLE FOR? Dark spots, pigmentation and dull skin? This serum is for you!',
@@ -2372,7 +2429,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'glow-atelier',
         title: 'Minimalist Sunscreen SPF 50 PA++++',
         brand: 'Minimalist',
-        description: 'Minimalist Sunscreen SPF 50 PA++++ from Minimalist — finished in white, 50 Millilitres bottle. 1️⃣ Broad Spectrum SPF 50 Protection Formulated with 4 highly effective UV filters — Uvinul T150, Avobenzone, Octocrylene & Titanium Dioxide — to protect skin from harmful UVA & UVB rays.',
+        description:
+            'Minimalist Sunscreen SPF 50 PA++++ from Minimalist — finished in white, 50 Millilitres bottle. 1️⃣ Broad Spectrum SPF 50 Protection Formulated with 4 highly effective UV filters — Uvinul T150, Avobenzone, Octocrylene & Titanium Dioxide — to protect skin from harmful UVA & UVB rays.',
         highlights: [
             '1️⃣ Broad Spectrum SPF 50 Protection Formulated with 4 highly effective UV filters — Uvinul T150, Avobenzone, Octocrylene & Titanium Dioxide — to.',
             '2️⃣ Boosted with Skin-Repairing Multi-Vitamins Enriched with Vitamins A, B3, B5, E & F to help repair post-sun damage, soothe irritation, nourish.',
@@ -2412,7 +2470,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'glow-atelier',
         title: 'Dot & Key Vitamin C + E Sunscreen SPF 50+',
         brand: 'DOT & KEY',
-        description: 'Dot & Key Vitamin C + E Sunscreen SPF 50+ from DOT & KEY — finished in white, 50 Millilitres bottle. 2-IN-1 PROTECTS SKIN + BOOSTS GLOW - Packed with SPF 50 PA+++, for even-toned & glowing which protects skin every day. This sunscreen SPF 50 Prevents tanning & gives skin glow.',
+        description:
+            'Dot & Key Vitamin C + E Sunscreen SPF 50+ from DOT & KEY — finished in white, 50 Millilitres bottle. 2-IN-1 PROTECTS SKIN + BOOSTS GLOW - Packed with SPF 50 PA+++, for even-toned & glowing which protects skin every day. This sunscreen SPF 50 Prevents tanning & gives skin glow.',
         highlights: [
             '2-IN-1 PROTECTS SKIN + BOOSTS GLOW - Packed with SPF 50 PA+++, for even-toned & glowing which protects skin every day. This sunscreen SPF 50 Prevents.',
             'DOT & KEY Vitamin C + E Super Bright Sun Screen SPF 50 , activates Vitamin D Receptors on skin, making it beneficial to be in the sun.',
@@ -2492,7 +2551,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'glow-atelier',
         title: 'Blue Heaven Matte Love Mini Lipsticks (Pack of 10)',
         brand: 'Blue Heaven',
-        description: 'Blue Heaven Matte Love Mini Lipsticks (Pack of 10) from Blue Heaven — finished in multicolor.',
+        description:
+            'Blue Heaven Matte Love Mini Lipsticks (Pack of 10) from Blue Heaven — finished in multicolor.',
         highlights: ['Stick format', 'Matte finish', 'Weighs 13 Grams'],
         specs: {
             Colour: 'Multicolor',
@@ -2527,7 +2587,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'mint-market',
         title: 'Zaveri Pearls Kundan Necklace & Earrings Set',
         brand: 'Zaveri Pearls',
-        description: 'A gold-tone kundan necklace with matching drop earrings, designed as a complete festive gift set.',
+        description:
+            'A gold-tone kundan necklace with matching drop earrings, designed as a complete festive gift set.',
         highlights: [
             'Complete necklace and matching earrings gift set',
             'Gold-tone kundan-style stones',
@@ -2562,7 +2623,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'mint-market',
         title: 'GIVA Silver Zircon Heart Pendant',
         brand: 'GIVA',
-        description: 'A sterling-silver heart pendant with a fine chain and zircon detail, sized for everyday wear and gifting.',
+        description:
+            'A sterling-silver heart pendant with a fine chain and zircon detail, sized for everyday wear and gifting.',
         highlights: [
             '925 sterling silver',
             'Minimal heart pendant with zircon detail',
@@ -2597,7 +2659,8 @@ const PRODUCTS: SeedProduct[] = [
         seller: 'mint-market',
         title: 'Shining Diva Rose Gold Crystal Bracelet',
         brand: 'Shining Diva',
-        description: 'A slim rose-gold-tone bracelet with crystal accents and an adjustable clasp for an easy gift fit.',
+        description:
+            'A slim rose-gold-tone bracelet with crystal accents and an adjustable clasp for an easy gift fit.',
         highlights: [
             'Adjustable clasp fits most wrists',
             'Rose-gold-tone finish',
@@ -2829,7 +2892,8 @@ const TRANSCRIPT_FIXTURE: {
         language: 'hi-IN',
         text: 'Sabse pehle Noise Airwave Max 5 — iski hybrid ANC pachaas decibel tak jaati hai.',
         translatedText: {
-            'en-US': 'First up is the Noise Airwave Max 5 — its hybrid ANC goes up to fifty decibels.',
+            'en-US':
+                'First up is the Noise Airwave Max 5 — its hybrid ANC goes up to fifty decibels.',
         },
     },
     {
@@ -2852,7 +2916,8 @@ const TRANSCRIPT_FIXTURE: {
         language: 'hi-IN',
         text: 'Rockerz 512 ka forty millisecond latency mode gaming ke liye kaafi accha hai.',
         translatedText: {
-            'en-US': "The Rockerz 512's forty millisecond latency mode is genuinely good for gaming.",
+            'en-US':
+                "The Rockerz 512's forty millisecond latency mode is genuinely good for gaming.",
         },
     },
     {
@@ -2875,7 +2940,8 @@ const TRANSCRIPT_FIXTURE: {
         language: 'hi-IN',
         text: 'Sony mein ANC nahi hai, lekin awaaz sabse saaf hai aur battery pachaas ghante chalti hai.',
         translatedText: {
-            'en-US': 'The Sony has no ANC, but the cleanest sound of the group and fifty hours of battery.',
+            'en-US':
+                'The Sony has no ANC, but the cleanest sound of the group and fifty hours of battery.',
         },
     },
     {
@@ -2918,7 +2984,8 @@ const TRANSCRIPT_FIXTURE: {
         language: 'hi-IN',
         text: 'Aaj ka live offer session khatam hone tak hi valid hai, toh cart abhi check kar lijiye.',
         translatedText: {
-            'en-US': "Today's live offer is only valid until the session ends, so check your cart now.",
+            'en-US':
+                "Today's live offer is only valid until the session ends, so check your cart now.",
         },
     },
     {
@@ -2937,9 +3004,15 @@ const CHAT_FIXTURE: {
     text: string;
 }[] = [
     { user: 'shopper', text: 'Does the Noise Airwave actually hit 50dB of ANC?' },
-    { user: 'loyal', text: 'Bought the Rockerz 512 in the last drop, the latency mode is legit.' },
+    {
+        user: 'loyal',
+        text: 'Bought the Rockerz 512 in the last drop, the latency mode is legit.',
+    },
     { user: 'shopper', text: 'Can you show the folding hinge on the Philips?' },
-    { user: 'admin', text: 'Reminder: the live offer only applies while this session is running.' },
+    {
+        user: 'admin',
+        text: 'Reminder: the live offer only applies while this session is running.',
+    },
     { user: 'loyal', text: 'Is the Sony worth it with no ANC at 4,490?' },
     { user: 'shopper', text: 'Adding the Noise to my cart now.' },
     { user: 'loyal', text: 'What is the delivery time to 400001?' },
@@ -2968,8 +3041,7 @@ const clearRedisKeys = async (): Promise<number> => {
         do {
             const [next, batch] = await redis.scan(cursor, 'MATCH', `${prefix}*`, 'COUNT', 500);
             cursor = next;
-            if (batch.length > 0)
-                removed += await redis.del(...batch);
+            if (batch.length > 0) removed += await redis.del(...batch);
         } while (cursor !== '0');
     }
     removed += await redis.del(keys.aiAgents, keys.analyticsStream, keys.summaryStream);
@@ -2977,7 +3049,7 @@ const clearRedisKeys = async (): Promise<number> => {
 };
 const seed = async (): Promise<void> => {
     console.log('seed: truncating every table and clearing the app Redis keyspace');
-    await db.execute(sql `
+    await db.execute(sql`
     TRUNCATE TABLE
       analytics_events, ai_tool_calls, ai_messages, ai_conversations,
       poll_votes, poll_options, polls, chat_moderation, chat_messages,
@@ -2993,52 +3065,51 @@ const seed = async (): Promise<void> => {
     const userRows = await db
         .insert(t.users)
         .values([
-        {
-            email: 'shopper@demo.test',
-            passwordHash,
-            displayName: 'Aarav Shopper',
-            role: 'shopper',
-            defaultPincode: '560001',
-            preferredLanguage: 'en-US',
-        },
-        {
-            email: 'admin@demo.test',
-            passwordHash,
-            displayName: 'Platform Admin',
-            role: 'admin',
-            defaultPincode: '110001',
-            preferredLanguage: 'en-US',
-        },
-        {
-            email: 'loyal@demo.test',
-            passwordHash,
-            displayName: 'Meera Loyal',
-            role: 'shopper',
-            defaultPincode: '400001',
-            preferredLanguage: 'hi-IN',
-        },
-        {
-            email: 'support@demo.test',
-            passwordHash,
-            displayName: 'Support Agent',
-            role: 'support',
-            defaultPincode: '560001',
-            preferredLanguage: 'en-US',
-        },
-        ...SELLERS.map((s) => ({
-            email: s.ownerEmail,
-            passwordHash,
-            displayName: s.ownerName,
-            role: 'seller' as const,
-            defaultPincode: '560103',
-            preferredLanguage: 'en-US',
-        })),
-    ])
+            {
+                email: 'shopper@demo.test',
+                passwordHash,
+                displayName: 'Aarav Shopper',
+                role: 'shopper',
+                defaultPincode: '560001',
+                preferredLanguage: 'en-US',
+            },
+            {
+                email: 'admin@demo.test',
+                passwordHash,
+                displayName: 'Platform Admin',
+                role: 'admin',
+                defaultPincode: '110001',
+                preferredLanguage: 'en-US',
+            },
+            {
+                email: 'loyal@demo.test',
+                passwordHash,
+                displayName: 'Meera Loyal',
+                role: 'shopper',
+                defaultPincode: '400001',
+                preferredLanguage: 'hi-IN',
+            },
+            {
+                email: 'support@demo.test',
+                passwordHash,
+                displayName: 'Support Agent',
+                role: 'support',
+                defaultPincode: '560001',
+                preferredLanguage: 'en-US',
+            },
+            ...SELLERS.map((s) => ({
+                email: s.ownerEmail,
+                passwordHash,
+                displayName: s.ownerName,
+                role: 'seller' as const,
+                defaultPincode: '560103',
+                preferredLanguage: 'en-US',
+            })),
+        ])
         .returning({ id: t.users.id, email: t.users.email });
     const userId = (email: string): string => {
         const row = userRows.find((u) => u.email === email);
-        if (!row)
-            throw new Error(`seed: user ${email} missing`);
+        if (!row) throw new Error(`seed: user ${email} missing`);
         return row.id;
     };
     const shopperId = userId('shopper@demo.test');
@@ -3048,111 +3119,128 @@ const seed = async (): Promise<void> => {
     const marketplaceProducts = await loadMarketplaceCatalog(MARKETPLACE_SELLERS);
     const catalogProducts: SeedProduct[] = [...PRODUCTS, ...marketplaceProducts];
     const catalogImageUrls = catalogProducts.flatMap((product) => product.images);
-    if (catalogProducts.some((product) => product.images.length === 0) ||
-        new Set(catalogImageUrls).size !== catalogImageUrls.length) {
+    if (
+        catalogProducts.some((product) => product.images.length === 0) ||
+        new Set(catalogImageUrls).size !== catalogImageUrls.length
+    ) {
         throw new Error('seed: every catalog product image URL must be present and unique');
     }
-    console.log(`seed: ${PRODUCTS.length} curated products + ${marketplaceProducts.length} online marketplace listings`);
+    console.log(
+        `seed: ${PRODUCTS.length} curated products + ${marketplaceProducts.length} online marketplace listings`,
+    );
     const categoryRows = await db
         .insert(t.categories)
-        .values(CATEGORIES.map((c) => ({ slug: c.slug, name: c.name, imageUrl: c.imageUrl })))
+        .values(
+            CATEGORIES.map((c) => ({
+                slug: c.slug,
+                name: c.name,
+                imageUrl: c.imageUrl,
+            })),
+        )
         .returning({ id: t.categories.id, slug: t.categories.slug });
     const categoryId = (slug: string): string => {
         const row = categoryRows.find((c) => c.slug === slug);
-        if (!row)
-            throw new Error(`seed: category ${slug} missing`);
+        if (!row) throw new Error(`seed: category ${slug} missing`);
         return row.id;
     };
     const sellerRows = await db
         .insert(t.sellers)
         .values([
-        ...SELLERS.map((s) => ({
-            slug: s.slug,
-            displayName: s.displayName,
-            logoUrl: s.logoUrl,
-            ownerUserId: userId(s.ownerEmail),
-            rating: s.rating,
-        })),
-        ...MARKETPLACE_SELLERS.map((s) => ({
-            slug: s.slug,
-            displayName: s.displayName,
-            logoUrl: s.logoUrl,
-            rating: s.rating,
-        })),
-    ])
+            ...SELLERS.map((s) => ({
+                slug: s.slug,
+                displayName: s.displayName,
+                logoUrl: s.logoUrl,
+                ownerUserId: userId(s.ownerEmail),
+                rating: s.rating,
+            })),
+            ...MARKETPLACE_SELLERS.map((s) => ({
+                slug: s.slug,
+                displayName: s.displayName,
+                logoUrl: s.logoUrl,
+                rating: s.rating,
+            })),
+        ])
         .returning({ id: t.sellers.id, slug: t.sellers.slug });
     const sellerId = (slug: string): string => {
         const row = sellerRows.find((s) => s.slug === slug);
-        if (!row)
-            throw new Error(`seed: seller ${slug} missing`);
+        if (!row) throw new Error(`seed: seller ${slug} missing`);
         return row.id;
     };
     const productRows = await db
         .insert(t.products)
-        .values(catalogProducts.map((p) => ({
-        slug: p.slug,
-        categoryId: categoryId(p.category),
-        sellerId: sellerId(p.seller),
-        title: p.title,
-        brand: p.brand,
-        description: p.description,
-        highlights: p.highlights,
-        specs: p.specs,
-        images: p.images,
-        rating: p.rating,
-        ratingCount: p.ratingCount,
-        basePriceMinorUnits: p.variants[0]!.priceMinorUnits,
-    })))
+        .values(
+            catalogProducts.map((p) => ({
+                slug: p.slug,
+                categoryId: categoryId(p.category),
+                sellerId: sellerId(p.seller),
+                title: p.title,
+                brand: p.brand,
+                description: p.description,
+                highlights: p.highlights,
+                specs: p.specs,
+                images: p.images,
+                rating: p.rating,
+                ratingCount: p.ratingCount,
+                basePriceMinorUnits: p.variants[0]!.priceMinorUnits,
+            })),
+        )
         .returning({ id: t.products.id, slug: t.products.slug });
     const productId = (slug: string): string => {
         const row = productRows.find((p) => p.slug === slug);
-        if (!row)
-            throw new Error(`seed: product ${slug} missing`);
+        if (!row) throw new Error(`seed: product ${slug} missing`);
         return row.id;
     };
     const variantRows = await db
         .insert(t.productVariants)
-        .values(catalogProducts.flatMap((p) => p.variants.map((v, index) => ({
-        productId: productId(p.slug),
-        sku: v.sku,
-        label: v.label,
-        attrs: v.attrs,
-        priceMinorUnits: v.priceMinorUnits,
-        mrpMinorUnits: v.mrpMinorUnits,
-        stock: v.stock,
-        isDefault: index === 0,
-    }))))
+        .values(
+            catalogProducts.flatMap((p) =>
+                p.variants.map((v, index) => ({
+                    productId: productId(p.slug),
+                    sku: v.sku,
+                    label: v.label,
+                    attrs: v.attrs,
+                    priceMinorUnits: v.priceMinorUnits,
+                    mrpMinorUnits: v.mrpMinorUnits,
+                    stock: v.stock,
+                    isDefault: index === 0,
+                })),
+            ),
+        )
         .returning({ id: t.productVariants.id, sku: t.productVariants.sku });
     const variantId = (sku: string): string => {
         const row = variantRows.find((v) => v.sku === sku);
-        if (!row)
-            throw new Error(`seed: variant ${sku} missing`);
+        if (!row) throw new Error(`seed: variant ${sku} missing`);
         return row.id;
     };
     await db.insert(t.pincodes).values(PINCODES);
     const promotionRows = await db
         .insert(t.promotions)
-        .values(PROMOTIONS.map((p) => ({
-        code: p.code,
-        label: p.label,
-        description: p.description,
-        kind: p.kind,
-        value: p.value,
-        priority: p.priority,
-        stackable: p.stackable,
-        conditions: {
-            ...Object.fromEntries(Object.entries(p.conditions).filter(([k]) => k !== 'sellerSlugs')),
-            ...('sellerSlugs' in p.conditions
-                ? { sellerIds: (p.conditions.sellerSlugs as string[]).map(sellerId) }
-                : {}),
-        } as Record<string, unknown>,
-        active: true,
-    })))
+        .values(
+            PROMOTIONS.map((p) => ({
+                code: p.code,
+                label: p.label,
+                description: p.description,
+                kind: p.kind,
+                value: p.value,
+                priority: p.priority,
+                stackable: p.stackable,
+                conditions: {
+                    ...Object.fromEntries(
+                        Object.entries(p.conditions).filter(([k]) => k !== 'sellerSlugs'),
+                    ),
+                    ...('sellerSlugs' in p.conditions
+                        ? {
+                              sellerIds: (p.conditions.sellerSlugs as string[]).map(sellerId),
+                          }
+                        : {}),
+                } as Record<string, unknown>,
+                active: true,
+            })),
+        )
         .returning({ id: t.promotions.id, code: t.promotions.code });
     const promotionId = (code: string): string => {
         const row = promotionRows.find((p) => p.code === code);
-        if (!row)
-            throw new Error(`seed: promotion ${code} missing`);
+        if (!row) throw new Error(`seed: promotion ${code} missing`);
         return row.id;
     };
     await db.insert(t.checkoutPolicies).values({
@@ -3170,10 +3258,26 @@ const seed = async (): Promise<void> => {
         .insert(t.wishlistItems)
         .values([{ userId: shopperId, productId: productId(featuredReadyProduct) }]);
     await db.insert(t.productViews).values([
-        { userId: shopperId, productId: productId('noise-airwave-max-5'), viewedAt: at(-3 * HOUR) },
-        { userId: shopperId, productId: productId('sony-wh-ch520'), viewedAt: at(-2 * HOUR) },
-        { userId: shopperId, productId: productId(featuredReadyProduct), viewedAt: at(-90 * MINUTE) },
-        { userId: loyalId, productId: productId('samsung-galaxy-a56-5g'), viewedAt: at(-1 * DAY) },
+        {
+            userId: shopperId,
+            productId: productId('noise-airwave-max-5'),
+            viewedAt: at(-3 * HOUR),
+        },
+        {
+            userId: shopperId,
+            productId: productId('sony-wh-ch520'),
+            viewedAt: at(-2 * HOUR),
+        },
+        {
+            userId: shopperId,
+            productId: productId(featuredReadyProduct),
+            viewedAt: at(-90 * MINUTE),
+        },
+        {
+            userId: loyalId,
+            productId: productId('samsung-galaxy-a56-5g'),
+            viewedAt: at(-1 * DAY),
+        },
         {
             userId: loyalId,
             productId: productId('puma-graphics-training-tee'),
@@ -3190,7 +3294,8 @@ const seed = async (): Promise<void> => {
             slug: 'gym-live',
             sellerSlug: 'flexfit',
             title: 'The Perfect Summer Gym Outfits',
-            description: 'Building three summer training fits end to end — tee, shorts, tights, trainers, and the bag that carries it.',
+            description:
+                'Building three summer training fits end to end — tee, shorts, tights, trainers, and the bag that carries it.',
             status: 'ended' as const,
             scheduledFor: at(-40 * MINUTE),
             startedAt: at(-35 * MINUTE) as Date | null,
@@ -3217,7 +3322,8 @@ const seed = async (): Promise<void> => {
             slug: 'phones-live',
             sellerSlug: 'cellverse',
             title: 'Best Phones Under Rs 45,000: Camera & Performance Picks',
-            description: 'Ranking the under-Rs 45,000 shortlist on camera and sustained performance, with the two we would actually buy.',
+            description:
+                'Ranking the under-Rs 45,000 shortlist on camera and sustained performance, with the two we would actually buy.',
             status: 'ended' as const,
             scheduledFor: at(-30 * MINUTE),
             startedAt: at(-26 * MINUTE) as Date | null,
@@ -3244,7 +3350,8 @@ const seed = async (): Promise<void> => {
             slug: 'glow-live',
             sellerSlug: 'glow-atelier',
             title: 'Skincare Sunday: Building the Routine',
-            description: 'Serum, then sunscreen, then colour — layering order, and what actually goes on top of what.',
+            description:
+                'Serum, then sunscreen, then colour — layering order, and what actually goes on top of what.',
             status: 'ended' as const,
             scheduledFor: at(-22 * MINUTE),
             startedAt: at(-19 * MINUTE) as Date | null,
@@ -3271,7 +3378,8 @@ const seed = async (): Promise<void> => {
             slug: 'headphones-live',
             sellerSlug: 'pulse-audio',
             title: 'Prime Day: Best Headphones Under Rs 5,000',
-            description: 'Five pairs under Rs 5,000, two weeks with each, and one clear winner on ANC, battery and call quality.',
+            description:
+                'Five pairs under Rs 5,000, two weeks with each, and one clear winner on ANC, battery and call quality.',
             status: 'ended' as const,
             scheduledFor: at(-18 * MINUTE),
             startedAt: at(-14 * MINUTE) as Date | null,
@@ -3298,7 +3406,8 @@ const seed = async (): Promise<void> => {
             slug: 'decor-live',
             sellerSlug: 'casa-nido',
             title: 'Aesthetic Home Decor Haul: Budget Furnishing Finds',
-            description: 'Unboxing the whole haul — lamps, planters, framed art and the vase set that keeps selling out.',
+            description:
+                'Unboxing the whole haul — lamps, planters, framed art and the vase set that keeps selling out.',
             status: 'ended' as const,
             scheduledFor: at(-11 * MINUTE),
             startedAt: at(-8 * MINUTE) as Date | null,
@@ -3325,12 +3434,14 @@ const seed = async (): Promise<void> => {
             slug: 'scheduled',
             sellerSlug: 'cellverse',
             title: 'Big Billion Days Preview: The Under-Rs 25,000 Bracket',
-            description: 'A first look at the under-Rs 25,000 line-up before the sale opens: batteries, refresh rates and cameras.',
+            description:
+                'A first look at the under-Rs 25,000 line-up before the sale opens: batteries, refresh rates and cameras.',
             status: 'scheduled' as const,
             scheduledFor: at(2 * HOUR),
             startedAt: null as Date | null,
             endedAt: null as Date | null,
-            coverImageUrl: 'https://m.media-amazon.com/images/I/61f5ZCuSD6L._SL900_.jpg' as string | null,
+            coverImageUrl: 'https://m.media-amazon.com/images/I/61f5ZCuSD6L._SL900_.jpg' as
+                string | null,
             expectedPeakViewers: 200,
             chatShardCount: 1,
             peakViewers: 0,
@@ -3350,12 +3461,14 @@ const seed = async (): Promise<void> => {
             slug: 'ready-to-go-live',
             sellerSlug: 'pulse-audio',
             title: 'Gaming Audio Drop: Wired Picks Under Rs 3,000',
-            description: 'Wired headsets and low-latency earbuds under Rs 3,000, with mic tests on every one of them.',
+            description:
+                'Wired headsets and low-latency earbuds under Rs 3,000, with mic tests on every one of them.',
             status: 'scheduled' as const,
             scheduledFor: at(-5 * MINUTE),
             startedAt: null as Date | null,
             endedAt: null as Date | null,
-            coverImageUrl: 'https://m.media-amazon.com/images/I/51vT4GzBObL._SL900_.jpg' as string | null,
+            coverImageUrl: 'https://m.media-amazon.com/images/I/51vT4GzBObL._SL900_.jpg' as
+                string | null,
             expectedPeakViewers: 6,
             chatShardCount: 1,
             peakViewers: 0,
@@ -3376,7 +3489,8 @@ const seed = async (): Promise<void> => {
             slug: 'ended',
             sellerSlug: 'pulse-audio',
             title: 'The Under-Rs 5,000 Audio Shortlist',
-            description: "Last week's shortlist: five pairs on the desk, a restock poll, and the pair we told everyone to buy.",
+            description:
+                "Last week's shortlist: five pairs on the desk, a restock poll, and the pair we told everyone to buy.",
             status: 'ended' as const,
             scheduledFor: at(-1 * DAY - 50 * MINUTE),
             startedAt: at(-1 * DAY - 45 * MINUTE) as Date | null,
@@ -3387,7 +3501,9 @@ const seed = async (): Promise<void> => {
             peakViewers: 5,
             recordingStatus: 'ready' as const,
             recordingUrl: SAMPLE_VOD_FALLBACK_URL as string | null,
-            transcriptSummary: 'The Under-Rs 5,000 Audio Shortlist compared five pairs. The Noise Airwave Max 5 (Rs 4,999, MRP Rs 5,999) led on hybrid ANC up to 50 dB and 80 hours of playtime and was the featured pick. The boAt Rockerz 512 ANC (Rs 2,799) was called out for its 40 ms low-latency mode, and the Philips TAH6550 (Rs 2,499) for folding flat with 60 hours of battery; the Philips was pinned mid-show. The Sony WH-CH520 (Rs 4,490) has no ANC but the cleanest mids and 50 hours of battery, and was recommended for call-heavy use. A restock poll ran and the Noise won with two of three votes. The 20% live-session offer was repeatedly flagged as valid only until the session ended.' as string | null,
+            transcriptSummary:
+                'The Under-Rs 5,000 Audio Shortlist compared five pairs. The Noise Airwave Max 5 (Rs 4,999, MRP Rs 5,999) led on hybrid ANC up to 50 dB and 80 hours of playtime and was the featured pick. The boAt Rockerz 512 ANC (Rs 2,799) was called out for its 40 ms low-latency mode, and the Philips TAH6550 (Rs 2,499) for folding flat with 60 hours of battery; the Philips was pinned mid-show. The Sony WH-CH520 (Rs 4,490) has no ANC but the cleanest mids and 50 hours of battery, and was recommended for call-heavy use. A restock poll ran and the Noise won with two of three votes. The 20% live-session offer was repeatedly flagged as valid only until the session ended.' as
+                    string | null,
             products: [
                 'noise-airwave-max-5',
                 'boat-rockerz-512-anc',
@@ -3401,102 +3517,116 @@ const seed = async (): Promise<void> => {
     ];
     const sessionRows = await db
         .insert(t.liveSessions)
-        .values(sessionSeeds.map((s) => {
-        const seller = SELLERS.find((x) => x.slug === s.sellerSlug)!;
-        return {
-            slug: s.slug,
-            sellerId: sellerId(s.sellerSlug),
-            title: s.title,
-            description: s.description,
-            hostName: seller.ownerName,
-            hostUserId: userId(seller.ownerEmail),
-            status: s.status,
-            scheduledFor: s.scheduledFor,
-            startedAt: s.startedAt,
-            endedAt: s.endedAt,
-            rtcChannel: `live-${s.slug}`,
-            coverImageUrl: s.coverImageUrl,
-            language: 'en-US',
-            expectedPeakViewers: s.expectedPeakViewers,
-            chatShardCount: s.chatShardCount,
-            discountPercent: s.discountPercent,
-            deliveryTier: 'rtc' as const,
-            recordingConsentAt: s.startedAt,
-            recordingProvider: s.status === 'ended' ? 'browser' : null,
-            recordingStatus: s.recordingStatus,
-            recordingUrl: s.recordingUrl,
-            hlsUrl: null,
-            hlsOriginKind: null,
-            transcriptSummary: s.transcriptSummary,
-            peakViewers: s.peakViewers,
-        };
-    }))
+        .values(
+            sessionSeeds.map((s) => {
+                const seller = SELLERS.find((x) => x.slug === s.sellerSlug)!;
+                return {
+                    slug: s.slug,
+                    sellerId: sellerId(s.sellerSlug),
+                    title: s.title,
+                    description: s.description,
+                    hostName: seller.ownerName,
+                    hostUserId: userId(seller.ownerEmail),
+                    status: s.status,
+                    scheduledFor: s.scheduledFor,
+                    startedAt: s.startedAt,
+                    endedAt: s.endedAt,
+                    rtcChannel: `live-${s.slug}`,
+                    coverImageUrl: s.coverImageUrl,
+                    language: 'en-US',
+                    expectedPeakViewers: s.expectedPeakViewers,
+                    chatShardCount: s.chatShardCount,
+                    discountPercent: s.discountPercent,
+                    deliveryTier: 'rtc' as const,
+                    recordingConsentAt: s.startedAt,
+                    recordingProvider: s.status === 'ended' ? 'browser' : null,
+                    recordingStatus: s.recordingStatus,
+                    recordingUrl: s.recordingUrl,
+                    hlsUrl: null,
+                    hlsOriginKind: null,
+                    transcriptSummary: s.transcriptSummary,
+                    peakViewers: s.peakViewers,
+                };
+            }),
+        )
         .returning({ id: t.liveSessions.id, slug: t.liveSessions.slug });
     const sessionId = (slug: string): string => {
         const row = sessionRows.find((s) => s.slug === slug);
-        if (!row)
-            throw new Error(`seed: session ${slug} missing`);
+        if (!row) throw new Error(`seed: session ${slug} missing`);
         return row.id;
     };
-    await db.insert(t.liveSessionProducts).values(sessionSeeds.flatMap((s) => s.products.map((slug, index) => ({
-        sessionId: sessionId(s.slug),
-        productId: productId(slug),
-        sortOrder: index,
-        isFeatured: s.featured === slug,
-        pinnedAt: s.featured === slug && s.startedAt ? new Date(s.startedAt.getTime() + 4 * MINUTE) : null,
-    }))));
+    await db.insert(t.liveSessionProducts).values(
+        sessionSeeds.flatMap((s) =>
+            s.products.map((slug, index) => ({
+                sessionId: sessionId(s.slug),
+                productId: productId(slug),
+                sortOrder: index,
+                isFeatured: s.featured === slug,
+                pinnedAt:
+                    s.featured === slug && s.startedAt
+                        ? new Date(s.startedAt.getTime() + 4 * MINUTE)
+                        : null,
+            })),
+        ),
+    );
     const seedFor = (slug: string): (typeof sessionSeeds)[number] => {
         const row = sessionSeeds.find((s) => s.slug === slug);
-        if (!row)
-            throw new Error(`seed: session seed ${slug} missing`);
+        if (!row) throw new Error(`seed: session seed ${slug} missing`);
         return row;
     };
     const endedId = sessionId('ended');
     const endedStart = seedFor('ended').startedAt!.getTime();
     const endedShards = seedFor('ended').chatShardCount;
-    await db.insert(t.sessionTranscripts).values(TRANSCRIPT_FIXTURE.map((line, index) => ({
-        sessionId: endedId,
-        speaker: line.speaker,
-        language: line.language,
-        text: line.text,
-        translatedText: line.translatedText ?? {},
-        startMs: index * 135000,
-        createdAt: new Date(endedStart + index * 135000),
-    })));
-    const chatUserId = { shopper: shopperId, loyal: loyalId, admin: adminId } as const;
-    await db.insert(t.chatMessages).values(CHAT_FIXTURE.map((m, index) => ({
-        sessionId: endedId,
-        userId: chatUserId[m.user],
-        shardIndex: shardIndexFor(chatUserId[m.user], endedShards),
-        clientMessageId: `seed-chat-${index}`,
-        text: m.text,
-        status: 'visible' as const,
-        flagged: false,
-        createdAt: new Date(endedStart + (index + 1) * 3 * MINUTE),
-    })));
+    await db.insert(t.sessionTranscripts).values(
+        TRANSCRIPT_FIXTURE.map((line, index) => ({
+            sessionId: endedId,
+            speaker: line.speaker,
+            language: line.language,
+            text: line.text,
+            translatedText: line.translatedText ?? {},
+            startMs: index * 135000,
+            createdAt: new Date(endedStart + index * 135000),
+        })),
+    );
+    const chatUserId = {
+        shopper: shopperId,
+        loyal: loyalId,
+        admin: adminId,
+    } as const;
+    await db.insert(t.chatMessages).values(
+        CHAT_FIXTURE.map((m, index) => ({
+            sessionId: endedId,
+            userId: chatUserId[m.user],
+            shardIndex: shardIndexFor(chatUserId[m.user], endedShards),
+            clientMessageId: `seed-chat-${index}`,
+            text: m.text,
+            status: 'visible' as const,
+            flagged: false,
+            createdAt: new Date(endedStart + (index + 1) * 3 * MINUTE),
+        })),
+    );
     const [poll] = await db
         .insert(t.polls)
         .values({
-        sessionId: endedId,
-        question: 'Which pair should we restock first?',
-        status: 'closed',
-        createdAt: new Date(endedStart + 30 * MINUTE),
-        closedAt: new Date(endedStart + 38 * MINUTE),
-    })
+            sessionId: endedId,
+            question: 'Which pair should we restock first?',
+            status: 'closed',
+            createdAt: new Date(endedStart + 30 * MINUTE),
+            closedAt: new Date(endedStart + 38 * MINUTE),
+        })
         .returning({ id: t.polls.id });
     const pollId = poll!.id;
     const pollOptionRows = await db
         .insert(t.pollOptions)
         .values([
-        { pollId, label: 'Noise Airwave Max 5', sortOrder: 0 },
-        { pollId, label: 'boAt Rockerz 512 ANC', sortOrder: 1 },
-        { pollId, label: 'Sony WH-CH520', sortOrder: 2 },
-    ])
+            { pollId, label: 'Noise Airwave Max 5', sortOrder: 0 },
+            { pollId, label: 'boAt Rockerz 512 ANC', sortOrder: 1 },
+            { pollId, label: 'Sony WH-CH520', sortOrder: 2 },
+        ])
         .returning({ id: t.pollOptions.id, label: t.pollOptions.label });
     const optionId = (label: string): string => {
         const row = pollOptionRows.find((o) => o.label === label);
-        if (!row)
-            throw new Error(`seed: poll option ${label} missing`);
+        if (!row) throw new Error(`seed: poll option ${label} missing`);
         return row.id;
     };
     await db.insert(t.pollVotes).values([
@@ -3519,7 +3649,9 @@ const seed = async (): Promise<void> => {
             createdAt: new Date(endedStart + 33 * MINUTE),
         },
     ]);
-    const endedHostId = userId(SELLERS.find((s) => s.slug === seedFor('ended').sellerSlug)!.ownerEmail);
+    const endedHostId = userId(
+        SELLERS.find((s) => s.slug === seedFor('ended').sellerSlug)!.ownerEmail,
+    );
     await db.insert(t.chatModeration).values([
         {
             sessionId: endedId,
@@ -3539,63 +3671,68 @@ const seed = async (): Promise<void> => {
     const orderRows = await db
         .insert(t.orders)
         .values([
-        {
-            userId: loyalId,
-            status: 'paid' as const,
-            subtotalMinorUnits: 261900,
-            discountMinorUnits: 0,
-            totalMinorUnits: 261900,
-            appliedPromotions: [],
-            paymentMethod: 'upi',
-            paymentRef: 'mock_pre_auth_seed_1',
-            pincode: '400001',
-            idempotencyKey: 'seed-loyal-order-1',
-            createdAt: at(-40 * DAY),
-            fulfilmentStatus: 'delivered',
-            trackingNumber: 'AWB7829103456',
-            carrier: 'BlueDart',
-            estimatedDeliveryAt: at(-35 * DAY),
-        },
-        {
-            userId: loyalId,
-            status: 'paid' as const,
-            subtotalMinorUnits: 151400,
-            discountMinorUnits: 0,
-            totalMinorUnits: 151400,
-            appliedPromotions: [],
-            paymentMethod: 'card',
-            paymentRef: 'mock_pre_auth_seed_2',
-            pincode: '400001',
-            idempotencyKey: 'seed-loyal-order-2',
-            createdAt: at(-20 * DAY),
-            fulfilmentStatus: 'out_for_delivery',
-            trackingNumber: 'AWB8829109876',
-            carrier: 'Delhivery',
-            estimatedDeliveryAt: at(2 * DAY),
-        },
-        {
-            userId: loyalId,
-            status: 'paid' as const,
-            subtotalMinorUnits: 779800,
-            discountMinorUnits: 99980,
-            totalMinorUnits: 679820,
-            appliedPromotions: [{ code: 'LIVE20', label: '20% live-session offer', minorUnits: 99980 }],
-            paymentMethod: 'cod',
-            paymentRef: 'mock_pre_auth_seed_3',
-            pincode: '400001',
-            idempotencyKey: 'seed-loyal-order-3',
-            createdAt: new Date(endedStart + 24 * MINUTE),
-            fulfilmentStatus: 'shipped',
-            trackingNumber: 'AWB9928101234',
-            carrier: 'Ekart',
-            estimatedDeliveryAt: at(4 * DAY),
-        },
-    ])
+            {
+                userId: loyalId,
+                status: 'paid' as const,
+                subtotalMinorUnits: 261900,
+                discountMinorUnits: 0,
+                totalMinorUnits: 261900,
+                appliedPromotions: [],
+                paymentMethod: 'upi',
+                paymentRef: 'mock_pre_auth_seed_1',
+                pincode: '400001',
+                idempotencyKey: 'seed-loyal-order-1',
+                createdAt: at(-40 * DAY),
+                fulfilmentStatus: 'delivered',
+                trackingNumber: 'AWB7829103456',
+                carrier: 'BlueDart',
+                estimatedDeliveryAt: at(-35 * DAY),
+            },
+            {
+                userId: loyalId,
+                status: 'paid' as const,
+                subtotalMinorUnits: 151400,
+                discountMinorUnits: 0,
+                totalMinorUnits: 151400,
+                appliedPromotions: [],
+                paymentMethod: 'card',
+                paymentRef: 'mock_pre_auth_seed_2',
+                pincode: '400001',
+                idempotencyKey: 'seed-loyal-order-2',
+                createdAt: at(-20 * DAY),
+                fulfilmentStatus: 'out_for_delivery',
+                trackingNumber: 'AWB8829109876',
+                carrier: 'Delhivery',
+                estimatedDeliveryAt: at(2 * DAY),
+            },
+            {
+                userId: loyalId,
+                status: 'paid' as const,
+                subtotalMinorUnits: 779800,
+                discountMinorUnits: 99980,
+                totalMinorUnits: 679820,
+                appliedPromotions: [
+                    {
+                        code: 'LIVE20',
+                        label: '20% live-session offer',
+                        minorUnits: 99980,
+                    },
+                ],
+                paymentMethod: 'cod',
+                paymentRef: 'mock_pre_auth_seed_3',
+                pincode: '400001',
+                idempotencyKey: 'seed-loyal-order-3',
+                createdAt: new Date(endedStart + 24 * MINUTE),
+                fulfilmentStatus: 'shipped',
+                trackingNumber: 'AWB9928101234',
+                carrier: 'Ekart',
+                estimatedDeliveryAt: at(4 * DAY),
+            },
+        ])
         .returning({ id: t.orders.id, idempotencyKey: t.orders.idempotencyKey });
     const orderId = (key: string): string => {
         const row = orderRows.find((o) => o.idempotencyKey === key);
-        if (!row)
-            throw new Error(`seed: order ${key} missing`);
+        if (!row) throw new Error(`seed: order ${key} missing`);
         return row.id;
     };
     await db.insert(t.orderItems).values([
@@ -3678,8 +3815,8 @@ const seed = async (): Promise<void> => {
         });
     }
     const viewerCurve = [
-        1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 4, 4, 3, 4, 5, 5, 5, 4, 4, 3, 3, 4, 5, 5, 5, 5, 4, 4, 3, 3, 4, 4,
-        5, 4, 4, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1,
+        1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 4, 4, 3, 4, 5, 5, 5, 4, 4, 3, 3, 4, 5, 5, 5, 5, 4, 4, 3, 3, 4,
+        4, 5, 4, 4, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1,
     ];
     viewerCurve.forEach((viewers, minute) => {
         analyticsRows.push({
@@ -3691,10 +3828,7 @@ const seed = async (): Promise<void> => {
             payload: { viewers },
         });
     });
-    const pinPlan: [
-        string,
-        number
-    ][] = [
+    const pinPlan: [string, number][] = [
         ['noise-airwave-max-5', 4],
         ['boat-rockerz-512-anc', 20],
         ['philips-tah6550', 34],
@@ -3709,11 +3843,7 @@ const seed = async (): Promise<void> => {
             payload: { slug },
         });
     }
-    const addToCartPlan: [
-        string,
-        string,
-        number
-    ][] = [
+    const addToCartPlan: [string, string, number][] = [
         ['noise-airwave-max-5', loyalId, 9],
         ['noise-airwave-max-5', shopperId, 14],
         ['noise-airwave-max-5', adminId, 18],
@@ -3737,24 +3867,36 @@ const seed = async (): Promise<void> => {
         sessionId: endedId,
         productId: null,
         type: 'order_created',
-        payload: { orderId: orderId('seed-loyal-order-3'), totalMinorUnits: 679820 },
+        payload: {
+            orderId: orderId('seed-loyal-order-3'),
+            totalMinorUnits: 679820,
+        },
     });
     await db.insert(t.analyticsEvents).values(analyticsRows);
     for (const s of sessionSeeds) {
         await redis.set(keys.sessionStatus(sessionId(s.slug)), s.status);
     }
-    await redis.hset(keys.sessionReactions(endedId), { '❤️': 128, '🔥': 64, '👏': 32, '😮': 11 });
+    await redis.hset(keys.sessionReactions(endedId), {
+        '❤️': 128,
+        '🔥': 64,
+        '👏': 32,
+        '😮': 11,
+    });
     const mp4Present = existsSync(join(env.RECORDING_LOCAL_DIR, 'sample-session.mp4'));
     if (!mp4Present) {
-        console.warn(`seed: ${join(env.RECORDING_LOCAL_DIR, 'sample-session.mp4')} is absent — recorded playback still points at ` +
-            `${SAMPLE_VOD_FALLBACK_URL}, and the CDN-tier step reports the missing HLS fixture rather than a broken player.`);
+        console.warn(
+            `seed: ${join(env.RECORDING_LOCAL_DIR, 'sample-session.mp4')} is absent — recorded playback still points at ` +
+                `${SAMPLE_VOD_FALLBACK_URL}, and the CDN-tier step reports the missing HLS fixture rather than a broken player.`,
+        );
     }
     const missingCovers = sessionSeeds
         .filter((s) => s.coverImageUrl?.startsWith('/media/recordings/covers/'))
         .filter((s) => !existsSync(join(env.RECORDING_LOCAL_DIR, 'covers', `${s.slug}.jpg`)));
     if (missingCovers.length > 0) {
-        console.warn(`seed: cover art missing for ${missingCovers.map((s) => s.slug).join(', ')} — those replay tiles fall back to ` +
-            'a decoded playback frame, which is the same path glow-live takes on purpose.');
+        console.warn(
+            `seed: cover art missing for ${missingCovers.map((s) => s.slug).join(', ')} — those replay tiles fall back to ` +
+                'a decoded playback frame, which is the same path glow-live takes on purpose.',
+        );
     }
     const counts = await pool.query<{
         table: string;
@@ -3788,30 +3930,34 @@ const seed = async (): Promise<void> => {
     const width = Math.max(...counts.rows.map((r) => r.table.length));
     for (const row of counts.rows)
         console.log(`  ${row.table.padEnd(width)}  ${String(row.rows).padStart(5)}`);
-    const replaySeeds = sessionSeeds.filter((s) => s.status === 'ended' && s.recordingStatus === 'ready' && s.recordingUrl !== null);
+    const replaySeeds = sessionSeeds.filter(
+        (s) => s.status === 'ended' && s.recordingStatus === 'ready' && s.recordingUrl !== null,
+    );
     const shardSummary = replaySeeds.map((s) => `${s.slug}=${s.chatShardCount}`).join(', ');
     const coverless = replaySeeds.filter((s) => s.coverImageUrl === null).map((s) => s.slug);
-    console.log([
-        '',
-        `  shopper logins  shopper@demo.test / loyal@demo.test / admin@demo.test`,
-        `  seller logins   ${SELLERS.map((s) => `${s.ownerEmail} (${s.displayName})`).join(', ')}`,
-        `  password        ${PASSWORD}`,
-        '  sessions        scheduled (+2h) | ready-to-go-live (start this one)',
-        '  live now        0',
-        `  replays         ${replaySeeds.map((s) => s.slug).join(' | ')} (${replaySeeds.length} playable)`,
-        `  covers          ${replaySeeds.length - coverless.length}/${replaySeeds.length} replays have cover art; ${coverless.join(', ') || 'none'} falls back to the playback frame`,
-        `  chat shards     ${shardSummary} (RTM_CHAT_SHARD_TARGET=${env.RTM_CHAT_SHARD_TARGET})`,
-        '',
-    ].join('\n'));
+    console.log(
+        [
+            '',
+            `  shopper logins  shopper@demo.test / loyal@demo.test / admin@demo.test`,
+            `  seller logins   ${SELLERS.map((s) => `${s.ownerEmail} (${s.displayName})`).join(', ')}`,
+            `  password        ${PASSWORD}`,
+            '  sessions        scheduled (+2h) | ready-to-go-live (start this one)',
+            '  live now        0',
+            `  replays         ${replaySeeds.map((s) => s.slug).join(' | ')} (${replaySeeds.length} playable)`,
+            `  covers          ${replaySeeds.length - coverless.length}/${replaySeeds.length} replays have cover art; ${coverless.join(', ') || 'none'} falls back to the playback frame`,
+            `  chat shards     ${shardSummary} (RTM_CHAT_SHARD_TARGET=${env.RTM_CHAT_SHARD_TARGET})`,
+            '',
+        ].join('\n'),
+    );
 };
 seed()
     .then(async () => {
-    await closeRedis();
-    await pool.end();
-})
+        await closeRedis();
+        await pool.end();
+    })
     .catch(async (err) => {
-    console.error(err);
-    await closeRedis();
-    await pool.end();
-    process.exit(1);
-});
+        console.error(err);
+        await closeRedis();
+        await pool.end();
+        process.exit(1);
+    });

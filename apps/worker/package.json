@@ -1,27 +1,32 @@
 {
-  "name": "@shop/worker",
-  "private": true,
-  "version": "1.0.0",
-  "type": "module",
-  "main": "./src/index.ts",
-  "exports": {
-    ".": "./src/index.ts",
-    "./background": "./src/background.ts",
-    "./leader": "./src/leader.ts"
-  },
-  "scripts": {
-    "dev": "node --env-file=../../.env --import tsx --watch src/index.ts",
-    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node22 --packages=external --outfile=dist/index.js",
-    "start": "node dist/index.js",
-    "start:dev": "node --env-file=../../.env --import tsx src/index.ts"
-  },
-  "dependencies": {
-    "@shop/db": "*",
-    "@shop/api": "*",
-    "@shop/shared": "*"
-  },
-  "devDependencies": {
-    "esbuild": "^0.25.0",
-    "tsx": "^4.19.2"
-  }
+    "name": "@shop/worker",
+    "private": true,
+    "version": "1.0.0",
+    "type": "module",
+    "main": "./src/index.ts",
+    "exports": {
+        ".": "./src/index.ts",
+        "./background": "./src/background.ts",
+        "./leader": "./src/leader.ts"
+    },
+    "scripts": {
+        "dev": "node --env-file=../../.env --import tsx --watch src/index.ts",
+        "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node22 --packages=external --outfile=dist/index.js",
+        "start": "node dist/index.js",
+        "start:dev": "node --env-file=../../.env --import tsx src/index.ts"
+    },
+    "dependencies": {
+        "@shop/agora": "*",
+        "@shop/ai": "*",
+        "@shop/db": "*",
+        "@shop/domain-commerce": "*",
+        "@shop/domain-live": "*",
+        "@shop/platform": "*",
+        "@shop/shared": "*",
+        "drizzle-orm": "^0.38.3"
+    },
+    "devDependencies": {
+        "esbuild": "^0.25.0",
+        "tsx": "^4.19.2"
+    }
 }

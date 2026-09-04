@@ -14,18 +14,18 @@ Start here: [`docs/hld/hld-one-page.excalidraw`](docs/hld/hld-one-page.excalidra
 
 ## Prerequisites
 
-| Requirement                           | Notes                                                                           |
-| ------------------------------------- | ------------------------------------------------------------------------------- |
-| Node **≥ 22**                         | required by `openai@7`; built and tested on Node 24                             |
-| PostgreSQL **≥ 15**                   | `UNIQUE NULLS NOT DISTINCT` is load-bearing for cart lines                      |
-| Redis 7                               | sessions, presence, leases, streams, pub/sub                                    |
-| Docker _or_ nginx + redis natively    | `infra/docker-compose.yml`, or `npm run stack:up` (see below)                   |
-| ngrok                                 | so Agora can reach the custom-LLM callback                                      |
-| MinIO _(or any S3-compatible bucket)_ | stores session recordings; `brew install minio` runs it locally                 |
-| ffmpeg                                | speech-format encoding; also builds media fixtures and the simulated-HLS ladder |
-| MediaMTX _(optional)_                 | free local RTMP→HLS origin for the CDN tier — `infra/mediamtx.yml`              |
+| Requirement                           | Notes                                                                             |
+| ------------------------------------- | --------------------------------------------------------------------------------- |
+| Node **≥ 22**                         | required by `openai@7`; built and tested on Node 24                               |
+| PostgreSQL **≥ 15**                   | `UNIQUE NULLS NOT DISTINCT` is load-bearing for cart lines                        |
+| Redis 7                               | sessions, presence, leases, streams, pub/sub                                      |
+| Docker _or_ nginx + redis natively    | `infra/docker-compose.yml`, or `npm run stack:up` (see below)                     |
+| ngrok                                 | so Agora can reach `/mcp` in dev (optional if `PUBLIC_API_URL` is already public) |
+| MinIO _(or any S3-compatible bucket)_ | stores session recordings; `brew install minio` runs it locally                   |
+| ffmpeg                                | speech-format encoding; also builds media fixtures and the simulated-HLS ladder   |
+| MediaMTX _(optional)_                 | free local RTMP→HLS origin for the CDN tier — `infra/mediamtx.yml`                |
 
-**Credentials.** You need an Agora App ID + App Certificate + Customer ID/Secret with **Conversational AI Engine** and **Real-Time Speech-to-Text** enabled, and an **OpenRouter** API key. Voice TTS is **Agora-managed** (OpenAI or minimax vendor via ConvoAI — no separate TTS API key). Cloud Recording and Media Push remain optional paid Agora add-ons.
+**Credentials.** Agora App ID + Certificate + Customer ID/Secret (ConvoAI + RTT). For text chat, set `LLM_PROVIDER=openrouter` and `LLM_API_KEY` — voice does not need them.
 
 ### Agora Console (enable before demo)
 
@@ -44,7 +44,7 @@ Also ensure **Primary Certificate** is enabled on the project.
 ## Run it
 
 ```bash
-cp .env.example .env          # then fill in the Agora + OpenRouter values
+cp .env.example .env          # then fill in Agora credentials (+ LLM_API_KEY for text chat)
 npm install
 
 npm run stack:up              # redis + nginx (:8080) over two API replicas; checks postgres
@@ -99,12 +99,12 @@ cookie.
 
 **Free-tier limits to expect:**
 
-| Limit | Effect |
-| ----- | ------ |
-| Spin-down after ~15 min idle | First request after idle can take ~1 minute |
-| Postgres expires after 30 days | Upgrade the database before expiry to keep data |
+| Limit                          | Effect                                                                        |
+| ------------------------------ | ----------------------------------------------------------------------------- |
+| Spin-down after ~15 min idle   | First request after idle can take ~1 minute                                   |
+| Postgres expires after 30 days | Upgrade the database before expiry to keep data                               |
 | 512 MB RAM, no persistent disk | Voice uses Agora managed TTS (no Kokoro in-process); recordings are ephemeral |
-| No private services / workers | Everything runs in-process in the one web container |
+| No private services / workers  | Everything runs in-process in the one web container                           |
 
 After deploy:
 
@@ -115,8 +115,8 @@ https://<your-service>.onrender.com/support/    support console
 https://<your-service>.onrender.com/api/health
 ```
 
-Log in with the demo accounts below. Point Agora's custom-LLM callback at
-`https://<your-service>.onrender.com` (no ngrok needed).
+Log in with the demo accounts below. Ensure `PUBLIC_API_URL` points at
+`https://<your-service>.onrender.com` so Agora can reach `/mcp` (no ngrok needed on Render).
 
 ### The second replica
 
@@ -216,19 +216,13 @@ node --env-file=.env --import tsx apps/api/src/mcp/__checks__/mcp.check.ts
 3. Open the **support dashboard** at `http://localhost:5175` (`npm run dev:support -w @shop/web`), sign in as `support@demo.test` / `demo1234`, accept the ticket, and join the shopper's `ai-<conversationId>` RTC channel.
 4. The shopper UI shows a handoff notice while waiting for the agent.
 
-## Voice AI: custom LLM + Agora managed TTS
+## Voice AI: Agora managed ASR + LLM + TTS
 
-`CONVOAI_LLM_MODE=custom` is the default voice path. Agora streams ASR text to the signed completions callback (`POST /api/ai/convo/:id/chat/completions`); the callback runs the model and shopping tools and streams **text** deltas over SSE. Agora's managed TTS (`CONVOAI_TTS_VOICE`, `CONVOAI_TTS_SPEED`) renders speech in the RTC channel. Per-conversation HMAC headers (`X-Convo-Id`, `X-Convo-Expires`, `X-Convo-Signature`) scope every callback to one shopper session.
+Voice uses Agora ConvoAI end-to-end: **ARES ASR** transcribes speech, Agora's **managed LLM** reasons and calls shopping tools over streamable HTTP at `POST /mcp`, and **managed TTS** speaks the reply in the RTC channel. Per-conversation HMAC headers (`X-Convo-Id`, `X-Convo-Expires`, `X-Convo-Signature`) are attached to every MCP tool call so catalog access stays scoped to one shopper session.
 
-`CONVOAI_LLM_MODE=mcp` remains available. It uses Agora's managed LLM, calls catalog tools over streamable HTTP at `POST /mcp`, and uses the same Agora managed TTS path. Text turns on the same conversation route tools through the MCP loopback first. If an MCP join or tool transport fails, the session falls back to the custom path automatically.
+MCP is wired programmatically when the agent joins at `${PUBLIC_API_URL}/mcp`. Text chat (degraded mode) uses `LLM_PROVIDER` (defaults to `mock`).
 
-**Optional MCP-mode Agora Console setup:**
-
-1. **Integrations → MCP Servers** — create `shop` pointing at `https://<PUBLIC_API>/mcp` (streamable HTTP, 10s timeout). In dev, expose the API with ngrok and set `MCP_ENDPOINT_URL`.
-2. **Agents → Customer service agent** — **Prompt**: base persona + escalation instructions; **Models**: managed ASR and managed LLM; **Actions**: attach the `shop` MCP server and enable shopping + order tools; **Advanced**: tools + RTM data channel.
-3. Publish the agent. Mirror model vendor/name in `.env` (`AGORA_MANAGED_LLM_VENDOR`, `AGORA_MANAGED_LLM_MODEL`).
-
-Dynamic commerce context is recomputed by the custom callback on every turn. MCP mode obtains the same state through `get_conversation_context`. Text transport uses the configured model provider with the same tool handlers.
+Dynamic commerce context is available through the `get_conversation_context` MCP tool. Text transport uses the configured model provider with the same direct tool handlers.
 
 ## What is mocked, and why
 
@@ -249,15 +243,15 @@ The brief explicitly permits mock inventory, product, serviceability, payment an
 
 Nothing below is claimed as working when it cannot be. This table is repeated verbatim from the plan.
 
-| Capability                                                     | Status                                                                                                                                                                                                                                                                                     | Missing prerequisite             |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------- |
-| ConvoAI voice pipeline (ARES ASR + Agora managed TTS)          | **Built** — the custom callback streams text; Agora speaks it; optional `mcp` mode retains Agora-managed LLM + MCP tools                                                                                                 | public API URL in dev            |
-| Host captions (Real-Time STT v7)                               | **Verified with real credentials** — join → `RUNNING` → query → leave, 5/5 (`apps/api/src/agora/__checks__/rtt.check.ts`)                                                                                                                                                                  | —                                |
-| Session recording → object storage → replay                    | **Verified end to end** against MinIO: upload → object stored → public `GET 200`, `206` on range requests → `DELETE` removes object + local copy + row                                                                                                                                     | —                                |
-| Chat sharding, moderation authority, stateless routing         | **Built** below the default 500 REST req/s per App ID                                                                                                                                                                                                                                      | an Agora quota increase for more |
-| Media Push → real CDN/HLS, end to end                          | **`unverified — external RTMP/HLS origin required`.** The converter call, the threshold, the single transition event and the client HLS handoff are built and exercised against a **`simulated-origin`** HLS file. That is _not_ evidence that video traversed Agora Media Push.           | CDN RTMP ingest + HLS origin     |
-| Agora Cloud Recording                                          | **Not used — deliberately dropped.** A **paid add-on** (`400 invalid_appid` until purchased), and it adds nothing over browser capture + a real object store. Kept behind `RECORDING_PROVIDER=agora`, including the `vendor: 11` S3-compatible `storageConfig`, for a customer who has it. | the paid add-on                  |
-| PSTN                                                           | **Stub routes only** (`POST /api/pstn/incoming`, `POST /api/pstn/callback`). In-app human handoff via support dashboard is built.                                                                                                                                                          | phone number / SIP trunk         |
+| Capability                                             | Status                                                                                                                                                                                                                                                                                     | Missing prerequisite             |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------- |
+| ConvoAI voice pipeline (ARES ASR + Agora managed TTS)  | **Built** — the custom callback streams text; Agora speaks it; optional `mcp` mode retains Agora-managed LLM + MCP tools                                                                                                                                                                   | public API URL in dev            |
+| Host captions (Real-Time STT v7)                       | **Verified with real credentials** — join → `RUNNING` → query → leave, 5/5 (`apps/api/src/agora/__checks__/rtt.check.ts`)                                                                                                                                                                  | —                                |
+| Session recording → object storage → replay            | **Verified end to end** against MinIO: upload → object stored → public `GET 200`, `206` on range requests → `DELETE` removes object + local copy + row                                                                                                                                     | —                                |
+| Chat sharding, moderation authority, stateless routing | **Built** below the default 500 REST req/s per App ID                                                                                                                                                                                                                                      | an Agora quota increase for more |
+| Media Push → real CDN/HLS, end to end                  | **`unverified — external RTMP/HLS origin required`.** The converter call, the threshold, the single transition event and the client HLS handoff are built and exercised against a **`simulated-origin`** HLS file. That is _not_ evidence that video traversed Agora Media Push.           | CDN RTMP ingest + HLS origin     |
+| Agora Cloud Recording                                  | **Not used — deliberately dropped.** A **paid add-on** (`400 invalid_appid` until purchased), and it adds nothing over browser capture + a real object store. Kept behind `RECORDING_PROVIDER=agora`, including the `vendor: 11` S3-compatible `storageConfig`, for a customer who has it. | the paid add-on                  |
+| PSTN                                                   | **Stub routes only** (`POST /api/pstn/incoming`, `POST /api/pstn/callback`). In-app human handoff via support dashboard is built.                                                                                                                                                          | phone number / SIP trunk         |
 
 If `MEDIA_PUSH_ENABLED=false` (the default), every surface — UI badge, API response and analytics — says `simulated-origin`. Voice audio uses Agora managed TTS (`CONVOAI_TTS_VOICE`, `CONVOAI_TTS_SPEED`).
 
@@ -266,7 +260,7 @@ If `MEDIA_PUSH_ENABLED=false` (the default), every surface — UI badge, API res
 ```
 apps/api/src
   agora/        tokens, signaling REST, convoai, recording, rtt, mediapush   ← the Agora surface
-  ai/           callbackAuth, admission, executor, completionsRoute,
+  ai/           callbackAuth, admission, executor, mcp/server,
                 providers/{openrouter,openai-compatible,mock}, transports/   ← the AI↔commerce boundary
   mcp/          streamable HTTP server, HMAC auth, shared tool execution      ← Agora MCP tools
   domain/       catalog, eligibility, promotions, cart, orders, fulfilment, support, …
@@ -293,10 +287,8 @@ infra/           docker-compose.yml, nginx.conf, Dockerfile
 | `RTC_TIER_MAX_VIEWERS`          | `3`                     | viewer count that flips a session to the CDN tier. 3 so three tabs demonstrate it; the load stack uses 150; production derives from the 10k PCU / 10 Gbps regional quota |
 | `RTM_CHAT_SHARD_TARGET`         | `2`                     | viewers per chat shard. `clamp(ceil(expectedPeakViewers / target), 1, 49)` is frozen at go-live and never recomputed                                                     |
 | `CONVOAI_MAX_CONCURRENT_AGENTS` | `15`                    | under Agora's documented default of 20 per App ID. On exhaustion the client degrades to a labelled text transport                                                        |
-| `CONVOAI_TURN_TIMEOUT_MS`       | `12000`                 | bounds a stalled spoken turn and returns a retryable voice response instead of waiting indefinitely                                                                      |
-| `CONVOAI_LLM_MODE`              | `custom`                | `custom` = stream model text for Agora TTS; `mcp` = managed LLM + `/mcp` tools                                                                                          |
-| `MCP_ENDPOINT_URL`              | _(PUBLIC_API)/mcp_      | public URL Agora calls for MCP (set to ngrok URL in dev)                                                                                                                 |
-| `LLM_PROVIDER`                  | `openrouter`            | `openrouter` · `openai-compatible` · `mock` (used by tests and the load suite)                                                                                           |
+| `AGORA_MANAGED_LLM_MODEL`       | `gpt-4o-mini`           | managed LLM Agora uses for voice reasoning + tool calls                                                                                                                  |
+| `LLM_PROVIDER`                  | `mock`                  | `mock` for dev/Render free tier; set `openrouter` + `LLM_API_KEY` for real text chat                                                                                     |
 | `PRIVACY_MODE`                  | `standard`              | `strict` stops persisting transcript and AI message bodies, and requires viewer recording consent before video renders                                                   |
 | `MAX_TOTAL_DISCOUNT_PCT`        | `50`                    | cap applied to the winning promotion candidate                                                                                                                           |
 | `TRANSCRIPTION_PROVIDER`        | `agora`                 | Real-Time STT v7 host captions are enabled for live video; set `off` only for local environments without Agora customer credentials                                      |

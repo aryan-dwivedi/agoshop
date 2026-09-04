@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+
 type AssistantSurfaceStore = {
     pageOwned: boolean;
     openSignal: number;
@@ -18,9 +19,10 @@ export const useAssistantSurface = create<AssistantSurfaceStore>((set) => ({
     claimPage: () => set({ pageOwned: true }),
     releasePage: () => set({ pageOwned: false }),
     requestOpen: () => set((state) => ({ openSignal: state.openSignal + 1 })),
-    requestBrowseAssistant: (prompt) => set((state) => ({
-        browseRequested: state.browseRequested + 1,
-        browseSeedPrompt: prompt ?? null,
-    })),
+    requestBrowseAssistant: (prompt) =>
+        set((state) => ({
+            browseRequested: state.browseRequested + 1,
+            browseSeedPrompt: prompt ?? null,
+        })),
     consumeBrowseSeed: () => set({ browseSeedPrompt: null }),
 }));

@@ -1,55 +1,55 @@
 {
-  "version": "7",
-  "dialect": "postgresql",
-  "entries": [
-    {
-      "idx": 0,
-      "version": "7",
-      "when": 1788329756421,
-      "tag": "0000_shocking_venom",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1788378260474,
-      "tag": "0001_overrated_silver_samurai",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1788379067721,
-      "tag": "0002_worthless_true_believers",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1788409630431,
-      "tag": "0003_empty_spyke",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1788415000000,
-      "tag": "0004_async_checkout",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": 7,
-      "when": 1788420000000,
-      "tag": "0005_mcp_support",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1788425000000,
-      "tag": "0006_media_gateway",
-      "breakpoints": true
-    }
-  ]
+    "version": "7",
+    "dialect": "postgresql",
+    "entries": [
+        {
+            "idx": 0,
+            "version": "7",
+            "when": 1788329756421,
+            "tag": "0000_shocking_venom",
+            "breakpoints": true
+        },
+        {
+            "idx": 1,
+            "version": "7",
+            "when": 1788378260474,
+            "tag": "0001_overrated_silver_samurai",
+            "breakpoints": true
+        },
+        {
+            "idx": 2,
+            "version": "7",
+            "when": 1788379067721,
+            "tag": "0002_worthless_true_believers",
+            "breakpoints": true
+        },
+        {
+            "idx": 3,
+            "version": "7",
+            "when": 1788409630431,
+            "tag": "0003_empty_spyke",
+            "breakpoints": true
+        },
+        {
+            "idx": 4,
+            "version": "7",
+            "when": 1788415000000,
+            "tag": "0004_async_checkout",
+            "breakpoints": true
+        },
+        {
+            "idx": 5,
+            "version": 7,
+            "when": 1788420000000,
+            "tag": "0005_mcp_support",
+            "breakpoints": true
+        },
+        {
+            "idx": 6,
+            "version": "7",
+            "when": 1788425000000,
+            "tag": "0006_media_gateway",
+            "breakpoints": true
+        }
+    ]
 }

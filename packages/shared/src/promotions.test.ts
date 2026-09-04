@@ -1,5 +1,9 @@
+import type { LineContext, Promotion } from './promotions.js';
+
 import { describe, expect, it } from 'vitest';
-import { evaluatePromotions, type LineContext, type Promotion } from './promotions.js';
+
+import { evaluatePromotions } from './promotions.js';
+
 const promo = (over: Partial<Promotion> & Pick<Promotion, 'code'>): Promotion => ({
     id: over.code,
     label: `${over.code} label`,
@@ -51,26 +55,42 @@ describe('live-session eligibility', () => {
         expect(ended.netMinorUnits).toBe(100000);
     });
     it('never trusts the surface alone — a browse surface with a stale session id stays ineligible', () => {
-        const result = evaluatePromotions([LIVE20], ctx({ surface: 'browse', liveEligible: false, liveSessionId: 'session-1' }), 50);
+        const result = evaluatePromotions(
+            [LIVE20],
+            ctx({ surface: 'browse', liveEligible: false, liveSessionId: 'session-1' }),
+            50,
+        );
         expect(result.applied).toEqual([]);
     });
 });
 describe('candidate classes: non-stackable means it combines with nothing', () => {
     it('seeded LIVE20 excludes WISHLIST5, which is reported as not_stackable', () => {
-        const result = evaluatePromotions([LIVE20, WISHLIST5], ctx({ userSegments: ['has_wishlisted'] }), 50);
+        const result = evaluatePromotions(
+            [LIVE20, WISHLIST5],
+            ctx({ userSegments: ['has_wishlisted'] }),
+            50,
+        );
         expect(result.applied.map((a) => a.code)).toEqual(['LIVE20']);
         expect(result.suppressed).toEqual([
             { code: 'WISHLIST5', label: 'WISHLIST5 label', reason: 'not_stackable' },
         ]);
     });
     it('flipping LIVE20.stackable to true is exactly what permits the combination', () => {
-        const result = evaluatePromotions([{ ...LIVE20, stackable: true }, WISHLIST5], ctx({ userSegments: ['has_wishlisted'] }), 50);
+        const result = evaluatePromotions(
+            [{ ...LIVE20, stackable: true }, WISHLIST5],
+            ctx({ userSegments: ['has_wishlisted'] }),
+            50,
+        );
         expect(result.applied.map((a) => a.code).sort()).toEqual(['LIVE20', 'WISHLIST5']);
         expect(result.discountMinorUnits).toBe(25000);
         expect(result.suppressed).toEqual([]);
     });
     it('prefers a single large non-stackable over a smaller stackable set', () => {
-        const result = evaluatePromotions([LIVE20, WISHLIST5, promo({ code: 'TINY', value: 1, stackable: true })], ctx({ userSegments: ['has_wishlisted'] }), 50);
+        const result = evaluatePromotions(
+            [LIVE20, WISHLIST5, promo({ code: 'TINY', value: 1, stackable: true })],
+            ctx({ userSegments: ['has_wishlisted'] }),
+            50,
+        );
         expect(result.applied.map((a) => a.code)).toEqual(['LIVE20']);
         expect(result.suppressed.map((s) => s.reason)).toEqual(['not_stackable', 'not_stackable']);
     });
@@ -123,7 +143,9 @@ describe('the total cap', () => {
         const result = evaluatePromotions([huge], ctx(), 50);
         expect(result.discountMinorUnits).toBe(50000);
         expect(result.applied).toEqual([{ code: 'HUGE', label: 'HUGE label', minorUnits: 50000 }]);
-        expect(result.suppressed).toEqual([{ code: 'HUGE', label: 'HUGE label', reason: 'capped' }]);
+        expect(result.suppressed).toEqual([
+            { code: 'HUGE', label: 'HUGE label', reason: 'capped' },
+        ]);
     });
 });
 describe('conditions', () => {
@@ -135,7 +157,11 @@ describe('conditions', () => {
         });
         const fresh = evaluatePromotions([limited], ctx(), 50);
         expect(fresh.applied.map((a) => a.code)).toEqual(['ONCE']);
-        const used = evaluatePromotions([limited], ctx({ redemptionsByPromotionId: { ONCE: 1 } }), 50);
+        const used = evaluatePromotions(
+            [limited],
+            ctx({ redemptionsByPromotionId: { ONCE: 1 } }),
+            50,
+        );
         expect(used.applied).toEqual([]);
         expect(used.suppressed).toEqual([
             { code: 'ONCE', label: 'ONCE label', reason: 'redemption_limit' },
@@ -153,12 +179,22 @@ describe('conditions', () => {
             conditions: { categorySlugs: ['cosmetics'], minLineMinorUnits: 99900 },
         });
         expect(evaluatePromotions([beauty], ctx(), 50).applied).toEqual([]);
-        expect(evaluatePromotions([beauty], ctx({ categorySlug: 'cosmetics' }), 50).applied.map((a) => a.code)).toEqual(['BEAUTY15']);
-        expect(evaluatePromotions([beauty], ctx({
-            categorySlug: 'cosmetics',
-            unitPriceMinorUnits: 50000,
-            orderSubtotalMinorUnits: 50000,
-        }), 50).applied).toEqual([]);
+        expect(
+            evaluatePromotions([beauty], ctx({ categorySlug: 'cosmetics' }), 50).applied.map(
+                (a) => a.code,
+            ),
+        ).toEqual(['BEAUTY15']);
+        expect(
+            evaluatePromotions(
+                [beauty],
+                ctx({
+                    categorySlug: 'cosmetics',
+                    unitPriceMinorUnits: 50000,
+                    orderSubtotalMinorUnits: 50000,
+                }),
+                50,
+            ).applied,
+        ).toEqual([]);
     });
     it('is order-independent: shuffling the input cannot change the outcome', () => {
         const rules = [
@@ -167,7 +203,11 @@ describe('conditions', () => {
             promo({ code: 'MID', value: 12, stackable: true, priority: 3 }),
         ];
         const forward = evaluatePromotions(rules, ctx({ userSegments: ['has_wishlisted'] }), 50);
-        const reversed = evaluatePromotions([...rules].reverse(), ctx({ userSegments: ['has_wishlisted'] }), 50);
+        const reversed = evaluatePromotions(
+            [...rules].reverse(),
+            ctx({ userSegments: ['has_wishlisted'] }),
+            50,
+        );
         expect(reversed.discountMinorUnits).toBe(forward.discountMinorUnits);
         expect(reversed.applied).toEqual(forward.applied);
     });

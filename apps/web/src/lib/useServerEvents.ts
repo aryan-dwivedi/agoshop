@@ -1,8 +1,13 @@
+import type { CartDto, EventName, ServerEvent } from '@shop/shared';
+
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { EVENTS, type CartDto, type EventName, type ServerEvent } from '@shop/shared';
+
+import { EVENTS } from '@shop/shared';
+
 type Handler = (event: ServerEvent) => void;
-const isCartDto = (data: unknown): data is CartDto => typeof data === 'object' &&
+const isCartDto = (data: unknown): data is CartDto =>
+    typeof data === 'object' &&
     data !== null &&
     'items' in data &&
     'totals' in data &&
@@ -16,11 +21,9 @@ export const useServerEvents = (opts: {
     const queryClient = useQueryClient();
     const key = (sessionIds ?? []).join(',');
     useEffect(() => {
-        if (!enabled)
-            return;
+        if (!enabled) return;
         const params = new URLSearchParams();
-        for (const id of key.length > 0 ? key.split(',') : [])
-            params.append('sessionId', id);
+        for (const id of key.length > 0 ? key.split(',') : []) params.append('sessionId', id);
         const url = `/api/events${params.toString() ? `?${params.toString()}` : ''}`;
         const source = new EventSource(url, { withCredentials: true });
         const refetchAuthoritative = () => {
@@ -35,8 +38,7 @@ export const useServerEvents = (opts: {
                 case EVENTS.cartUpdated:
                     if (isCartDto(event.data)) {
                         queryClient.setQueryData(['cart'], event.data);
-                    }
-                    else {
+                    } else {
                         void queryClient.refetchQueries({ queryKey: ['cart'] });
                     }
                     break;

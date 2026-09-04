@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AiProductCard } from '@shop/shared';
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
 import { api } from '../lib/api';
+
 const ASSISTANT_TURN_TIMEOUT_MS = 30000;
 export type TextAssistMessage = {
     id: string;
@@ -29,9 +32,7 @@ type SpeechRecognizer = {
     continuous: boolean;
     interimResults: boolean;
     onresult: ((event: SpeechEvent) => void) | null;
-    onerror: ((event: {
-        error: string;
-    }) => void) | null;
+    onerror: ((event: { error: string }) => void) | null;
     onend: (() => void) | null;
     start: () => void;
     stop: () => void;
@@ -73,58 +74,72 @@ export const useTextAssist = (opts: {
     messagesRef.current = messages;
     const recognizerRef = useRef<SpeechRecognizer | null>(null);
     const supported = useMemo(() => recognizerConstructor() !== null, []);
-    const send = useCallback(async (text: string): Promise<void> => {
-        const body = text.trim();
-        if (body.length === 0 || pendingRef.current)
-            return;
-        pendingRef.current = true;
-        const id = crypto.randomUUID();
-        setMessages((current) => [
-            ...current,
-            { id, role: 'user', text: body, language: resolveLanguage(), products: [] },
-        ]);
-        setPending(true);
-        setError(null);
-        try {
-            const conversationId = await ensureConversation();
-            const result = await api.post<{
-                reply: string;
-                language: string;
-                products?: AiProductCard[];
-            }>(`/api/ai/convo/${conversationId}/message`, {
-                text: body,
-                history: messagesRef.current.slice(-12).map((message) => ({
-                    role: message.role,
-                    content: message.text,
-                })),
-            }, undefined, AbortSignal.timeout(ASSISTANT_TURN_TIMEOUT_MS));
+    const send = useCallback(
+        async (text: string): Promise<void> => {
+            const body = text.trim();
+            if (body.length === 0 || pendingRef.current) return;
+            pendingRef.current = true;
+            const id = crypto.randomUUID();
             setMessages((current) => [
-                ...current.map((message) => message.id === id ? { ...message, language: result.language } : message),
+                ...current,
                 {
-                    id: crypto.randomUUID(),
-                    role: 'assistant',
-                    text: result.reply,
-                    language: result.language,
-                    products: result.products ?? [],
+                    id,
+                    role: 'user',
+                    text: body,
+                    language: resolveLanguage(),
+                    products: [],
                 },
             ]);
-        }
-        catch (err) {
-            setError(err instanceof DOMException && err.name === 'TimeoutError'
-                ? 'That took too long, so I stopped the request. Try once more.'
-                : "That didn't go through — try again.");
-        }
-        finally {
-            pendingRef.current = false;
-            setPending(false);
-        }
-    }, [ensureConversation, resolveLanguage]);
+            setPending(true);
+            setError(null);
+            try {
+                const conversationId = await ensureConversation();
+                const result = await api.post<{
+                    reply: string;
+                    language: string;
+                    products?: AiProductCard[];
+                }>(
+                    `/api/ai/convo/${conversationId}/message`,
+                    {
+                        text: body,
+                        history: messagesRef.current.slice(-12).map((message) => ({
+                            role: message.role,
+                            content: message.text,
+                        })),
+                    },
+                    undefined,
+                    AbortSignal.timeout(ASSISTANT_TURN_TIMEOUT_MS),
+                );
+                setMessages((current) => [
+                    ...current.map((message) =>
+                        message.id === id ? { ...message, language: result.language } : message,
+                    ),
+                    {
+                        id: crypto.randomUUID(),
+                        role: 'assistant',
+                        text: result.reply,
+                        language: result.language,
+                        products: result.products ?? [],
+                    },
+                ]);
+            } catch (err) {
+                setError(
+                    err instanceof DOMException && err.name === 'TimeoutError'
+                        ? 'That took too long, so I stopped the request. Try once more.'
+                        : "That didn't go through — try again.",
+                );
+            } finally {
+                pendingRef.current = false;
+                setPending(false);
+            }
+        },
+        [ensureConversation, resolveLanguage],
+    );
     const sendRef = useRef(send);
     sendRef.current = send;
     const startDictation = useCallback(() => {
         const Recognizer = recognizerConstructor();
-        if (!Recognizer || recognizerRef.current)
-            return;
+        if (!Recognizer || recognizerRef.current) return;
         const recognizer = new Recognizer();
         recognizerRef.current = recognizer;
         recognizer.lang = resolveLanguage();
@@ -135,12 +150,9 @@ export const useTextAssist = (opts: {
             let draft = '';
             for (let i = event.resultIndex; i < event.results.length; i += 1) {
                 const result = event.results[i];
-                if (!result)
-                    continue;
-                if (result.isFinal)
-                    finalText += result[0].transcript;
-                else
-                    draft += result[0].transcript;
+                if (!result) continue;
+                if (result.isFinal) finalText += result[0].transcript;
+                else draft += result[0].transcript;
             }
             setInterim(draft);
             if (finalText.trim().length > 0) {
@@ -149,9 +161,11 @@ export const useTextAssist = (opts: {
             }
         };
         recognizer.onerror = (event) => {
-            setError(event.error === 'not-allowed'
-                ? "Your browser is blocking the microphone — keep typing and I'll answer."
-                : "The mic didn't catch that — try again.");
+            setError(
+                event.error === 'not-allowed'
+                    ? "Your browser is blocking the microphone — keep typing and I'll answer."
+                    : "The mic didn't catch that — try again.",
+            );
         };
         recognizer.onend = () => {
             recognizerRef.current = null;
@@ -164,10 +178,13 @@ export const useTextAssist = (opts: {
     const stopDictation = useCallback(() => {
         recognizerRef.current?.stop();
     }, []);
-    useEffect(() => () => {
-        recognizerRef.current?.abort();
-        recognizerRef.current = null;
-    }, []);
+    useEffect(
+        () => () => {
+            recognizerRef.current?.abort();
+            recognizerRef.current = null;
+        },
+        [],
+    );
     return {
         messages,
         send,

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+
 export const useOfflineGuard = (): boolean => {
     const [offline, setOffline] = useState(() => !window.navigator.onLine);
     useEffect(() => {

@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ConnectionState, IAgoraRTCClient, NetworkQuality } from 'agora-rtc-sdk-ng';
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+
 export type StreamHealthState = 'unknown' | 'good' | 'strain' | 'bad';
 export const HEALTH_CODE: Record<StreamHealthState, number> = {
     unknown: 0,
@@ -63,30 +65,38 @@ const grade = (opts: {
     uplink: number;
 }): number => {
     const { sendBitrate, targetSendBitrate, loss, uplink } = opts;
-    if (targetSendBitrate <= 0 && sendBitrate <= 0 && uplink === 0)
-        return HEALTH_CODE.unknown;
+    if (targetSendBitrate <= 0 && sendBitrate <= 0 && uplink === 0) return HEALTH_CODE.unknown;
     let code = HEALTH_CODE.good;
     if (targetSendBitrate > 0) {
         const ratio = sendBitrate / targetSendBitrate;
-        code = worse(code, ratio >= RATIO_GOOD
-            ? HEALTH_CODE.good
-            : ratio >= RATIO_STRAIN
-                ? HEALTH_CODE.strain
-                : HEALTH_CODE.bad);
+        code = worse(
+            code,
+            ratio >= RATIO_GOOD
+                ? HEALTH_CODE.good
+                : ratio >= RATIO_STRAIN
+                  ? HEALTH_CODE.strain
+                  : HEALTH_CODE.bad,
+        );
     }
     if (Number.isFinite(loss)) {
-        code = worse(code, loss < LOSS_GOOD
-            ? HEALTH_CODE.good
-            : loss < LOSS_STRAIN
-                ? HEALTH_CODE.strain
-                : HEALTH_CODE.bad);
+        code = worse(
+            code,
+            loss < LOSS_GOOD
+                ? HEALTH_CODE.good
+                : loss < LOSS_STRAIN
+                  ? HEALTH_CODE.strain
+                  : HEALTH_CODE.bad,
+        );
     }
     if (uplink > 0) {
-        code = worse(code, uplink <= UPLINK_GOOD
-            ? HEALTH_CODE.good
-            : uplink <= UPLINK_STRAIN
-                ? HEALTH_CODE.strain
-                : HEALTH_CODE.bad);
+        code = worse(
+            code,
+            uplink <= UPLINK_GOOD
+                ? HEALTH_CODE.good
+                : uplink <= UPLINK_STRAIN
+                  ? HEALTH_CODE.strain
+                  : HEALTH_CODE.bad,
+        );
     }
     return code;
 };
@@ -126,20 +136,20 @@ export const useStreamHealth = (opts: {
         };
     }, [client]);
     useEffect(() => {
-        if (!client || !enabled)
-            return;
+        if (!client || !enabled) return;
         const tick = (): void => {
             const video = client.getLocalVideoStats();
             const rtc = client.getRTCStats();
             const uplink = uplinkRef.current;
-            const code = connectionRef.current === 'RECONNECTING' || connectionRef.current === 'DISCONNECTED'
-                ? HEALTH_CODE.bad
-                : grade({
-                    sendBitrate: video.sendBitrate,
-                    targetSendBitrate: video.targetSendBitrate,
-                    loss: video.currentPacketLossRate,
-                    uplink,
-                });
+            const code =
+                connectionRef.current === 'RECONNECTING' || connectionRef.current === 'DISCONNECTED'
+                    ? HEALTH_CODE.bad
+                    : grade({
+                          sendBitrate: video.sendBitrate,
+                          targetSendBitrate: video.targetSendBitrate,
+                          loss: video.currentPacketLossRate,
+                          uplink,
+                      });
             const history = [...historyRef.current, code].slice(-HISTORY_CELLS);
             historyRef.current = history;
             setSample((current) => ({
@@ -159,7 +169,8 @@ export const useStreamHealth = (opts: {
         return () => window.clearInterval(id);
     }, [client, enabled]);
     return useMemo(() => {
-        const dropped = connectionState === 'RECONNECTING' ||
+        const dropped =
+            connectionState === 'RECONNECTING' ||
             (connectionState === 'DISCONNECTED' && sample.taken > 0);
         const code = dropped ? HEALTH_CODE.bad : sample.code;
         const state = HEALTH_STATE_BY_CODE[code] ?? 'unknown';

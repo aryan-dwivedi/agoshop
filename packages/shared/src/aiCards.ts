@@ -1,4 +1,5 @@
 import type { ProductDto } from './types.js';
+
 export type AiProductCard = {
     productId: string;
     slug: string;

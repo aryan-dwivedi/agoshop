@@ -1,5 +1,7 @@
 import type { Role } from '@shop/shared';
+
 import { sellerUrl, supportUrl } from './origins';
+
 export const DEMO_PASSWORD = 'demo1234';
 export type DemoPersona = {
     role: Role;
@@ -33,8 +35,7 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
 ] as const;
 export const demoPersona = (role: Role): DemoPersona => {
     const persona = DEMO_PERSONAS.find((p) => p.role === role);
-    if (!persona)
-        throw new Error(`no demo persona for role ${role}`);
+    if (!persona) throw new Error(`no demo persona for role ${role}`);
     return persona;
 };
 export type ReservedTab = {
@@ -42,8 +43,7 @@ export type ReservedTab = {
     cancel: () => void;
 };
 export const reserveDashboardTab = (dashboard: string | null): ReservedTab | null => {
-    if (dashboard === null)
-        return null;
+    if (dashboard === null) return null;
     const tab = window.open('', '_blank');
     return {
         show: () => {

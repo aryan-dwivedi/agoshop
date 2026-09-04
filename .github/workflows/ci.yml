@@ -1,62 +1,62 @@
 name: CI
 
 on:
-  push:
-    branches: [main, master]
-  pull_request:
+    push:
+        branches: [main, master]
+    pull_request:
 
 jobs:
-  verify:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
+    verify:
+        runs-on: ubuntu-latest
+        services:
+            postgres:
+                image: postgres:16
+                env:
+                    POSTGRES_USER: postgres
+                    POSTGRES_PASSWORD: postgres
+                    POSTGRES_DB: live_commerce
+                ports:
+                    - 5432:5432
+                options: >-
+                    --health-cmd pg_isready
+                    --health-interval 10s
+                    --health-timeout 5s
+                    --health-retries 5
+            redis:
+                image: redis:7
+                ports:
+                    - 6379:6379
+                options: >-
+                    --health-cmd "redis-cli ping"
+                    --health-interval 10s
+                    --health-timeout 5s
+                    --health-retries 5
+
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: live_commerce
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      redis:
-        image: redis:7
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+            DATABASE_URL: postgres://postgres:postgres@localhost:5432/live_commerce
+            REDIS_URL: redis://localhost:6379
+            SESSION_COOKIE_SECRET: ci-test-secret-min-32-chars-long
+            CONVO_LLM_SHARED_SECRET: ci-test-llm-secret-min-32-chars
+            AGORA_APP_ID: '00000000000000000000000000000000'
+            AGORA_APP_CERTIFICATE: '0000000000000000000000000000000000000000000000000000000000000000'
+            PUBLIC_API_URL: http://localhost:8080
+            LLM_PROVIDER: mock
+            RECORDING_LOCAL_DIR: ./var/recordings
 
-    env:
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/live_commerce
-      REDIS_URL: redis://localhost:6379
-      SESSION_COOKIE_SECRET: ci-test-secret-min-32-chars-long
-      CONVO_LLM_SHARED_SECRET: ci-test-llm-secret-min-32-chars
-      AGORA_APP_ID: '00000000000000000000000000000000'
-      AGORA_APP_CERTIFICATE: '0000000000000000000000000000000000000000000000000000000000000000'
-      PUBLIC_API_URL: http://localhost:8080
-      LLM_PROVIDER: mock
-      RECORDING_LOCAL_DIR: ./var/recordings
+        steps:
+            - uses: actions/checkout@v4
 
-    steps:
-      - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: '22'
+                  cache: npm
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
+            - run: npm ci
 
-      - run: npm ci
+            - run: npm run lint
 
-      - run: npm run lint
+            - run: npm run typecheck
 
-      - run: npm run typecheck
+            - run: npm run db:push
 
-      - run: npm run db:push
-
-      - run: npm test
+            - run: npm test

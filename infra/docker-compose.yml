@@ -13,219 +13,209 @@
 name: live-commerce
 
 x-api-env: &api-env
-  NODE_ENV: production
-  PORT: 8787
-  PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8080}
-  # Both frontends: customer storefront first, seller console second. The API splits on commas.
-  WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:5173,http://localhost:5174}
-  DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/live_commerce
-  PG_POOL_MAX: ${PG_POOL_MAX:-20}
-  REDIS_URL: redis://redis:6379
-  SESSION_COOKIE_SECRET: ${SESSION_COOKIE_SECRET:?set SESSION_COOKIE_SECRET in .env}
-  RATE_LIMIT_TRUSTED_CIDRS: ${RATE_LIMIT_TRUSTED_CIDRS:-127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
-  TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
-  AGORA_APP_ID: ${AGORA_APP_ID:?set AGORA_APP_ID in .env}
-  AGORA_APP_CERTIFICATE: ${AGORA_APP_CERTIFICATE:?set AGORA_APP_CERTIFICATE in .env}
-  AGORA_CUSTOMER_ID: ${AGORA_CUSTOMER_ID:-}
-  AGORA_CUSTOMER_SECRET: ${AGORA_CUSTOMER_SECRET:-}
-  AGORA_TOKEN_TTL_SECONDS: ${AGORA_TOKEN_TTL_SECONDS:-3600}
-  AGORA_WEBHOOK_SECRET: ${AGORA_WEBHOOK_SECRET:-}
-  CHAT_SERVICE_RTM_USER: ${CHAT_SERVICE_RTM_USER:-chat-service}
+    NODE_ENV: production
+    PORT: 8787
+    PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8080}
+    # Both frontends: customer storefront first, seller console second. The API splits on commas.
+    WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:5173,http://localhost:5174}
+    DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/live_commerce
+    PG_POOL_MAX: ${PG_POOL_MAX:-20}
+    REDIS_URL: redis://redis:6379
+    SESSION_COOKIE_SECRET: ${SESSION_COOKIE_SECRET:?set SESSION_COOKIE_SECRET in .env}
+    RATE_LIMIT_TRUSTED_CIDRS: ${RATE_LIMIT_TRUSTED_CIDRS:-127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
+    TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
+    AGORA_APP_ID: ${AGORA_APP_ID:?set AGORA_APP_ID in .env}
+    AGORA_APP_CERTIFICATE: ${AGORA_APP_CERTIFICATE:?set AGORA_APP_CERTIFICATE in .env}
+    AGORA_CUSTOMER_ID: ${AGORA_CUSTOMER_ID:-}
+    AGORA_CUSTOMER_SECRET: ${AGORA_CUSTOMER_SECRET:-}
+    AGORA_TOKEN_TTL_SECONDS: ${AGORA_TOKEN_TTL_SECONDS:-3600}
+    AGORA_WEBHOOK_SECRET: ${AGORA_WEBHOOK_SECRET:-}
+    CHAT_SERVICE_RTM_USER: ${CHAT_SERVICE_RTM_USER:-chat-service}
   CONVOAI_ENABLED: ${CONVOAI_ENABLED:-true}
   CONVOAI_MAX_CONCURRENT_AGENTS: ${CONVOAI_MAX_CONCURRENT_AGENTS:-15}
   CONVOAI_IDLE_TIMEOUT_SECONDS: ${CONVOAI_IDLE_TIMEOUT_SECONDS:-120}
-  CONVOAI_TURN_TIMEOUT_MS: ${CONVOAI_TURN_TIMEOUT_MS:-12000}
-  CONVOAI_ASR_VENDOR: ${CONVOAI_ASR_VENDOR:-ares}
-  CONVOAI_ASR_CREDENTIAL_MODE: ${CONVOAI_ASR_CREDENTIAL_MODE:-managed}
-  CONVOAI_TTS_VENDOR: ${CONVOAI_TTS_VENDOR:-elevenlabs}
-  CONVOAI_TTS_MODEL: ${CONVOAI_TTS_MODEL:-eleven_multilingual_v2}
-  CONVOAI_TTS_VOICE: ${CONVOAI_TTS_VOICE:-21m00Tcm4TlvDq8ikWAM}
+  CONVOAI_TTS_VENDOR: ${CONVOAI_TTS_VENDOR:-minimax}
+  CONVOAI_TTS_MODEL: ${CONVOAI_TTS_MODEL:-speech-02-turbo}
+  CONVOAI_TTS_VOICE: ${CONVOAI_TTS_VOICE:-English_Reserved_Woman}
   CONVOAI_TTS_SPEED: ${CONVOAI_TTS_SPEED:-1.6}
-  CONVOAI_GEOFENCE_AREA: ${CONVOAI_GEOFENCE_AREA:-INDIA}
-  CONVOAI_SUPPORTED_LANGUAGES: ${CONVOAI_SUPPORTED_LANGUAGES:-en-US,hi-IN,es-ES}
-  CONVOAI_LLM_MODE: ${CONVOAI_LLM_MODE:-custom}
-  MCP_ENDPOINT_URL: ${MCP_ENDPOINT_URL:-}
-  AGORA_MANAGED_LLM_VENDOR: ${AGORA_MANAGED_LLM_VENDOR:-openai}
   AGORA_MANAGED_LLM_MODEL: ${AGORA_MANAGED_LLM_MODEL:-gpt-4o-mini}
-  PSTN_GATEWAY_URL: ${PSTN_GATEWAY_URL:-}
   CONVO_LLM_SHARED_SECRET: ${CONVO_LLM_SHARED_SECRET:?set CONVO_LLM_SHARED_SECRET in .env}
   CONVO_CALLBACK_TTL_SECONDS: ${CONVO_CALLBACK_TTL_SECONDS:-7200}
-  LLM_PROVIDER: ${LLM_PROVIDER:-openrouter}
-  LLM_BASE_URL: ${LLM_BASE_URL:-https://openrouter.ai/api/v1}
+  LLM_PROVIDER: ${LLM_PROVIDER:-mock}
   LLM_API_KEY: ${LLM_API_KEY:-}
   LLM_MODEL: ${LLM_MODEL:-openai/gpt-4o-mini}
-  RECORDING_PROVIDER: ${RECORDING_PROVIDER:-auto}
-  # Must match the mount path below in every service, including nginx.
-  RECORDING_LOCAL_DIR: /var/lib/live-commerce/recordings
-  RECORDING_STORAGE_VENDOR: ${RECORDING_STORAGE_VENDOR:-}
-  RECORDING_STORAGE_REGION: ${RECORDING_STORAGE_REGION:-}
-  RECORDING_STORAGE_BUCKET: ${RECORDING_STORAGE_BUCKET:-}
-  RECORDING_STORAGE_ACCESS_KEY: ${RECORDING_STORAGE_ACCESS_KEY:-}
-  RECORDING_STORAGE_SECRET_KEY: ${RECORDING_STORAGE_SECRET_KEY:-}
-  RECORDING_STORAGE_ENDPOINT: ${RECORDING_STORAGE_ENDPOINT:-}
-  RECORDING_PUBLIC_BASE_URL: ${RECORDING_PUBLIC_BASE_URL:-}
-  TRANSCRIPTION_PROVIDER: ${TRANSCRIPTION_PROVIDER:-agora}
-  TRANSCRIPTION_LANGUAGES: ${TRANSCRIPTION_LANGUAGES:-en-US}
-  TRANSCRIPTION_TRANSLATE_TARGETS: ${TRANSCRIPTION_TRANSLATE_TARGETS:-}
-  MEDIA_PUSH_ENABLED: ${MEDIA_PUSH_ENABLED:-false}
-  MEDIA_PUSH_REGION: ${MEDIA_PUSH_REGION:-ap}
-  MEDIA_PUSH_RTMP_URL: ${MEDIA_PUSH_RTMP_URL:-}
-  MEDIA_PUSH_HLS_URL: ${MEDIA_PUSH_HLS_URL:-}
-  MEDIA_GATEWAY_ENABLED: ${MEDIA_GATEWAY_ENABLED:-false}
-  MEDIA_GATEWAY_REGION: ${MEDIA_GATEWAY_REGION:-ap}
-  MEDIA_GATEWAY_KEY_TTL_SECONDS: ${MEDIA_GATEWAY_KEY_TTL_SECONDS:-3600}
-  RTC_TIER_MAX_VIEWERS: ${RTC_TIER_MAX_VIEWERS:-3}
-  RTM_CHAT_SHARD_TARGET: ${RTM_CHAT_SHARD_TARGET:-2}
-  ANALYTICS_DRAIN_BATCH: ${ANALYTICS_DRAIN_BATCH:-500}
-  ANALYTICS_DRAIN_INTERVAL_MS: ${ANALYTICS_DRAIN_INTERVAL_MS:-250}
-  PRIVACY_MODE: ${PRIVACY_MODE:-standard}
-  PII_REDACTION: ${PII_REDACTION:-true}
-  TRANSCRIPT_RETENTION_DAYS: ${TRANSCRIPT_RETENTION_DAYS:-30}
-  RECORDING_RETENTION_DAYS: ${RECORDING_RETENTION_DAYS:-30}
-  ANALYTICS_RETENTION_DAYS: ${ANALYTICS_RETENTION_DAYS:-90}
-  MAX_TOTAL_DISCOUNT_PCT: ${MAX_TOTAL_DISCOUNT_PCT:-50}
-  CHECKOUT_MODE: ${CHECKOUT_MODE:-async}
-  ORDER_RESERVATION_TTL_SECONDS: ${ORDER_RESERVATION_TTL_SECONDS:-900}
-  SEARCH_PROVIDER: ${SEARCH_PROVIDER:-postgres}
-  OPENSEARCH_URL: ${OPENSEARCH_URL:-http://opensearch:9200}
-  ANALYTICS_BACKLOG_WATERMARK: ${ANALYTICS_BACKLOG_WATERMARK:-150000}
+    RECORDING_PROVIDER: ${RECORDING_PROVIDER:-auto}
+    # Must match the mount path below in every service, including nginx.
+    RECORDING_LOCAL_DIR: /var/lib/live-commerce/recordings
+    RECORDING_STORAGE_VENDOR: ${RECORDING_STORAGE_VENDOR:-}
+    RECORDING_STORAGE_REGION: ${RECORDING_STORAGE_REGION:-}
+    RECORDING_STORAGE_BUCKET: ${RECORDING_STORAGE_BUCKET:-}
+    RECORDING_STORAGE_ACCESS_KEY: ${RECORDING_STORAGE_ACCESS_KEY:-}
+    RECORDING_STORAGE_SECRET_KEY: ${RECORDING_STORAGE_SECRET_KEY:-}
+    RECORDING_STORAGE_ENDPOINT: ${RECORDING_STORAGE_ENDPOINT:-}
+    RECORDING_PUBLIC_BASE_URL: ${RECORDING_PUBLIC_BASE_URL:-}
+    TRANSCRIPTION_PROVIDER: ${TRANSCRIPTION_PROVIDER:-agora}
+    TRANSCRIPTION_LANGUAGES: ${TRANSCRIPTION_LANGUAGES:-en-US}
+    TRANSCRIPTION_TRANSLATE_TARGETS: ${TRANSCRIPTION_TRANSLATE_TARGETS:-}
+    MEDIA_PUSH_ENABLED: ${MEDIA_PUSH_ENABLED:-false}
+    MEDIA_PUSH_REGION: ${MEDIA_PUSH_REGION:-ap}
+    MEDIA_PUSH_RTMP_URL: ${MEDIA_PUSH_RTMP_URL:-}
+    MEDIA_PUSH_HLS_URL: ${MEDIA_PUSH_HLS_URL:-}
+    MEDIA_GATEWAY_ENABLED: ${MEDIA_GATEWAY_ENABLED:-false}
+    MEDIA_GATEWAY_REGION: ${MEDIA_GATEWAY_REGION:-ap}
+    MEDIA_GATEWAY_KEY_TTL_SECONDS: ${MEDIA_GATEWAY_KEY_TTL_SECONDS:-3600}
+    RTC_TIER_MAX_VIEWERS: ${RTC_TIER_MAX_VIEWERS:-3}
+    RTM_CHAT_SHARD_TARGET: ${RTM_CHAT_SHARD_TARGET:-2}
+    ANALYTICS_DRAIN_BATCH: ${ANALYTICS_DRAIN_BATCH:-500}
+    ANALYTICS_DRAIN_INTERVAL_MS: ${ANALYTICS_DRAIN_INTERVAL_MS:-250}
+    PRIVACY_MODE: ${PRIVACY_MODE:-standard}
+    PII_REDACTION: ${PII_REDACTION:-true}
+    TRANSCRIPT_RETENTION_DAYS: ${TRANSCRIPT_RETENTION_DAYS:-30}
+    RECORDING_RETENTION_DAYS: ${RECORDING_RETENTION_DAYS:-30}
+    ANALYTICS_RETENTION_DAYS: ${ANALYTICS_RETENTION_DAYS:-90}
+    MAX_TOTAL_DISCOUNT_PCT: ${MAX_TOTAL_DISCOUNT_PCT:-50}
+    CHECKOUT_MODE: ${CHECKOUT_MODE:-async}
+    ORDER_RESERVATION_TTL_SECONDS: ${ORDER_RESERVATION_TTL_SECONDS:-900}
+    SEARCH_PROVIDER: ${SEARCH_PROVIDER:-postgres}
+    OPENSEARCH_URL: ${OPENSEARCH_URL:-http://opensearch:9200}
+    ANALYTICS_BACKLOG_WATERMARK: ${ANALYTICS_BACKLOG_WATERMARK:-150000}
 
 services:
-  postgres:
-    # Postgres 16 is required, not incidental: cart uniqueness uses
-    # `UNIQUE NULLS NOT DISTINCT`.
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: live_commerce
-    ports: ['127.0.0.1:5432:5432']
-    volumes: ['pgdata:/var/lib/postgresql/data']
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres -d live_commerce']
-      interval: 5s
-      timeout: 3s
-      retries: 12
+    postgres:
+        # Postgres 16 is required, not incidental: cart uniqueness uses
+        # `UNIQUE NULLS NOT DISTINCT`.
+        image: postgres:16-alpine
+        environment:
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+            POSTGRES_DB: live_commerce
+        ports: ['127.0.0.1:5432:5432']
+        volumes: ['pgdata:/var/lib/postgresql/data']
+        healthcheck:
+            test: ['CMD-SHELL', 'pg_isready -U postgres -d live_commerce']
+            interval: 5s
+            timeout: 3s
+            retries: 12
 
-  redis:
-    image: redis:7-alpine
-    command: ['redis-server', '--appendonly', 'yes']
-    ports: ['127.0.0.1:6379:6379']
-    volumes: ['redisdata:/data']
-    healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
-      interval: 5s
-      timeout: 3s
-      retries: 12
+    redis:
+        image: redis:7-alpine
+        command: ['redis-server', '--appendonly', 'yes']
+        ports: ['127.0.0.1:6379:6379']
+        volumes: ['redisdata:/data']
+        healthcheck:
+            test: ['CMD', 'redis-cli', 'ping']
+            interval: 5s
+            timeout: 3s
+            retries: 12
 
-  api1: &api
-    build:
-      context: ..
-      dockerfile: apps/api/Dockerfile
-    environment: *api-env
-    volumes: ['recordings:/var/lib/live-commerce/recordings']
-    depends_on:
-      postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
-    restart: unless-stopped
+    api1: &api
+        build:
+            context: ..
+            dockerfile: apps/api/Dockerfile
+        environment: *api-env
+        volumes: ['recordings:/var/lib/live-commerce/recordings']
+        depends_on:
+            postgres: { condition: service_healthy }
+            redis: { condition: service_healthy }
+        restart: unless-stopped
 
-  api2:
-    <<: *api
-    # Same image, same env, same volume — the replicas differ in nothing.
-  # Explicit one-shot jobs for first deploys and schema upgrades. They use the API
-  # build stage because it contains the TypeScript sources and migration tooling.
-  migrate: &migrate
-    build:
-      context: ..
-      dockerfile: apps/api/Dockerfile
-      target: build
-    environment: *api-env
-    volumes: ['recordings:/var/lib/live-commerce/recordings']
-    depends_on:
-      postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
-    command: ['node', '--import', 'tsx', 'apps/api/src/db/push.ts']
-    profiles: [tools]
-    restart: 'no'
+    api2:
+        <<: *api
+        # Same image, same env, same volume — the replicas differ in nothing.
+    # Explicit one-shot jobs for first deploys and schema upgrades. They use the API
+    # build stage because it contains the TypeScript sources and migration tooling.
+    migrate: &migrate
+        build:
+            context: ..
+            dockerfile: apps/api/Dockerfile
+            target: build
+        environment: *api-env
+        volumes: ['recordings:/var/lib/live-commerce/recordings']
+        depends_on:
+            postgres: { condition: service_healthy }
+            redis: { condition: service_healthy }
+        command: ['node', '--import', 'tsx', 'apps/api/src/db/push.ts']
+        profiles: [tools]
+        restart: 'no'
 
-  seed:
-    <<: *migrate
-    command: ['node', '--import', 'tsx', 'apps/api/src/db/seed.ts']
+    seed:
+        <<: *migrate
+        command: ['node', '--import', 'tsx', 'apps/api/src/db/seed.ts']
 
-  ai1: &ai
-    build:
-      context: ..
-      dockerfile: apps/ai-service/Dockerfile
-    environment:
-      <<: *api-env
-      PORT: 8790
-    depends_on:
-      postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
-    restart: unless-stopped
+    ai1: &ai
+        build:
+            context: ..
+            dockerfile: apps/ai-service/Dockerfile
+        environment:
+            <<: *api-env
+            PORT: 8790
+        depends_on:
+            postgres: { condition: service_healthy }
+            redis: { condition: service_healthy }
+        restart: unless-stopped
 
-  ai2:
-    <<: *ai
+    ai2:
+        <<: *ai
 
-  worker: &worker
-    build:
-      context: ..
-      dockerfile: apps/worker/Dockerfile
-    environment: *api-env
-    volumes: ['recordings:/var/lib/live-commerce/recordings']
-    depends_on:
-      postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
-    restart: unless-stopped
-    healthcheck:
-      disable: true
+    worker: &worker
+        build:
+            context: ..
+            dockerfile: apps/worker/Dockerfile
+        environment: *api-env
+        volumes: ['recordings:/var/lib/live-commerce/recordings']
+        depends_on:
+            postgres: { condition: service_healthy }
+            redis: { condition: service_healthy }
+        restart: unless-stopped
+        healthcheck:
+            disable: true
 
-  worker2:
-    <<: *worker
+    worker2:
+        <<: *worker
 
-  sse1: &sse
-    build:
-      context: ..
-      dockerfile: apps/sse-gateway/Dockerfile
-    environment:
-      <<: *api-env
-      PORT: 8789
-    depends_on:
-      postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
-    restart: unless-stopped
+    sse1: &sse
+        build:
+            context: ..
+            dockerfile: apps/sse-gateway/Dockerfile
+        environment:
+            <<: *api-env
+            PORT: 8789
+        depends_on:
+            postgres: { condition: service_healthy }
+            redis: { condition: service_healthy }
+        restart: unless-stopped
 
-  sse2:
-    <<: *sse
-    # Same image, same env — nginx round-robins long-lived SSE connections.
+    sse2:
+        <<: *sse
+        # Same image, same env — nginx round-robins long-lived SSE connections.
 
-  opensearch:
-    profiles: [opensearch]
-    image: opensearchproject/opensearch:2.17.0
-    environment:
-      discovery.type: single-node
-      plugins.security.disabled: 'true'
-      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
-    ports: ['127.0.0.1:9200:9200']
-    healthcheck:
-      test: ['CMD-SHELL', 'curl -fsS http://localhost:9200/_cluster/health || exit 1']
-      interval: 10s
-      timeout: 5s
-      retries: 12
+    opensearch:
+        profiles: [opensearch]
+        image: opensearchproject/opensearch:2.17.0
+        environment:
+            discovery.type: single-node
+            plugins.security.disabled: 'true'
+            OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+        ports: ['127.0.0.1:9200:9200']
+        healthcheck:
+            test: ['CMD-SHELL', 'curl -fsS http://localhost:9200/_cluster/health || exit 1']
+            interval: 10s
+            timeout: 5s
+            retries: 12
 
-  nginx:
-    image: nginx:1.27-alpine
-    ports: ['127.0.0.1:8080:8080']
-    volumes:
-      - ./nginx.compose.conf:/etc/nginx/nginx.conf:ro
-      # Read-only here: nginx serves the recordings the API replicas and the worker
-      # retention loop write and delete.
-      - recordings:/var/lib/live-commerce/recordings:ro
-    depends_on: [api1, api2, ai1, ai2, sse1, sse2]
-    restart: unless-stopped
+    nginx:
+        image: nginx:1.27-alpine
+        ports: ['127.0.0.1:8080:8080']
+        volumes:
+            - ./nginx.compose.conf:/etc/nginx/nginx.conf:ro
+            # Read-only here: nginx serves the recordings the API replicas and the worker
+            # retention loop write and delete.
+            - recordings:/var/lib/live-commerce/recordings:ro
+        depends_on: [api1, api2, ai1, ai2, sse1, sse2]
+        restart: unless-stopped
 
 volumes:
-  pgdata:
-  redisdata:
-  # ONE recordings volume, shared by api1, api2, worker replicas and nginx.
-  recordings:
+    pgdata:
+    redisdata:
+    # ONE recordings volume, shared by api1, api2, worker replicas and nginx.
+    recordings:

@@ -1,8 +1,10 @@
-import { env } from '../../api/src/env.js';
-import { logger } from '../../api/src/lib/logger.js';
+import { env } from '@shop/platform/env.js';
+import { logger } from '@shop/platform/lib/logger.js';
+
 import { createApp } from './app.js';
-import { drainSseClients, getSseClientCount } from './lib/sse.js';
 import { closeRedis as closeSubscriber } from './lib/redis.js';
+import { drainSseClients, getSseClientCount } from './lib/sse.js';
+
 const DRAIN_MS = 30000;
 const app = createApp();
 const server = app.listen(env.PORT, () => {
@@ -10,8 +12,7 @@ const server = app.listen(env.PORT, () => {
 });
 let shuttingDown = false;
 const shutdown = async (signal: string): Promise<void> => {
-    if (shuttingDown)
-        return;
+    if (shuttingDown) return;
     shuttingDown = true;
     logger.info({ signal, clients: getSseClientCount() }, 'sse-gateway draining');
     server.close();

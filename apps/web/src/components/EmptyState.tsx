@@ -1,7 +1,15 @@
-import { type ReactNode } from 'react';
+import type { ReactNode } from 'react';
+
 import { Link } from 'react-router-dom';
+
 import { ApiError } from '../lib/api';
-export const EmptyState = ({ title, body, action, children, }: {
+
+export const EmptyState = ({
+    title,
+    body,
+    action,
+    children,
+}: {
     title: string;
     body: string;
     action?: {
@@ -9,16 +17,23 @@ export const EmptyState = ({ title, body, action, children, }: {
         label: string;
     };
     children?: ReactNode;
-}): JSX.Element => (<div className="card flex flex-col items-start gap-3 p-6">
-    <div>
-      <h3 className="text-16 font-semibold text-t1">{title}</h3>
-      <p className="mt-1 max-w-prose text-14 text-t2">{body}</p>
+}): JSX.Element => (
+    <div className="card flex flex-col items-start gap-3 p-6">
+        <div>
+            <h3 className="text-16 font-semibold text-t1">{title}</h3>
+            <p className="mt-1 max-w-prose text-14 text-t2">{body}</p>
+        </div>
+        {action !== undefined && (
+            <Link
+                to={action.to}
+                className="btn-standard"
+            >
+                {action.label}
+            </Link>
+        )}
+        {children}
     </div>
-    {action !== undefined && (<Link to={action.to} className="btn-standard">
-        {action.label}
-      </Link>)}
-    {children}
-  </div>);
+);
 const humanReason = (error: Error): string => {
     if (!(error instanceof ApiError)) {
         return 'Your connection dropped before this finished loading.';
@@ -34,16 +49,28 @@ const humanReason = (error: Error): string => {
     }
     return 'Something went wrong at our end. Nothing you did caused it.';
 };
-export const ErrorState = ({ title, error, onRetry, }: {
+export const ErrorState = ({
+    title,
+    error,
+    onRetry,
+}: {
     title: string;
     error: Error;
     onRetry?: () => void;
-}): JSX.Element => (<div className="card flex flex-col items-start gap-3 p-6">
-    <div>
-      <h3 className="text-16 font-semibold text-t1">{title}</h3>
-      <p className="mt-1 max-w-prose text-14 text-t2">{humanReason(error)}</p>
+}): JSX.Element => (
+    <div className="card flex flex-col items-start gap-3 p-6">
+        <div>
+            <h3 className="text-16 font-semibold text-t1">{title}</h3>
+            <p className="mt-1 max-w-prose text-14 text-t2">{humanReason(error)}</p>
+        </div>
+        {onRetry !== undefined && (
+            <button
+                type="button"
+                className="btn-standard"
+                onClick={onRetry}
+            >
+                Try again
+            </button>
+        )}
     </div>
-    {onRetry !== undefined && (<button type="button" className="btn-standard" onClick={onRetry}>
-        Try again
-      </button>)}
-  </div>);
+);

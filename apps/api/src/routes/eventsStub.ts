@@ -1,5 +1,7 @@
 import { Router } from 'express';
-import { ensureIdentity } from '../middleware/session.js';
+
+import { ensureIdentity } from '@shop/platform/middleware/session.js';
+
 export const router = Router();
 router.get('/api/events', ensureIdentity, (req, res) => {
     res.status(200);

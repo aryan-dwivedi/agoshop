@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+
 import { syncedPosition } from './liveClock.js';
+
 describe('syncedPosition', () => {
     const startedAt = Date.UTC(2026, 0, 1, 12, 0, 0);
     const duration = 180;
@@ -13,7 +15,10 @@ describe('syncedPosition', () => {
     });
     it('wraps at the loop boundary instead of running past the asset', () => {
         expect(syncedPosition(startedAt, startedAt + duration * 1000, duration)).toBeCloseTo(0, 6);
-        expect(syncedPosition(startedAt, startedAt + (duration + 4) * 1000, duration)).toBeCloseTo(4, 6);
+        expect(syncedPosition(startedAt, startedAt + (duration + 4) * 1000, duration)).toBeCloseTo(
+            4,
+            6,
+        );
     });
     it('holds at the start for a stream that has only just begun', () => {
         expect(syncedPosition(startedAt, startedAt, duration)).toBe(0);

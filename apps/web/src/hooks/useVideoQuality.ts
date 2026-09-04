@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
 import type { VideoQuality } from '../components/live/VideoStage';
+
+import { useEffect, useState } from 'react';
+
 const QUALITY_STORAGE_KEY = 'live.video.quality';
 export const useVideoQuality = (): {
     quality: VideoQuality;
@@ -16,11 +18,9 @@ export const useVideoQuality = (): {
         window.localStorage.setItem(QUALITY_STORAGE_KEY, quality);
     }, [quality]);
     useEffect(() => {
-        if (!qualityMenuOpen)
-            return undefined;
+        if (!qualityMenuOpen) return undefined;
         const onKeyDown = (event: KeyboardEvent): void => {
-            if (event.key !== 'Escape')
-                return;
+            if (event.key !== 'Escape') return;
             setQualityMenuOpen(false);
         };
         window.addEventListener('keydown', onKeyDown);

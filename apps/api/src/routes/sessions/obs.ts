@@ -1,31 +1,39 @@
 import type { Router } from 'express';
+
 import { eq } from 'drizzle-orm';
-import { requireMediaGateway, rtmpServerUrl } from '../../agora/ingress.js';
-import { ensureGatewayUid, mintObsIngest } from '../../agora/mediagateway.js';
-import { db } from '../../db/client.js';
-import { liveSessions } from '../../db/schema.js';
-import { env } from '../../env.js';
-import { badRequest, notFound } from '../../lib/errors.js';
-import { requireSessionHost } from '../../middleware/session.js';
+
+import { requireMediaGateway, rtmpServerUrl } from '@shop/agora/ingress.js';
+import { ensureGatewayUid, mintObsIngest } from '@shop/agora/mediagateway.js';
+import { db } from '@shop/db/client.js';
+import { liveSessions } from '@shop/db/schema.js';
+import { env } from '@shop/platform/env.js';
+import { badRequest, notFound } from '@shop/platform/lib/errors.js';
+import { requireSessionHost } from '@shop/platform/middleware/session.js';
+
 import { idParam } from './schemas.js';
+
 export const registerObsRoutes = (router: Router): void => {
     router.post('/api/sessions/:id/obs-ingest', requireSessionHost, async (req, res, next) => {
         try {
             requireMediaGateway(env.MEDIA_GATEWAY_ENABLED);
             const id = idParam.safeParse(req.params.id);
-            if (!id.success)
-                throw badRequest('invalid_session_id');
+            if (!id.success) throw badRequest('invalid_session_id');
             const sessionId = id.data;
             const [row] = await db
-                .select({ id: liveSessions.id, rtcChannel: liveSessions.rtcChannel, status: liveSessions.status })
+                .select({
+                    id: liveSessions.id,
+                    rtcChannel: liveSessions.rtcChannel,
+                    status: liveSessions.status,
+                })
                 .from(liveSessions)
                 .where(eq(liveSessions.id, sessionId));
-            if (!row)
-                throw notFound('session_not_found');
-            const credentials = await mintObsIngest({ id: row.id, rtcChannel: row.rtcChannel });
+            if (!row) throw notFound('session_not_found');
+            const credentials = await mintObsIngest({
+                id: row.id,
+                rtcChannel: row.rtcChannel,
+            });
             res.json(credentials);
-        }
-        catch (err) {
+        } catch (err) {
             next(err);
         }
     });
@@ -33,20 +41,18 @@ export const registerObsRoutes = (router: Router): void => {
         try {
             requireMediaGateway(env.MEDIA_GATEWAY_ENABLED);
             const id = idParam.safeParse(req.params.id);
-            if (!id.success)
-                throw badRequest('invalid_session_id');
+            if (!id.success) throw badRequest('invalid_session_id');
             const sessionId = id.data;
             const [row] = await db
                 .select({
-                id: liveSessions.id,
-                rtcChannel: liveSessions.rtcChannel,
-                status: liveSessions.status,
-                mediaGatewayUid: liveSessions.mediaGatewayUid,
-            })
+                    id: liveSessions.id,
+                    rtcChannel: liveSessions.rtcChannel,
+                    status: liveSessions.status,
+                    mediaGatewayUid: liveSessions.mediaGatewayUid,
+                })
                 .from(liveSessions)
                 .where(eq(liveSessions.id, sessionId));
-            if (!row)
-                throw notFound('session_not_found');
+            if (!row) throw notFound('session_not_found');
             const uid = row.mediaGatewayUid ?? (await ensureGatewayUid(sessionId));
             const base = {
                 rtmpServer: rtmpServerUrl(env.MEDIA_GATEWAY_REGION),
@@ -58,10 +64,12 @@ export const registerObsRoutes = (router: Router): void => {
                 res.json({ ...base, streamKey: null });
                 return;
             }
-            const credentials = await mintObsIngest({ id: row.id, rtcChannel: row.rtcChannel });
+            const credentials = await mintObsIngest({
+                id: row.id,
+                rtcChannel: row.rtcChannel,
+            });
             res.json(credentials);
-        }
-        catch (err) {
+        } catch (err) {
             next(err);
         }
     });

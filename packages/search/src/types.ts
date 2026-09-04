@@ -1,4 +1,5 @@
 import type { ProductDto } from '@shop/shared';
+
 export type SearchQuery = {
     q: string;
     categorySlug?: string;

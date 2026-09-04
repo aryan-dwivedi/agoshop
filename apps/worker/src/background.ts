@@ -1,26 +1,47 @@
 import { unlink } from 'node:fs/promises';
 import { basename, join } from 'node:path';
+
 import { and, eq, inArray, isNotNull, lt } from 'drizzle-orm';
-import { expiredLeases, syncSlotGauge } from '@shop/api/ai/admission.js';
-import { stopConversation } from '@shop/api/ai/conversations.js';
-import { getProvider } from '@shop/api/ai/providers/index.js';
-import { listPollableRecordingSessionIds, pollRecording } from '@shop/api/agora/recording.js';
-import { startRtt } from '@shop/api/agora/rtt.js';
+
+import { listPollableRecordingSessionIds, pollRecording } from '@shop/agora/recording.js';
+import { startRtt } from '@shop/agora/rtt.js';
+import { expiredLeases, syncSlotGauge } from '@shop/ai/admission.js';
+import { stopConversation } from '@shop/ai/conversations.js';
+import { getProvider } from '@shop/ai/providers/index.js';
 import { db, pool } from '@shop/db';
-import { aiConversations, analyticsEvents, liveSessions, products, sessionTranscripts, users, } from '@shop/db/schema';
-import { flushOpenPolls } from '@shop/api/domain/polls.js';
-import { flushReactions } from '@shop/api/domain/reactions.js';
-import { flushViewers, listLiveSessionIds, startDuePremieres, viewerCount, } from '@shop/api/domain/sessions.js';
-import { captureOrder, expireStaleOrders } from '@shop/api/domain/ordersAsync.js';
-import { getProductById } from '@shop/api/domain/catalog.js';
-import { indexCatalogProduct } from '@shop/api/domain/searchBridge.js';
-import { env } from '@shop/api/env.js';
-import { track } from '@shop/api/lib/analytics.js';
-import { logger } from '@shop/api/lib/logger.js';
-import { analyticsStreamBacklog, searchIndexFailuresTotal } from '@shop/api/lib/metrics.js';
-import { deleteRecordingObject, keyFromUrl } from '@shop/api/lib/objectStore.js';
-import { closeRedis, keys, redis } from '@shop/api/lib/redis.js';
-import { getIsLeader, releaseLeaderLock, startLeaderElection, tryAcquireOrRenewLeader, } from './leader.js';
+import {
+    aiConversations,
+    analyticsEvents,
+    liveSessions,
+    products,
+    sessionTranscripts,
+    users,
+} from '@shop/db/schema';
+import { getProductById } from '@shop/domain-commerce/catalog.js';
+import { captureOrder, expireStaleOrders } from '@shop/domain-commerce/ordersAsync.js';
+import { indexCatalogProduct } from '@shop/domain-commerce/searchBridge.js';
+import { flushOpenPolls } from '@shop/domain-live/polls.js';
+import { flushReactions } from '@shop/domain-live/reactions.js';
+import {
+    flushViewers,
+    listLiveSessionIds,
+    startDuePremieres,
+    viewerCount,
+} from '@shop/domain-live/sessions.js';
+import { env } from '@shop/platform/env.js';
+import { track } from '@shop/platform/lib/analytics.js';
+import { logger } from '@shop/platform/lib/logger.js';
+import { analyticsStreamBacklog, searchIndexFailuresTotal } from '@shop/platform/lib/metrics.js';
+import { deleteRecordingObject, keyFromUrl } from '@shop/platform/lib/objectStore.js';
+import { closeRedis, keys, redis } from '@shop/platform/lib/redis.js';
+
+import {
+    getIsLeader,
+    releaseLeaderLock,
+    startLeaderElection,
+    tryAcquireOrRenewLeader,
+} from './leader.js';
+
 const GROUP_ANALYTICS = 'analytics';
 const GROUP_CAPTURE = 'capture';
 const GROUP_SEARCH = 'search-index';
@@ -40,41 +61,42 @@ let leaderElection: {
 const ensureGroup = async (stream: string, group: string): Promise<void> => {
     try {
         await redis.xgroup('CREATE', stream, group, '0', 'MKSTREAM');
-    }
-    catch (err) {
-        if (!(err as Error).message.includes('BUSYGROUP'))
-            throw err;
+    } catch (err) {
+        if (!(err as Error).message.includes('BUSYGROUP')) throw err;
     }
 };
-type StreamEntry = [
-    id: string,
-    fields: string[]
-];
+type StreamEntry = [id: string, fields: string[]];
 const fieldsToRecord = (fields: string[]): Record<string, string> => {
     const out: Record<string, string> = {};
-    for (let i = 0; i + 1 < fields.length; i += 2)
-        out[fields[i]!] = fields[i + 1]!;
+    for (let i = 0; i + 1 < fields.length; i += 2) out[fields[i]!] = fields[i + 1]!;
     return out;
 };
 const readBatch = async (stream: string, group: string, count: number): Promise<StreamEntry[]> => {
     try {
-        const claimed = (await redis.xautoclaim(stream, group, CONSUMER, 60000, '0', 'COUNT', count)) as [
-            string,
-            StreamEntry[],
-            string[]
-        ];
+        const claimed = (await redis.xautoclaim(
+            stream,
+            group,
+            CONSUMER,
+            60000,
+            '0',
+            'COUNT',
+            count,
+        )) as [string, StreamEntry[], string[]];
         const pending = claimed?.[1] ?? [];
-        if (pending.length >= count)
-            return pending;
-        const fresh = (await redis.xreadgroup('GROUP', group, CONSUMER, 'COUNT', count - pending.length, 'STREAMS', stream, '>')) as [
-            string,
-            StreamEntry[]
-        ][] | null;
+        if (pending.length >= count) return pending;
+        const fresh = (await redis.xreadgroup(
+            'GROUP',
+            group,
+            CONSUMER,
+            'COUNT',
+            count - pending.length,
+            'STREAMS',
+            stream,
+            '>',
+        )) as [string, StreamEntry[]][] | null;
         return [...pending, ...(fresh?.[0]?.[1] ?? [])];
-    }
-    catch (err) {
-        if (!(err as Error).message.includes('NOGROUP'))
-            throw err;
+    } catch (err) {
+        if (!(err as Error).message.includes('NOGROUP')) throw err;
         await ensureGroup(stream, group);
         return [];
     }
@@ -98,9 +120,9 @@ const resolveRefs = async (rows: AnalyticsRow[]): Promise<AnalyticsRow[]> => {
         sessionIds.length === 0
             ? []
             : db
-                .select({ id: liveSessions.id })
-                .from(liveSessions)
-                .where(inArray(liveSessions.id, sessionIds)),
+                  .select({ id: liveSessions.id })
+                  .from(liveSessions)
+                  .where(inArray(liveSessions.id, sessionIds)),
         productIds.length === 0
             ? []
             : db.select({ id: products.id }).from(products).where(inArray(products.id, productIds)),
@@ -111,14 +133,12 @@ const resolveRefs = async (rows: AnalyticsRow[]): Promise<AnalyticsRow[]> => {
     let orphaned = 0;
     const resolved = rows.map((row) => {
         const missing: Record<string, string> = {};
-        if (row.userId !== null && !liveUsers.has(row.userId))
-            missing.userId = row.userId;
+        if (row.userId !== null && !liveUsers.has(row.userId)) missing.userId = row.userId;
         if (row.sessionId !== null && !liveSessionIds.has(row.sessionId))
             missing.sessionId = row.sessionId;
         if (row.productId !== null && !liveProducts.has(row.productId))
             missing.productId = row.productId;
-        if (Object.keys(missing).length === 0)
-            return row;
+        if (Object.keys(missing).length === 0) return row;
         orphaned += 1;
         return {
             ...row,
@@ -129,12 +149,19 @@ const resolveRefs = async (rows: AnalyticsRow[]): Promise<AnalyticsRow[]> => {
         };
     });
     if (orphaned > 0) {
-        logger.warn({ orphaned, batch: rows.length }, 'analytics rows kept with unresolved references');
+        logger.warn(
+            { orphaned, batch: rows.length },
+            'analytics rows kept with unresolved references',
+        );
     }
     return resolved;
 };
 export const drainAnalyticsOnce = async (): Promise<number> => {
-    const entries = await readBatch(keys.analyticsStream, GROUP_ANALYTICS, env.ANALYTICS_DRAIN_BATCH);
+    const entries = await readBatch(
+        keys.analyticsStream,
+        GROUP_ANALYTICS,
+        env.ANALYTICS_DRAIN_BATCH,
+    );
     if (entries.length === 0) {
         analyticsStreamBacklog.set(await redis.xlen(keys.analyticsStream));
         return 0;
@@ -144,8 +171,7 @@ export const drainAnalyticsOnce = async (): Promise<number> => {
         let payload: Record<string, unknown> = {};
         try {
             payload = record.payload ? (JSON.parse(record.payload) as Record<string, unknown>) : {};
-        }
-        catch {
+        } catch {
             payload = { raw: record.payload ?? null };
         }
         return {
@@ -166,19 +192,20 @@ export const drainAnalyticsOnce = async (): Promise<number> => {
 };
 export const summarizeSession = async (sessionId: string): Promise<string | null> => {
     const lines = await db
-        .select({ speaker: sessionTranscripts.speaker, text: sessionTranscripts.text })
+        .select({
+            speaker: sessionTranscripts.speaker,
+            text: sessionTranscripts.text,
+        })
         .from(sessionTranscripts)
         .where(eq(sessionTranscripts.sessionId, sessionId))
         .orderBy(sessionTranscripts.startMs)
         .limit(400);
-    if (lines.length === 0)
-        return null;
+    if (lines.length === 0) return null;
     const [session] = await db
         .select({ title: liveSessions.title })
         .from(liveSessions)
         .where(eq(liveSessions.id, sessionId));
-    if (!session)
-        return null;
+    if (!session) return null;
     const transcript = lines.map((l) => `${l.speaker}: ${l.text}`).join('\n');
     const provider = getProvider();
     const controller = new AbortController();
@@ -190,22 +217,23 @@ export const summarizeSession = async (sessionId: string): Promise<string | null
             messages: [
                 {
                     role: 'system',
-                    content: 'You summarise live-shopping sessions for a replay page. Write one paragraph of at most 120 words: which products were shown, the prices and key specs mentioned, any offer that was stated, and what the host committed to. Plain prose, no bullet points, no preamble.',
+                    content:
+                        'You summarise live-shopping sessions for a replay page. Write one paragraph of at most 120 words: which products were shown, the prices and key specs mentioned, any offer that was stated, and what the host committed to. Plain prose, no bullet points, no preamble.',
                 },
-                { role: 'user', content: `Session: ${session.title}\n\nTranscript:\n${transcript}` },
+                {
+                    role: 'user',
+                    content: `Session: ${session.title}\n\nTranscript:\n${transcript}`,
+                },
             ],
             signal: controller.signal,
         })) {
-            if (chunk.contentDelta)
-                summary += chunk.contentDelta;
+            if (chunk.contentDelta) summary += chunk.contentDelta;
         }
-    }
-    finally {
+    } finally {
         clearTimeout(timeout);
     }
     const text = summary.trim();
-    if (text.length === 0)
-        return null;
+    if (text.length === 0) return null;
     await db
         .update(liveSessions)
         .set({ transcriptSummary: text })
@@ -221,16 +249,21 @@ const consumeSummariesOnce = async (): Promise<number> => {
         try {
             if (sessionId) {
                 const summary = await summarizeSession(sessionId);
-                logger.info({ sessionId, summarized: summary !== null }, summary === null
-                    ? 'session summary skipped (no transcript rows)'
-                    : 'session summary written');
+                logger.info(
+                    { sessionId, summarized: summary !== null },
+                    summary === null
+                        ? 'session summary skipped (no transcript rows)'
+                        : 'session summary written',
+                );
             }
             await redis.xack(keys.summaryStream, GROUP_SUMMARIES, id);
             await redis.xdel(keys.summaryStream, id);
             done += 1;
-        }
-        catch (err) {
-            logger.error({ err, sessionId }, 'session summary failed; leaving entry pending for retry');
+        } catch (err) {
+            logger.error(
+                { err, sessionId },
+                'session summary failed; leaving entry pending for retry',
+            );
         }
     }
     return done;
@@ -242,13 +275,11 @@ const consumeOrderCaptureOnce = async (): Promise<number> => {
         const record = fieldsToRecord(fields);
         const orderId = record.orderId ?? '';
         try {
-            if (orderId)
-                await captureOrder(orderId);
+            if (orderId) await captureOrder(orderId);
             await redis.xack(keys.orderCaptureStream, GROUP_CAPTURE, id);
             await redis.xdel(keys.orderCaptureStream, id);
             done += 1;
-        }
-        catch (err) {
+        } catch (err) {
             logger.error({ err, orderId }, 'order capture failed; leaving entry pending for retry');
         }
     }
@@ -266,8 +297,7 @@ const consumeSearchIndexOnce = async (): Promise<number> => {
                 if (product) {
                     try {
                         await indexCatalogProduct(product);
-                    }
-                    catch (indexErr) {
+                    } catch (indexErr) {
                         searchIndexFailuresTotal.inc();
                         throw indexErr;
                     }
@@ -276,9 +306,11 @@ const consumeSearchIndexOnce = async (): Promise<number> => {
             await redis.xack(keys.searchIndexStream, GROUP_SEARCH, id);
             await redis.xdel(keys.searchIndexStream, id);
             done += 1;
-        }
-        catch (err) {
-            logger.error({ err, productId }, 'search index failed; leaving entry pending for retry');
+        } catch (err) {
+            logger.error(
+                { err, productId },
+                'search index failed; leaving entry pending for retry',
+            );
         }
     }
     return done;
@@ -303,20 +335,26 @@ export const sweepLeasesOnce = async (): Promise<number> => {
     const stale = await db
         .select({ id: aiConversations.id })
         .from(aiConversations)
-        .where(and(inArray(aiConversations.status, ['created', 'running']), lt(aiConversations.callbackExpiresAt, new Date())))
+        .where(
+            and(
+                inArray(aiConversations.status, ['created', 'running']),
+                lt(aiConversations.callbackExpiresAt, new Date()),
+            ),
+        )
         .limit(200);
     const ids = [...new Set([...fromLeases, ...stale.map((r) => r.id)])];
     for (const id of ids) {
         try {
-            await stopConversation(id, { status: 'stopped', reason: 'lease_expired' });
-        }
-        catch (err) {
+            await stopConversation(id, {
+                status: 'stopped',
+                reason: 'lease_expired',
+            });
+        } catch (err) {
             logger.warn({ err, conversationId: id }, 'lease sweep could not stop conversation');
         }
     }
     await syncSlotGauge();
-    if (ids.length > 0)
-        logger.info({ swept: ids.length }, 'convoai leases swept');
+    if (ids.length > 0) logger.info({ swept: ids.length }, 'convoai leases swept');
     return ids.length;
 };
 const pollRecordingsOnce = async (): Promise<void> => {
@@ -324,16 +362,14 @@ const pollRecordingsOnce = async (): Promise<void> => {
     for (const sessionId of sessionIds) {
         try {
             await pollRecording(sessionId);
-        }
-        catch (err) {
+        } catch (err) {
             logger.warn({ err, sessionId }, 'recording query failed');
         }
     }
 };
 export const startDuePremieresOnce = async (): Promise<number> => {
     const started = await startDuePremieres();
-    if (started > 0)
-        logger.info({ started }, 'premieres auto-started');
+    if (started > 0) logger.info({ started }, 'premieres auto-started');
     return started;
 };
 export const runRetentionPurge = async (): Promise<{
@@ -349,24 +385,30 @@ export const runRetentionPurge = async (): Promise<{
     const expiredRecordings = await db
         .select({ id: liveSessions.id, recordingUrl: liveSessions.recordingUrl })
         .from(liveSessions)
-        .where(and(isNotNull(liveSessions.recordingUrl), isNotNull(liveSessions.endedAt), lt(liveSessions.endedAt, cutoff(env.RECORDING_RETENTION_DAYS))));
+        .where(
+            and(
+                isNotNull(liveSessions.recordingUrl),
+                isNotNull(liveSessions.endedAt),
+                lt(liveSessions.endedAt, cutoff(env.RECORDING_RETENTION_DAYS)),
+            ),
+        );
     for (const row of expiredRecordings) {
         if (env.RECORDING_LOCAL_FILE_PURGE) {
             const url = row.recordingUrl ?? '';
             if (!url.startsWith('/media/recordings/')) {
                 const key = keyFromUrl(url);
-                if (key)
-                    await deleteRecordingObject(key);
-            }
-            else {
+                if (key) await deleteRecordingObject(key);
+            } else {
                 const name = basename(url);
                 if (name && name.includes('.')) {
                     try {
                         await unlink(join(env.RECORDING_LOCAL_DIR, name));
-                    }
-                    catch (err) {
+                    } catch (err) {
                         if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
-                            logger.warn({ err, sessionId: row.id, name }, 'recording file unlink failed');
+                            logger.warn(
+                                { err, sessionId: row.id, name },
+                                'recording file unlink failed',
+                            );
                         }
                     }
                 }
@@ -375,11 +417,11 @@ export const runRetentionPurge = async (): Promise<{
         await db
             .update(liveSessions)
             .set({
-            recordingUrl: null,
-            recordingStatus: 'none',
-            recordingSid: null,
-            recordingResourceId: null,
-        })
+                recordingUrl: null,
+                recordingStatus: 'none',
+                recordingSid: null,
+                recordingResourceId: null,
+            })
             .where(eq(liveSessions.id, row.id));
     }
     const analytics = await db
@@ -395,35 +437,34 @@ export const runRetentionPurge = async (): Promise<{
     return result;
 };
 export const resumeLiveRttOnce = async (): Promise<number> => {
-    if (env.TRANSCRIPTION_PROVIDER !== 'agora')
-        return 0;
+    if (env.TRANSCRIPTION_PROVIDER !== 'agora') return 0;
     const rows = await db
         .select({ id: liveSessions.id, rtcChannel: liveSessions.rtcChannel })
         .from(liveSessions)
-        .where(and(eq(liveSessions.status, 'live'), inArray(liveSessions.rttStatus, ['off', 'failed'])));
-    for (const row of rows)
-        await startRtt(row);
+        .where(
+            and(
+                eq(liveSessions.status, 'live'),
+                inArray(liveSessions.rttStatus, ['off', 'failed']),
+            ),
+        );
+    for (const row of rows) await startRtt(row);
     return rows.length;
 };
 const loop = (name: string, intervalMs: number, body: () => Promise<unknown>): void => {
     const tick = async (): Promise<void> => {
-        if (stopping)
-            return;
+        if (stopping) return;
         try {
             await body();
-        }
-        catch (err) {
+        } catch (err) {
             logger.error({ err, loop: name }, 'background loop iteration failed');
         }
-        if (!stopping)
-            setTimeout(() => void tick(), intervalMs).unref();
+        if (!stopping) setTimeout(() => void tick(), intervalMs).unref();
     };
     void tick();
 };
 const leaderLoop = (name: string, intervalMs: number, body: () => Promise<unknown>): void => {
     loop(name, intervalMs, async () => {
-        if (!getIsLeader())
-            return;
+        if (!getIsLeader()) return;
         await body();
     });
 };
@@ -434,27 +475,32 @@ export const startBackground = async (): Promise<void> => {
     await ensureGroup(keys.searchIndexStream, GROUP_SEARCH);
     await tryAcquireOrRenewLeader();
     leaderElection = startLeaderElection((next) => {
-        logger.info({ leader: next }, next ? 'became worker leader' : 'relinquished worker leadership');
+        logger.info(
+            { leader: next },
+            next ? 'became worker leader' : 'relinquished worker leadership',
+        );
     });
-    if (getIsLeader())
-        await resumeLiveRttOnce();
-    logger.info({
-        consumer: CONSUMER,
-        drainBatch: env.ANALYTICS_DRAIN_BATCH,
-        drainIntervalMs: env.ANALYTICS_DRAIN_INTERVAL_MS,
-        groups: {
-            analytics: GROUP_ANALYTICS,
-            capture: GROUP_CAPTURE,
-            search: GROUP_SEARCH,
-            summaries: GROUP_SUMMARIES,
+    if (getIsLeader()) await resumeLiveRttOnce();
+    logger.info(
+        {
+            consumer: CONSUMER,
+            drainBatch: env.ANALYTICS_DRAIN_BATCH,
+            drainIntervalMs: env.ANALYTICS_DRAIN_INTERVAL_MS,
+            groups: {
+                analytics: GROUP_ANALYTICS,
+                capture: GROUP_CAPTURE,
+                search: GROUP_SEARCH,
+                summaries: GROUP_SUMMARIES,
+            },
+            provider: env.LLM_PROVIDER,
+            retentionDays: {
+                transcripts: env.TRANSCRIPT_RETENTION_DAYS,
+                recordings: env.RECORDING_RETENTION_DAYS,
+                analytics: env.ANALYTICS_RETENTION_DAYS,
+            },
         },
-        provider: env.LLM_PROVIDER,
-        retentionDays: {
-            transcripts: env.TRANSCRIPT_RETENTION_DAYS,
-            recordings: env.RECORDING_RETENTION_DAYS,
-            analytics: env.ANALYTICS_RETENTION_DAYS,
-        },
-    }, 'worker started — stream consumers on every replica, singleton loops on leader');
+        'worker started — stream consumers on every replica, singleton loops on leader',
+    );
     loop('analytics-drain', env.ANALYTICS_DRAIN_INTERVAL_MS, drainAnalyticsOnce);
     leaderLoop('aggregates', AGGREGATE_INTERVAL_MS, flushAggregatesOnce);
     leaderLoop('viewer-sample', VIEWER_SAMPLE_INTERVAL_MS, sampleViewersOnce);

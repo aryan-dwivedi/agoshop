@@ -1,10 +1,12 @@
 import { createApp } from '@shop/api/app.js';
-import { pool } from '@shop/api/db/client.js';
-import { env } from '@shop/api/env.js';
-import { logger } from '@shop/api/lib/logger.js';
-import { closeRedis } from '@shop/api/lib/redis.js';
 import { router as healthRouter } from '@shop/api/routes/health.js';
+import { pool } from '@shop/db/client.js';
+import { env } from '@shop/platform/env.js';
+import { logger } from '@shop/platform/lib/logger.js';
+import { closeRedis } from '@shop/platform/lib/redis.js';
+
 import { aiServiceRouters } from './routes.js';
+
 const app = createApp([healthRouter, ...aiServiceRouters]);
 const port = Number(process.env.PORT ?? 8790);
 const server = app.listen(port, () => {

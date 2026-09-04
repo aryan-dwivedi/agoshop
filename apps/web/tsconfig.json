@@ -1,15 +1,15 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "jsx": "react-jsx",
-    "types": ["vite/client"],
-    "lib": ["ES2023", "DOM", "DOM.Iterable"]
-  },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "vite.base.ts",
-    "vite.config.ts",
-    "vite.seller.config.ts"
-  ]
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "jsx": "react-jsx",
+        "types": ["vite/client"],
+        "lib": ["ES2023", "DOM", "DOM.Iterable"]
+    },
+    "include": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "vite.base.ts",
+        "vite.config.ts",
+        "vite.seller.config.ts"
+    ]
 }

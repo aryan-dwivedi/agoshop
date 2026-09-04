@@ -1,6 +1,17 @@
-import { useMutation, useQuery, useQueryClient, type UseMutationResult, type UseQueryResult, } from '@tanstack/react-query';
-import type { DeliveryTier, LiveSessionDto, OrderDto, SellerOverviewDto as SellerOverviewBody, SessionAnalyticsDto, SessionStatus, } from '@shop/shared';
+import type {
+    DeliveryTier,
+    LiveSessionDto,
+    OrderDto,
+    SellerOverviewDto as SellerOverviewBody,
+    SessionAnalyticsDto,
+    SessionStatus,
+} from '@shop/shared';
+import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
+
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
 import { ApiError, api } from './api';
+
 export type SellerRef = {
     id: string;
     slug: string;
@@ -88,42 +99,69 @@ export const operatorKeys = {
     analytics: (sessionId: string) => ['seller', 'session', sessionId, 'analytics'] as const,
     moderation: (sessionId: string) => ['seller', 'session', sessionId, 'moderation'] as const,
 };
-const scoped = (path: string, sellerId: string | null): string => sellerId === null ? path : `${path}?sellerId=${encodeURIComponent(sellerId)}`;
-export const useSellerOverview = (enabled: boolean, sellerId: string | null = null): UseQueryResult<SellerOverviewDto> => useQuery({
-    queryKey: operatorKeys.overview(sellerId),
-    queryFn: () => api.get<SellerOverviewDto>(scoped('/api/seller/overview', sellerId)),
-    enabled,
-});
-export const useSellerSessions = (enabled: boolean, sellerId: string | null = null): UseQueryResult<SellerSessionsDto> => useQuery({
-    queryKey: operatorKeys.sessions(sellerId),
-    queryFn: () => api.get<SellerSessionsDto>(scoped('/api/seller/sessions', sellerId)),
-    enabled,
-    refetchInterval: (query) => query.state.data?.sessions.some((s) => s.status === 'live') === true ? 10000 : false,
-});
-export const useSellerProducts = (enabled: boolean, sellerId: string | null = null): UseQueryResult<SellerProductsDto> => useQuery({
-    queryKey: operatorKeys.products(sellerId),
-    queryFn: () => api.get<SellerProductsDto>(scoped('/api/seller/products', sellerId)),
-    enabled,
-});
-export const useSellerOrders = (enabled: boolean, sellerId: string | null = null): UseQueryResult<SellerOrdersDto> => useQuery({
-    queryKey: operatorKeys.orders(sellerId),
-    queryFn: () => api.get<SellerOrdersDto>(scoped('/api/seller/orders', sellerId)),
-    enabled,
-});
-export const useSessionAnalytics = (sessionId: string, enabled: boolean): UseQueryResult<SessionAnalyticsDto> => useQuery({
-    queryKey: operatorKeys.analytics(sessionId),
-    queryFn: () => api.get<SessionAnalyticsDto>(`/api/seller/sessions/${sessionId}/analytics`),
-    enabled,
-});
-export const useSessionModeration = (sessionId: string | null, enabled: boolean): UseQueryResult<{
+const scoped = (path: string, sellerId: string | null): string =>
+    sellerId === null ? path : `${path}?sellerId=${encodeURIComponent(sellerId)}`;
+export const useSellerOverview = (
+    enabled: boolean,
+    sellerId: string | null = null,
+): UseQueryResult<SellerOverviewDto> =>
+    useQuery({
+        queryKey: operatorKeys.overview(sellerId),
+        queryFn: () => api.get<SellerOverviewDto>(scoped('/api/seller/overview', sellerId)),
+        enabled,
+    });
+export const useSellerSessions = (
+    enabled: boolean,
+    sellerId: string | null = null,
+): UseQueryResult<SellerSessionsDto> =>
+    useQuery({
+        queryKey: operatorKeys.sessions(sellerId),
+        queryFn: () => api.get<SellerSessionsDto>(scoped('/api/seller/sessions', sellerId)),
+        enabled,
+        refetchInterval: (query) =>
+            query.state.data?.sessions.some((s) => s.status === 'live') === true ? 10000 : false,
+    });
+export const useSellerProducts = (
+    enabled: boolean,
+    sellerId: string | null = null,
+): UseQueryResult<SellerProductsDto> =>
+    useQuery({
+        queryKey: operatorKeys.products(sellerId),
+        queryFn: () => api.get<SellerProductsDto>(scoped('/api/seller/products', sellerId)),
+        enabled,
+    });
+export const useSellerOrders = (
+    enabled: boolean,
+    sellerId: string | null = null,
+): UseQueryResult<SellerOrdersDto> =>
+    useQuery({
+        queryKey: operatorKeys.orders(sellerId),
+        queryFn: () => api.get<SellerOrdersDto>(scoped('/api/seller/orders', sellerId)),
+        enabled,
+    });
+export const useSessionAnalytics = (
+    sessionId: string,
+    enabled: boolean,
+): UseQueryResult<SessionAnalyticsDto> =>
+    useQuery({
+        queryKey: operatorKeys.analytics(sessionId),
+        queryFn: () => api.get<SessionAnalyticsDto>(`/api/seller/sessions/${sessionId}/analytics`),
+        enabled,
+    });
+export const useSessionModeration = (
+    sessionId: string | null,
+    enabled: boolean,
+): UseQueryResult<{
     entries: ModerationEntry[];
-}> => useQuery({
-    queryKey: operatorKeys.moderation(sessionId ?? 'none'),
-    queryFn: () => api.get<{
-        entries: ModerationEntry[];
-    }>(`/api/seller/sessions/${sessionId ?? ''}/moderation`),
-    enabled: enabled && sessionId !== null,
-});
+}> =>
+    useQuery({
+        queryKey: operatorKeys.moderation(sessionId ?? 'none'),
+        queryFn: () =>
+            api.get<{
+                entries: ModerationEntry[];
+            }>(`/api/seller/sessions/${sessionId ?? ''}/moderation`),
+        enabled: enabled && sessionId !== null,
+    });
 const SHOPPER_PRICE_KEYS = [['products'], ['product'], ['session'], ['cart']];
 const pricingMessage = (err: unknown): string => {
     if (err instanceof ApiError) {
@@ -140,9 +178,15 @@ export type VariantPricingInput = {
     mrpMinorUnits?: number | null;
     stock?: number;
 };
-export const useUpdateVariantPricing = (sellerId: string | null = null): UseMutationResult<{
-    variant: SellerProductVariant;
-}, Error, VariantPricingInput> => {
+export const useUpdateVariantPricing = (
+    sellerId: string | null = null,
+): UseMutationResult<
+    {
+        variant: SellerProductVariant;
+    },
+    Error,
+    VariantPricingInput
+> => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: async ({ productId, variantId, ...patch }: VariantPricingInput) => {
@@ -150,24 +194,31 @@ export const useUpdateVariantPricing = (sellerId: string | null = null): UseMuta
                 return await api.patch<{
                     variant: SellerProductVariant;
                 }>(`/api/seller/products/${productId}/variants/${variantId}`, patch);
-            }
-            catch (err) {
+            } catch (err) {
                 throw new Error(pricingMessage(err));
             }
         },
         onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: operatorKeys.products(sellerId) });
-            await queryClient.invalidateQueries({ queryKey: operatorKeys.overview(sellerId) });
+            await queryClient.invalidateQueries({
+                queryKey: operatorKeys.products(sellerId),
+            });
+            await queryClient.invalidateQueries({
+                queryKey: operatorKeys.overview(sellerId),
+            });
             for (const key of SHOPPER_PRICE_KEYS) {
                 await queryClient.invalidateQueries({ queryKey: key });
             }
         },
     });
 };
-export const useInviteCohost = (): UseMutationResult<LiveSessionDto, Error, {
-    sessionId: string;
-    email: string;
-}> => {
+export const useInviteCohost = (): UseMutationResult<
+    LiveSessionDto,
+    Error,
+    {
+        sessionId: string;
+        email: string;
+    }
+> => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: async ({ sessionId, email }) => {
@@ -199,10 +250,14 @@ export const useRemoveCohost = (): UseMutationResult<LiveSessionDto, Error, stri
         },
     });
 };
-export const useUpdateSessionPricing = (): UseMutationResult<LiveSessionDto, Error, {
-    sessionId: string;
-    discountPercent: number | null;
-}> => {
+export const useUpdateSessionPricing = (): UseMutationResult<
+    LiveSessionDto,
+    Error,
+    {
+        sessionId: string;
+        discountPercent: number | null;
+    }
+> => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: async ({ sessionId, discountPercent }) => {
@@ -211,8 +266,7 @@ export const useUpdateSessionPricing = (): UseMutationResult<LiveSessionDto, Err
                     session: LiveSessionDto;
                 }>(`/api/sessions/${sessionId}/pricing`, { discountPercent });
                 return res.session;
-            }
-            catch (err) {
+            } catch (err) {
                 throw new Error(pricingMessage(err));
             }
         },
@@ -242,14 +296,19 @@ export type NewProductInput = {
     specs?: Record<string, string>;
     variants: NewProductVariantInput[];
 };
-export const useCreateProduct = (): UseMutationResult<{
-    product: SellerProduct;
-}, Error, NewProductInput> => {
+export const useCreateProduct = (): UseMutationResult<
+    {
+        product: SellerProduct;
+    },
+    Error,
+    NewProductInput
+> => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: (input: NewProductInput) => api.post<{
-            product: SellerProduct;
-        }>('/api/seller/products', input),
+        mutationFn: (input: NewProductInput) =>
+            api.post<{
+                product: SellerProduct;
+            }>('/api/seller/products', input),
         onSuccess: async () => {
             await queryClient.invalidateQueries({ queryKey: ['seller', 'products'] });
             await queryClient.invalidateQueries({ queryKey: ['seller', 'overview'] });

@@ -1,1 +1,1 @@
-export * from '@shop/api/domain/sessions.js';
+export * from './sessions/index.js';

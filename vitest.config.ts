@@ -1,11 +1,10 @@
 import { fileURLToPath } from 'node:url';
+
+import tsconfigPaths from 'vite-tsconfig-paths';
 import { defineConfig } from 'vitest/config';
+
 export default defineConfig({
-    resolve: {
-        alias: {
-            '@shop/shared': fileURLToPath(new URL('./packages/shared/src/index.ts', import.meta.url)),
-        },
-    },
+    plugins: [tsconfigPaths({ projects: ['./tsconfig.base.json'] })],
     test: {
         include: [
             'apps/api/src/__tests__/**/*.test.ts',

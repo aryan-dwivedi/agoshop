@@ -1,9 +1,51 @@
-import { AudioLines, Captions, ChevronDown as LucideChevronDown, ChevronLeft as LucideChevronLeft, ChevronRight as LucideChevronRight, ChevronUp as LucideChevronUp, Heart, History, LayoutGrid, ListFilter, LockKeyhole, MapPin, Menu, MessageCircle, MessageCircleQuestion, Mic, Play, Quote, Search, Send, ShieldCheck, ShoppingBag, Sparkles, Square, Tag, Truck, UserRound, Volume2, VolumeX, X, type LucideIcon, } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+
+import {
+    AudioLines,
+    Captions,
+    Heart,
+    History,
+    LayoutGrid,
+    ListFilter,
+    LockKeyhole,
+    ChevronDown as LucideChevronDown,
+    ChevronLeft as LucideChevronLeft,
+    ChevronRight as LucideChevronRight,
+    ChevronUp as LucideChevronUp,
+    MapPin,
+    Menu,
+    MessageCircle,
+    MessageCircleQuestion,
+    Mic,
+    Play,
+    Quote,
+    Search,
+    Send,
+    ShieldCheck,
+    ShoppingBag,
+    Sparkles,
+    Square,
+    Tag,
+    Truck,
+    UserRound,
+    Volume2,
+    VolumeX,
+    X,
+} from 'lucide-react';
+
 type IconProps = {
     className?: string;
 };
 const iconClass = (className?: string): string => `shrink-0 ${className ?? 'h-5 w-5'}`;
-const makeIcon = (Glyph: LucideIcon) => ({ className }: IconProps): JSX.Element => (<Glyph aria-hidden="true" className={iconClass(className)} strokeWidth={1.8}/>);
+const makeIcon =
+    (Glyph: LucideIcon) =>
+    ({ className }: IconProps): JSX.Element => (
+        <Glyph
+            aria-hidden="true"
+            className={iconClass(className)}
+            strokeWidth={1.8}
+        />
+    );
 export const AudioLinesIcon = makeIcon(AudioLines);
 export const SearchIcon = makeIcon(Search);
 export const CartIcon = makeIcon(ShoppingBag);
@@ -32,7 +74,17 @@ export const CaptionIcon = makeIcon(Captions);
 export const LockIcon = makeIcon(LockKeyhole);
 export const QuoteIcon = makeIcon(Quote);
 export const StopIcon = makeIcon(Square);
-export const HeartIcon = ({ className, filled = false, }: IconProps & {
+export const HeartIcon = ({
+    className,
+    filled = false,
+}: IconProps & {
     filled?: boolean;
-}): JSX.Element => (<Heart aria-hidden="true" className={iconClass(className)} fill={filled ? 'currentColor' : 'none'} strokeWidth={1.8}/>);
+}): JSX.Element => (
+    <Heart
+        aria-hidden="true"
+        className={iconClass(className)}
+        fill={filled ? 'currentColor' : 'none'}
+        strokeWidth={1.8}
+    />
+);
 export const BrowseIcon = makeIcon(ListFilter);

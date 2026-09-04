@@ -1,4 +1,5 @@
-import type { AppliedPromotion, LiveOffer, Surface, SuppressedPromotion } from './promotions.js';
+import type { AppliedPromotion, LiveOffer, SuppressedPromotion, Surface } from './promotions.js';
+
 export type Role = 'shopper' | 'seller' | 'admin' | 'support';
 export type PublicUser = {
     id: string;
@@ -202,7 +203,8 @@ export type CheckoutOptionsDto = {
     etaDays: number | null;
 };
 export type OrderStatus = 'pending' | 'paid' | 'payment_failed' | 'expired' | 'cancelled';
-export type FulfilmentStatus = 'processing' | 'packed' | 'shipped' | 'out_for_delivery' | 'delivered' | 'failed';
+export type FulfilmentStatus =
+    'processing' | 'packed' | 'shipped' | 'out_for_delivery' | 'delivered' | 'failed';
 export type OrderDto = {
     id: string;
     status: OrderStatus;

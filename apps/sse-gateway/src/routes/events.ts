@@ -1,6 +1,9 @@
 import { Router } from 'express';
-import { ensureIdentity } from '../../../api/src/middleware/session.js';
+
+import { ensureIdentity } from '@shop/platform/middleware/session.js';
+
 import { addSseClient } from '../lib/sse.js';
+
 export const router = Router();
 router.get('/api/events', ensureIdentity, (req, res, next) => {
     try {
@@ -16,8 +19,7 @@ router.get('/api/events', ensureIdentity, (req, res, next) => {
         res.flushHeaders();
         res.write(': connected\n\n');
         addSseClient(res, req.session!.userId, sessionIds);
-    }
-    catch (err) {
+    } catch (err) {
         next(err);
     }
 });

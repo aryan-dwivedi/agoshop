@@ -1,6 +1,8 @@
 import { hostname } from 'node:os';
-import { redis } from '@shop/api/lib/redis.js';
-import { logger } from '@shop/api/lib/logger.js';
+
+import { logger } from '@shop/platform/lib/logger.js';
+import { redis } from '@shop/platform/lib/redis.js';
+
 export const LEADER_KEY = 'worker:leader';
 export const LEADER_TTL_SECONDS = 30;
 export const LEADER_RENEW_INTERVAL_MS = 10000;
@@ -26,39 +28,35 @@ const acquireOrRenew = async (): Promise<boolean> => {
     return false;
 };
 export const tryAcquireOrRenewLeader = acquireOrRenew;
-export const startLeaderElection = (onChange?: (next: boolean) => void): {
+export const startLeaderElection = (
+    onChange?: (next: boolean) => void,
+): {
     stop: () => void;
 } => {
     let timer: NodeJS.Timeout | undefined;
     let stopped = false;
     const tick = async (): Promise<void> => {
-        if (stopped)
-            return;
+        if (stopped) return;
         const wasLeader = isLeader;
         try {
             await acquireOrRenew();
-        }
-        catch (err) {
+        } catch (err) {
             isLeader = false;
             logger.warn({ err }, 'leader election tick failed');
         }
-        if (onChange && wasLeader !== isLeader)
-            onChange(isLeader);
-        if (!stopped)
-            timer = setTimeout(() => void tick(), LEADER_RENEW_INTERVAL_MS).unref();
+        if (onChange && wasLeader !== isLeader) onChange(isLeader);
+        if (!stopped) timer = setTimeout(() => void tick(), LEADER_RENEW_INTERVAL_MS).unref();
     };
     void tick();
     return {
         stop: () => {
             stopped = true;
-            if (timer)
-                clearTimeout(timer);
+            if (timer) clearTimeout(timer);
         },
     };
 };
 export const releaseLeaderLock = async (): Promise<void> => {
-    if (!isLeader)
-        return;
+    if (!isLeader) return;
     const script = `
     if redis.call("get", KEYS[1]) == ARGV[1] then
       return redis.call("del", KEYS[1])
@@ -68,11 +66,9 @@ export const releaseLeaderLock = async (): Promise<void> => {
   `;
     try {
         await redis.eval(script, 1, LEADER_KEY, leaderToken);
-    }
-    catch (err) {
+    } catch (err) {
         logger.warn({ err }, 'leader lock release failed');
-    }
-    finally {
+    } finally {
         isLeader = false;
     }
 };

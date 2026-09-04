@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+
 import { parseAgoraRttCaption } from './agoraRttCaption';
+
 const encode = (value: unknown): Uint8Array => new TextEncoder().encode(JSON.stringify(value));
 describe('Agora RTT JSON caption parsing', () => {
     it('returns every segment from the current transcript.results protocol', async () => {
@@ -55,10 +57,21 @@ describe('Agora RTT JSON caption parsing', () => {
                 textTs: 1710000012345,
                 offset: 1000,
                 language: 'en-US',
-                results: [{ text: 'Ready to shop.', isFinal: true, offset: 1000, duration: 200 }],
+                results: [
+                    {
+                        text: 'Ready to shop.',
+                        isFinal: true,
+                        offset: 1000,
+                        duration: 200,
+                    },
+                ],
             },
         });
-        const compressed = new Uint8Array(await new Response(new Blob([raw as BlobPart]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
+        const compressed = new Uint8Array(
+            await new Response(
+                new Blob([raw as BlobPart]).stream().pipeThrough(new CompressionStream('gzip')),
+            ).arrayBuffer(),
+        );
         await expect(parseAgoraRttCaption(compressed)).resolves.toEqual([
             {
                 id: '0:1710000012345:1000',
@@ -70,16 +83,17 @@ describe('Agora RTT JSON caption parsing', () => {
         ]);
     });
     it('keeps one id while an interim segment text changes', async () => {
-        const message = (text: string, isFinal: boolean) => encode({
-            transcript: {
-                uid: 42,
-                textTs: 1710000012345,
-                offset: 1300,
-                language: 'en-US',
-                sentenceId: 1710000012000,
-                results: [{ text, isFinal, offset: 1300, duration: 200 }],
-            },
-        });
+        const message = (text: string, isFinal: boolean) =>
+            encode({
+                transcript: {
+                    uid: 42,
+                    textTs: 1710000012345,
+                    offset: 1300,
+                    language: 'en-US',
+                    sentenceId: 1710000012000,
+                    results: [{ text, isFinal, offset: 1300, duration: 200 }],
+                },
+            });
         const [interim, finalized] = await Promise.all([
             parseAgoraRttCaption(message('This is real', false)),
             parseAgoraRttCaption(message('This is real time.', true)),

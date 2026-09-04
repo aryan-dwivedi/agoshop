@@ -1,4 +1,5 @@
 import type { SearchProvider, SearchQuery, SearchResult } from './types.js';
+
 export type PostgresSearchDeps = {
     listProducts: (query: {
         q?: string;
@@ -25,14 +26,16 @@ export const createPostgresSearchProvider = (deps: PostgresSearchDeps): SearchPr
             pageSize: query.pageSize ?? 12,
         });
     },
-    async index() {
-    },
+    async index() {},
 });
 export type OpenSearchConfig = {
     url: string;
     indexName: string;
 };
-export const createOpenSearchProvider = (config: OpenSearchConfig, fallback: SearchProvider): SearchProvider => ({
+export const createOpenSearchProvider = (
+    config: OpenSearchConfig,
+    fallback: SearchProvider,
+): SearchProvider => ({
     async search(query: SearchQuery): Promise<SearchResult> {
         try {
             const res = await fetch(`${config.url}/${config.indexName}/_search`, {
@@ -41,12 +44,16 @@ export const createOpenSearchProvider = (config: OpenSearchConfig, fallback: Sea
                 body: JSON.stringify({
                     from: ((query.page ?? 1) - 1) * (query.pageSize ?? 12),
                     size: query.pageSize ?? 12,
-                    query: { multi_match: { query: query.q, fields: ['title^3', 'brand^2', 'description'] } },
+                    query: {
+                        multi_match: {
+                            query: query.q,
+                            fields: ['title^3', 'brand^2', 'description'],
+                        },
+                    },
                 }),
                 signal: AbortSignal.timeout(5000),
             });
-            if (!res.ok)
-                return fallback.search(query);
+            if (!res.ok) return fallback.search(query);
             const body = (await res.json()) as {
                 hits: {
                     total: {
@@ -61,8 +68,7 @@ export const createOpenSearchProvider = (config: OpenSearchConfig, fallback: Sea
                 total: body.hits.total.value,
                 items: body.hits.hits.map((h) => h._source),
             };
-        }
-        catch {
+        } catch {
             return fallback.search(query);
         }
     },

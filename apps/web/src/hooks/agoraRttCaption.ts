@@ -18,20 +18,23 @@ export type AgoraRttCaptionSegment = {
     finalized: boolean;
     absoluteMs: number;
 };
-const finiteNumber = (value: unknown): number | null => typeof value === 'number' && Number.isFinite(value) ? value : null;
-export const parseAgoraRttCaption = async (payload: Uint8Array): Promise<AgoraRttCaptionSegment[]> => {
+const finiteNumber = (value: unknown): number | null =>
+    typeof value === 'number' && Number.isFinite(value) ? value : null;
+export const parseAgoraRttCaption = async (
+    payload: Uint8Array,
+): Promise<AgoraRttCaptionSegment[]> => {
     const gzipped = payload[0] === 0x1f && payload[1] === 0x8b;
     const raw = gzipped
-        ? await new Response(new Blob([payload as BlobPart]).stream().pipeThrough(new DecompressionStream('gzip'))).text()
+        ? await new Response(
+              new Blob([payload as BlobPart]).stream().pipeThrough(new DecompressionStream('gzip')),
+          ).text()
         : new TextDecoder().decode(payload);
     const envelope = JSON.parse(raw) as {
         transcript?: unknown;
     };
-    if (typeof envelope.transcript !== 'object' || envelope.transcript === null)
-        return [];
+    if (typeof envelope.transcript !== 'object' || envelope.transcript === null) return [];
     const transcript = envelope.transcript as AgoraTranscript;
-    if (!Array.isArray(transcript.results))
-        return [];
+    if (!Array.isArray(transcript.results)) return [];
     const textTs = finiteNumber(transcript.textTs) ?? Date.now();
     const uid = finiteNumber(transcript.uid) ?? 0;
     const sentenceId = finiteNumber(transcript.sentenceId) ?? textTs;
@@ -39,8 +42,7 @@ export const parseAgoraRttCaption = async (payload: Uint8Array): Promise<AgoraRt
     const language = typeof transcript.language === 'string' ? transcript.language : 'en-US';
     return (transcript.results as AgoraTranscriptResult[]).flatMap((result) => {
         const text = typeof result.text === 'string' ? result.text.trim() : '';
-        if (text.length === 0)
-            return [];
+        if (text.length === 0) return [];
         const segmentOffset = finiteNumber(result.offset) ?? batchOffset;
         return [
             {

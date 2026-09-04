@@ -1,0 +1,8 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "include": [
+        "src/**/*.ts",
+        "src/types/**/*.d.ts",
+        "../../packages/platform/src/types/express.d.ts"
+    ]
+}

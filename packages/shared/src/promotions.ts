@@ -1,4 +1,5 @@
 import { percentOf } from './money.js';
+
 export type Surface = 'live' | 'replay' | 'browse';
 export type UserSegment = 'first_order' | 'has_wishlisted' | 'loyalty_3plus';
 export type PromotionCondition = {
@@ -58,37 +59,30 @@ export type PromotionEvaluation = {
     suppressed: SuppressedPromotion[];
 };
 export const rawDiscountFor = (promotion: Promotion, grossMinorUnits: number): number => {
-    const raw = promotion.kind === 'percent' ? percentOf(grossMinorUnits, promotion.value) : promotion.value;
+    const raw =
+        promotion.kind === 'percent'
+            ? percentOf(grossMinorUnits, promotion.value)
+            : promotion.value;
     return Math.max(0, Math.min(raw, grossMinorUnits));
 };
 const passesConditions = (promotion: Promotion, ctx: LineContext): boolean => {
-    if (!promotion.active)
-        return false;
+    if (!promotion.active) return false;
     const from = promotion.validFrom == null ? null : new Date(promotion.validFrom);
     const until = promotion.validUntil == null ? null : new Date(promotion.validUntil);
-    if (from && ctx.now < from)
-        return false;
-    if (until && ctx.now > until)
-        return false;
+    if (from && ctx.now < from) return false;
+    if (until && ctx.now > until) return false;
     const c = promotion.conditions ?? {};
-    if (c.surfaces && !c.surfaces.includes(ctx.surface))
-        return false;
-    if (c.requiresLiveSession && !ctx.liveEligible)
-        return false;
-    if (c.categorySlugs && !c.categorySlugs.includes(ctx.categorySlug))
-        return false;
-    if (c.productIds && !c.productIds.includes(ctx.productId))
-        return false;
-    if (c.sellerIds && !c.sellerIds.includes(ctx.sellerId))
-        return false;
+    if (c.surfaces && !c.surfaces.includes(ctx.surface)) return false;
+    if (c.requiresLiveSession && !ctx.liveEligible) return false;
+    if (c.categorySlugs && !c.categorySlugs.includes(ctx.categorySlug)) return false;
+    if (c.productIds && !c.productIds.includes(ctx.productId)) return false;
+    if (c.sellerIds && !c.sellerIds.includes(ctx.sellerId)) return false;
     const gross = ctx.unitPriceMinorUnits * ctx.quantity;
-    if (c.minLineMinorUnits != null && gross < c.minLineMinorUnits)
-        return false;
+    if (c.minLineMinorUnits != null && gross < c.minLineMinorUnits) return false;
     if (c.minOrderMinorUnits != null && ctx.orderSubtotalMinorUnits < c.minOrderMinorUnits) {
         return false;
     }
-    if (c.userSegments && !c.userSegments.some((s) => ctx.userSegments.includes(s)))
-        return false;
+    if (c.userSegments && !c.userSegments.some((s) => ctx.userSegments.includes(s))) return false;
     return true;
 };
 type Candidate = {
@@ -115,7 +109,11 @@ const buildCandidate = (members: Promotion[], gross: number): Candidate => {
         tieCode: members.map((p) => p.code).sort()[0] ?? '',
     };
 };
-export function evaluatePromotions(all: Promotion[], ctx: LineContext, maxTotalPct: number): PromotionEvaluation {
+export function evaluatePromotions(
+    all: Promotion[],
+    ctx: LineContext,
+    maxTotalPct: number,
+): PromotionEvaluation {
     const grossMinorUnits = ctx.unitPriceMinorUnits * ctx.quantity;
     const suppressed: SuppressedPromotion[] = [];
     const eligible = all.filter((p) => passesConditions(p, ctx));
@@ -124,9 +122,12 @@ export function evaluatePromotions(all: Promotion[], ctx: LineContext, maxTotalP
         const perUserCap = p.conditions?.maxRedemptionsPerUser;
         const used = ctx.redemptionsByPromotionId[p.id] ?? 0;
         if (perUserCap != null && used >= perUserCap) {
-            suppressed.push({ code: p.code, label: p.label, reason: 'redemption_limit' });
-        }
-        else {
+            suppressed.push({
+                code: p.code,
+                label: p.label,
+                reason: 'redemption_limit',
+            });
+        } else {
             available.push(p);
         }
     }
@@ -142,19 +143,29 @@ export function evaluatePromotions(all: Promotion[], ctx: LineContext, maxTotalP
     const stackables = available.filter((p) => p.stackable);
     const nonStackables = available.filter((p) => !p.stackable);
     const candidates: Candidate[] = nonStackables.map((p) => buildCandidate([p], grossMinorUnits));
-    if (stackables.length > 0)
-        candidates.push(buildCandidate(stackables, grossMinorUnits));
-    candidates.sort((a, b) => b.total - a.total || b.maxPriority - a.maxPriority || a.tieCode.localeCompare(b.tieCode));
+    if (stackables.length > 0) candidates.push(buildCandidate(stackables, grossMinorUnits));
+    candidates.sort(
+        (a, b) =>
+            b.total - a.total ||
+            b.maxPriority - a.maxPriority ||
+            a.tieCode.localeCompare(b.tieCode),
+    );
     const winner = candidates[0]!;
     const capMinorUnits = percentOf(grossMinorUnits, maxTotalPct);
-    const kept = [...winner.members].sort((a, b) => b.priority - a.priority || a.code.localeCompare(b.code));
+    const kept = [...winner.members].sort(
+        (a, b) => b.priority - a.priority || a.code.localeCompare(b.code),
+    );
     const amounts = new Map(winner.amounts);
     let total = winner.total;
     while (total > capMinorUnits && kept.length > 1) {
         const dropped = kept.pop()!;
         total -= amounts.get(dropped.id) ?? 0;
         amounts.delete(dropped.id);
-        suppressed.push({ code: dropped.code, label: dropped.label, reason: 'capped' });
+        suppressed.push({
+            code: dropped.code,
+            label: dropped.label,
+            reason: 'capped',
+        });
     }
     if (total > capMinorUnits && kept.length === 1) {
         const only = kept[0]!;
@@ -165,12 +176,20 @@ export function evaluatePromotions(all: Promotion[], ctx: LineContext, maxTotalP
     const winnerIds = new Set(kept.map((p) => p.id));
     for (const p of available) {
         if (!winnerIds.has(p.id) && !suppressed.some((s) => s.code === p.code)) {
-            suppressed.push({ code: p.code, label: p.label, reason: 'not_stackable' });
+            suppressed.push({
+                code: p.code,
+                label: p.label,
+                reason: 'not_stackable',
+            });
         }
     }
     const applied: AppliedPromotion[] = kept
         .filter((p) => (amounts.get(p.id) ?? 0) > 0)
-        .map((p) => ({ code: p.code, label: p.label, minorUnits: amounts.get(p.id)! }));
+        .map((p) => ({
+            code: p.code,
+            label: p.label,
+            minorUnits: amounts.get(p.id)!,
+        }));
     const discountMinorUnits = applied.reduce((sum, a) => sum + a.minorUnits, 0);
     return {
         grossMinorUnits,

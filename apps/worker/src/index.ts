@@ -1,5 +1,7 @@
 import { pathToFileURL } from 'node:url';
+
 import { startBackground, stopBackground } from './background.js';
+
 const entry = process.argv[1] ? pathToFileURL(process.argv[1]).href : '';
 if (entry === import.meta.url) {
     process.on('SIGINT', () => void stopBackground('SIGINT').then(() => process.exit(0)));

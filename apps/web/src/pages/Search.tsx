@@ -1,9 +1,22 @@
+import type { CategoryDto, ProductListDto } from '../components/ProductRail';
+
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
+
 import { EmptyState, ErrorState } from '../components/EmptyState';
-import { FacetSidebar, GridSkeleton, InfiniteScrollTrigger, ListingToolbar, PAGE_SIZE, ProductGrid, productsQueryString, readFacetState, type CategoryDto, type ProductListDto, } from '../components/ProductRail';
+import {
+    FacetSidebar,
+    GridSkeleton,
+    InfiniteScrollTrigger,
+    ListingToolbar,
+    PAGE_SIZE,
+    ProductGrid,
+    productsQueryString,
+    readFacetState,
+} from '../components/ProductRail';
 import { ChevronRight, SearchIcon } from '../components/icons';
 import { api } from '../lib/api';
+
 const Search = (): JSX.Element => {
     const [params, setParams] = useSearchParams();
     const q = params.get('q') ?? '';
@@ -12,17 +25,16 @@ const Search = (): JSX.Element => {
         const merged = new URLSearchParams(params);
         merged.delete('page');
         for (const [k, v] of Object.entries(next)) {
-            if (v === '')
-                merged.delete(k);
-            else
-                merged.set(k, v);
+            if (v === '') merged.delete(k);
+            else merged.set(k, v);
         }
         setParams(merged, { replace: true });
     };
     const query = productsQueryString(facets, { q });
     const listing = useInfiniteQuery({
         queryKey: ['products', 'infinite', query],
-        queryFn: ({ pageParam }) => api.get<ProductListDto>(`/api/products?${query}&page=${pageParam}`),
+        queryFn: ({ pageParam }) =>
+            api.get<ProductListDto>(`/api/products?${query}&page=${pageParam}`),
         initialPageParam: 1,
         getNextPageParam: (last) => {
             const pageSize = last.pageSize || PAGE_SIZE;
@@ -31,54 +43,117 @@ const Search = (): JSX.Element => {
     });
     const categories = useQuery({
         queryKey: ['categories'],
-        queryFn: () => api.get<{
-            categories: CategoryDto[];
-        }>('/api/categories'),
+        queryFn: () =>
+            api.get<{
+                categories: CategoryDto[];
+            }>('/api/categories'),
         staleTime: 5 * 60 * 1000,
     });
     const data = listing.data?.pages[0];
     const products = listing.data?.pages.flatMap((page) => page.items) ?? [];
-    return (<div className="space-y-4 py-4 md:py-6">
-      <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-13 text-t3">
-        <Link to="/" className="link">
-          Home
-        </Link>
-        <ChevronRight className="h-3.5 w-3.5"/>
-        <span className="text-t2">Search</span>
-      </nav>
+    return (
+        <div className="space-y-4 py-4 md:py-6">
+            <nav
+                aria-label="Breadcrumb"
+                className="flex items-center gap-1 text-13 text-t3"
+            >
+                <Link
+                    to="/"
+                    className="link"
+                >
+                    Home
+                </Link>
+                <ChevronRight className="h-3.5 w-3.5" />
+                <span className="text-t2">Search</span>
+            </nav>
 
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="flex items-center gap-2 text-28 font-semibold tracking-[-0.02em] text-t1">
-          <SearchIcon className="h-5 w-5 text-t3"/>
-          {q.length === 0 ? 'All products' : `“${q}”`}
-        </h1>
-        {data !== undefined && (<p className="tnum text-14 text-t2">
-            {data.total.toLocaleString('en-IN')} {q.length === 0 ? 'products' : 'matches'}
-          </p>)}
-      </header>
+            <header className="flex flex-wrap items-end justify-between gap-3">
+                <h1 className="flex items-center gap-2 text-28 font-semibold tracking-[-0.02em] text-t1">
+                    <SearchIcon className="h-5 w-5 text-t3" />
+                    {q.length === 0 ? 'All products' : `“${q}”`}
+                </h1>
+                {data !== undefined && (
+                    <p className="tnum text-14 text-t2">
+                        {data.total.toLocaleString('en-IN')}{' '}
+                        {q.length === 0 ? 'products' : 'matches'}
+                    </p>
+                )}
+            </header>
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-        <FacetSidebar maxPriceMinorUnits={facets.maxPriceMinorUnits} minRating={facets.minRating} sellerId={facets.sellerId} priceBounds={data?.facets.priceMinorUnits} facets={data?.facets} onChange={patch} onReset={() => setParams(new URLSearchParams({ q }), { replace: true })} showCategories/>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+                <FacetSidebar
+                    maxPriceMinorUnits={facets.maxPriceMinorUnits}
+                    minRating={facets.minRating}
+                    sellerId={facets.sellerId}
+                    priceBounds={data?.facets.priceMinorUnits}
+                    facets={data?.facets}
+                    onChange={patch}
+                    onReset={() => setParams(new URLSearchParams({ q }), { replace: true })}
+                    showCategories
+                />
 
-        <div className="min-w-0 flex-1">
-          {listing.isPending ? (<GridSkeleton />) : listing.error !== null ? (<ErrorState title="Search did not run" error={listing.error} onRetry={() => void listing.refetch()}/>) : data === undefined || products.length === 0 ? (<EmptyState title={q.length === 0 ? 'Nothing matches these filters' : `No matches for “${q}”`} body={q.length === 0
-                ? 'Raise the price cap or drop the rating floor to widen the results.'
-                : 'Try a brand or a category word instead.'} action={{
-                to: q.length === 0 ? '/search' : `/search?q=${encodeURIComponent(q)}`,
-                label: 'Clear filters',
-            }}>
-              <div className="flex flex-wrap gap-2">
-                {(categories.data?.categories ?? []).map((c) => (<Link key={c.id} to={`/c/${c.slug}`} className="chip">
-                    {c.name}
-                  </Link>))}
-              </div>
-            </EmptyState>) : (<div className="card space-y-4 p-4">
-              <ListingToolbar loaded={products.length} total={data.total} sort={facets.sort} onChange={patch}/>
-              <ProductGrid products={products}/>
-              <InfiniteScrollTrigger hasMore={listing.hasNextPage} loading={listing.isFetchingNextPage} loaded={products.length} total={data.total} onLoadMore={() => void listing.fetchNextPage()}/>
-            </div>)}
+                <div className="min-w-0 flex-1">
+                    {listing.isPending ? (
+                        <GridSkeleton />
+                    ) : listing.error !== null ? (
+                        <ErrorState
+                            title="Search did not run"
+                            error={listing.error}
+                            onRetry={() => void listing.refetch()}
+                        />
+                    ) : data === undefined || products.length === 0 ? (
+                        <EmptyState
+                            title={
+                                q.length === 0
+                                    ? 'Nothing matches these filters'
+                                    : `No matches for “${q}”`
+                            }
+                            body={
+                                q.length === 0
+                                    ? 'Raise the price cap or drop the rating floor to widen the results.'
+                                    : 'Try a brand or a category word instead.'
+                            }
+                            action={{
+                                to:
+                                    q.length === 0
+                                        ? '/search'
+                                        : `/search?q=${encodeURIComponent(q)}`,
+                                label: 'Clear filters',
+                            }}
+                        >
+                            <div className="flex flex-wrap gap-2">
+                                {(categories.data?.categories ?? []).map((c) => (
+                                    <Link
+                                        key={c.id}
+                                        to={`/c/${c.slug}`}
+                                        className="chip"
+                                    >
+                                        {c.name}
+                                    </Link>
+                                ))}
+                            </div>
+                        </EmptyState>
+                    ) : (
+                        <div className="card space-y-4 p-4">
+                            <ListingToolbar
+                                loaded={products.length}
+                                total={data.total}
+                                sort={facets.sort}
+                                onChange={patch}
+                            />
+                            <ProductGrid products={products} />
+                            <InfiniteScrollTrigger
+                                hasMore={listing.hasNextPage}
+                                loading={listing.isFetchingNextPage}
+                                loaded={products.length}
+                                total={data.total}
+                                onLoadMore={() => void listing.fetchNextPage()}
+                            />
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
-      </div>
-    </div>);
+    );
 };
 export default Search;

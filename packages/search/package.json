@@ -1,12 +1,12 @@
 {
-  "name": "@shop/search",
-  "private": true,
-  "version": "1.0.0",
-  "type": "module",
-  "exports": {
-    ".": "./src/index.ts"
-  },
-  "dependencies": {
-    "@shop/shared": "*"
-  }
+    "name": "@shop/search",
+    "private": true,
+    "version": "1.0.0",
+    "type": "module",
+    "exports": {
+        ".": "./src/index.ts"
+    },
+    "dependencies": {
+        "@shop/shared": "*"
+    }
 }

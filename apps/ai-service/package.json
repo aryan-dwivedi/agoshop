@@ -1,21 +1,24 @@
 {
-  "name": "@shop/ai-service",
-  "private": true,
-  "version": "1.0.0",
-  "type": "module",
-  "//": "Hot-path AI routes run here; business logic lives in @shop/api and is imported, not duplicated.",
-  "scripts": {
-    "dev": "PORT=8790 node --env-file=../../.env --import tsx --watch src/index.ts",
-    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node22 --packages=external --outfile=dist/index.js",
-    "start": "node dist/index.js"
-  },
-  "dependencies": {
-    "@shop/api": "*",
-    "@shop/shared": "*",
-    "express": "^5.0.1"
-  },
-  "devDependencies": {
-    "esbuild": "^0.25.0",
-    "tsx": "^4.19.2"
-  }
+    "name": "@shop/ai-service",
+    "private": true,
+    "version": "1.0.0",
+    "type": "module",
+    "//": "Hot-path AI routes run here; business logic lives in @shop/ai and is imported, not duplicated.",
+    "scripts": {
+        "dev": "PORT=8790 node --env-file=../../.env --import tsx --watch src/index.ts",
+        "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node22 --packages=external --outfile=dist/index.js",
+        "start": "node dist/index.js"
+    },
+    "dependencies": {
+        "@shop/ai": "*",
+        "@shop/api": "*",
+        "@shop/db": "*",
+        "@shop/platform": "*",
+        "@shop/shared": "*",
+        "express": "^5.0.1"
+    },
+    "devDependencies": {
+        "esbuild": "^0.25.0",
+        "tsx": "^4.19.2"
+    }
 }

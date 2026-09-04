@@ -1,19 +1,23 @@
+import type { RoomTab } from '../components/live/LiveRoomSidebar';
+import type { ComposerMode, QuotedLine } from '../components/live/RoomConversation';
 import type { IRemoteAudioTrack } from 'agora-rtc-sdk-ng';
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+
 import { useAssistantSurface } from '../ai/assistantSurface';
 import { useVoiceAgent } from '../ai/useVoiceAgent';
-import { LiveRoomSidebar, type RoomTab } from '../components/live/LiveRoomSidebar';
+import { LiveRoomSidebar } from '../components/live/LiveRoomSidebar';
 import { LiveSavingsBanner } from '../components/live/LiveSavingsBanner';
 import { LiveTheatre } from '../components/live/LiveTheatre';
-import type { ComposerMode, QuotedLine } from '../components/live/RoomConversation';
+import { useCart } from '../hooks/useCart';
 import { useChat } from '../hooks/useChat';
 import { useLiveSession } from '../hooks/useLiveSession';
-import { useCart } from '../hooks/useCart';
 import { useOfflineGuard } from '../hooks/useOfflineGuard';
 import { useVideoQuality } from '../hooks/useVideoQuality';
 import { api } from '../lib/api';
 import { useSession } from '../state/session';
+
 const Live = (): JSX.Element => {
     const { slug } = useParams<{
         slug: string;
@@ -40,8 +44,7 @@ const Live = (): JSX.Element => {
         setTab(nextTab);
         window.requestAnimationFrame(() => {
             const panel = roomPanelRef.current;
-            if (panel === null)
-                return;
+            if (panel === null) return;
             const inputLabel = nextTab === 'ask' ? 'Ask Ago anything' : 'Message the room';
             panel.querySelector<HTMLInputElement>(`input[aria-label="${inputLabel}"]`)?.focus();
         });
@@ -54,13 +57,11 @@ const Live = (): JSX.Element => {
         return releasePage;
     }, [claimPage, releasePage]);
     useEffect(() => {
-        if (openSignal <= 0)
-            return;
+        if (openSignal <= 0) return;
         showRoomPanel('ask');
     }, [openSignal, showRoomPanel]);
     useEffect(() => {
-        if (captionNotice === null)
-            return undefined;
+        if (captionNotice === null) return undefined;
         const timer = window.setTimeout(() => setCaptionNotice(null), 3000);
         return () => window.clearTimeout(timer);
     }, [captionNotice]);
@@ -91,29 +92,37 @@ const Live = (): JSX.Element => {
     const cart = useCart(Boolean(user));
     const pollId = live.poll?.id ?? null;
     useEffect(() => {
-        if (pollId === null)
-            return;
+        if (pollId === null) return;
         setPollOpen(window.matchMedia('(min-width: 1024px)').matches);
     }, [pollId]);
-    const liveLines = (cart.data?.items ?? []).filter((item) => item.liveSessionId === session?.id && item.applied.length > 0);
+    const liveLines = (cart.data?.items ?? []).filter(
+        (item) => item.liveSessionId === session?.id && item.applied.length > 0,
+    );
     const liveSavings = liveLines.reduce((sum, item) => sum + item.pricing.discountMinorUnits, 0);
     const discountExpired = cart.data?.notices.includes('live_discount_expired') ?? false;
     if (live.query.isLoading) {
-        return (<div className="space-y-4 py-4">
-        <div className="skeleton aspect-video w-full rounded-panel"/>
-        <div className="skeleton h-pin-bar w-full"/>
-        <p className="text-center text-14 text-t3">Connecting</p>
-      </div>);
+        return (
+            <div className="space-y-4 py-4">
+                <div className="skeleton aspect-video w-full rounded-panel" />
+                <div className="skeleton h-pin-bar w-full" />
+                <p className="text-center text-14 text-t3">Connecting</p>
+            </div>
+        );
     }
     if (live.query.isError || session === null) {
-        return (<div className="card my-6 p-10 text-center">
-        <p className="text-16 font-medium text-danger">
-          This show could not be loaded. {live.query.error?.message}
-        </p>
-        <Link to="/live" className="btn-standard mt-4">
-          Back to live shows
-        </Link>
-      </div>);
+        return (
+            <div className="card my-6 p-10 text-center">
+                <p className="text-16 font-medium text-danger">
+                    This show could not be loaded. {live.query.error?.message}
+                </p>
+                <Link
+                    to="/live"
+                    className="btn-standard mt-4"
+                >
+                    Back to live shows
+                </Link>
+            </div>
+        );
     }
     const consentGate = Boolean(live.join?.recordingConsentRequired) && !consented;
     const captionsAvailable = live.join?.captionsEnabled ?? false;
@@ -129,8 +138,8 @@ const Live = (): JSX.Element => {
         firstProduct === undefined
             ? 'Summarise what has happened in this live room.'
             : secondProduct === undefined
-                ? `What should I know about ${firstProduct.title}?`
-                : `Compare ${firstProduct.title} and ${secondProduct.title}.`,
+              ? `What should I know about ${firstProduct.title}?`
+              : `Compare ${firstProduct.title} and ${secondProduct.title}.`,
         session.products.length > 1
             ? `Which of these ${session.products.length} live deals is the best value?`
             : 'Does this live deal fit what I need?',
@@ -138,22 +147,29 @@ const Live = (): JSX.Element => {
     const toggleCaptions = (): void => {
         const next = !captionsOn;
         setCaptionsOn(next);
-        setCaptionNotice(next
-            ? live.captions.length > 0
-                ? 'Closed captions on'
-                : 'Closed captions on — waiting for host speech'
-            : 'Closed captions off');
+        setCaptionNotice(
+            next
+                ? live.captions.length > 0
+                    ? 'Closed captions on'
+                    : 'Closed captions on — waiting for host speech'
+                : 'Closed captions off',
+        );
     };
-    const chatDot = chat.status === 'ready' ? 'bg-success' : chat.status === 'error' ? 'bg-danger' : 'bg-accent';
+    const chatDot =
+        chat.status === 'ready'
+            ? 'bg-success'
+            : chat.status === 'error'
+              ? 'bg-danger'
+              : 'bg-accent';
     const chatState = offline
         ? 'Offline'
         : chat.status === 'ready'
-            ? 'Live'
-            : chat.status === 'joining'
-                ? 'Joining'
-                : chat.status === 'error'
-                    ? 'Reconnecting'
-                    : '';
+          ? 'Live'
+          : chat.status === 'joining'
+            ? 'Joining'
+            : chat.status === 'error'
+              ? 'Reconnecting'
+              : '';
     const handleConsent = (): void => {
         setConsented(true);
         if (session.id !== '') {
@@ -162,16 +178,75 @@ const Live = (): JSX.Element => {
                 .catch(() => undefined);
         }
     };
-    return (<div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden">
-      <LiveSavingsBanner isLive={isLive} liveSavings={liveSavings} liveLineCount={liveLines.length} discountExpired={discountExpired}/>
+    return (
+        <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden">
+            <LiveSavingsBanner
+                isLive={isLive}
+                liveSavings={liveSavings}
+                liveLineCount={liveLines.length}
+                discountExpired={discountExpired}
+            />
 
-      <section className={`relative flex min-h-0 flex-1 overflow-hidden border-y border-line bg-black lg:grid ${chatCollapsed
-            ? 'lg:grid-cols-1'
-            : 'lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]'}`}>
-        <LiveTheatre session={session} live={live} isLive={isLive} config={config} offline={offline} consentGate={consentGate} onConsent={handleConsent} quality={quality} onQualityChange={setQuality} qualityMenuOpen={qualityMenuOpen} onQualityMenuOpenChange={setQualityMenuOpen} captionsAvailable={captionsAvailable} captionsOn={captionsOn} onToggleCaptions={toggleCaptions} captionNotice={captionNotice} pollOpen={pollOpen} onPollOpenChange={setPollOpen} chatCollapsed={chatCollapsed} onChatCollapsedChange={setChatCollapsed} onRemoteAudioTrack={onRemoteAudioTrack} onViewProducts={() => showRoomPanel('products')} user={user}/>
+            <section
+                className={`relative flex min-h-0 flex-1 overflow-hidden border-y border-line bg-black lg:grid ${
+                    chatCollapsed
+                        ? 'lg:grid-cols-1'
+                        : 'lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]'
+                }`}
+            >
+                <LiveTheatre
+                    session={session}
+                    live={live}
+                    isLive={isLive}
+                    config={config}
+                    offline={offline}
+                    consentGate={consentGate}
+                    onConsent={handleConsent}
+                    quality={quality}
+                    onQualityChange={setQuality}
+                    qualityMenuOpen={qualityMenuOpen}
+                    onQualityMenuOpenChange={setQualityMenuOpen}
+                    captionsAvailable={captionsAvailable}
+                    captionsOn={captionsOn}
+                    onToggleCaptions={toggleCaptions}
+                    captionNotice={captionNotice}
+                    pollOpen={pollOpen}
+                    onPollOpenChange={setPollOpen}
+                    chatCollapsed={chatCollapsed}
+                    onChatCollapsedChange={setChatCollapsed}
+                    onRemoteAudioTrack={onRemoteAudioTrack}
+                    onViewProducts={() => showRoomPanel('products')}
+                    user={user}
+                />
 
-        <LiveRoomSidebar ref={roomPanelRef} session={session} live={live} isLive={isLive} offline={offline} readOnly={readOnly} chat={chat} agent={agent} user={user} tab={tab} onTabChange={setTab} chatCollapsed={chatCollapsed} onChatCollapsedChange={setChatCollapsed} composerMode={composerMode} onComposerModeChange={setComposerMode} quoted={quoted} onQuotedChange={setQuoted} onAskAbout={quoteIntoAssistant} assistantSeedPrompt={assistantSeedPrompt} onAssistantSeedPromptConsumed={() => setAssistantSeedPrompt(null)} liveAssistantExamples={liveAssistantExamples} duckTrack={duckTrack} chatState={chatState} chatDot={chatDot}/>
-      </section>
-    </div>);
+                <LiveRoomSidebar
+                    ref={roomPanelRef}
+                    session={session}
+                    live={live}
+                    isLive={isLive}
+                    offline={offline}
+                    readOnly={readOnly}
+                    chat={chat}
+                    agent={agent}
+                    user={user}
+                    tab={tab}
+                    onTabChange={setTab}
+                    chatCollapsed={chatCollapsed}
+                    onChatCollapsedChange={setChatCollapsed}
+                    composerMode={composerMode}
+                    onComposerModeChange={setComposerMode}
+                    quoted={quoted}
+                    onQuotedChange={setQuoted}
+                    onAskAbout={quoteIntoAssistant}
+                    assistantSeedPrompt={assistantSeedPrompt}
+                    onAssistantSeedPromptConsumed={() => setAssistantSeedPrompt(null)}
+                    liveAssistantExamples={liveAssistantExamples}
+                    duckTrack={duckTrack}
+                    chatState={chatState}
+                    chatDot={chatDot}
+                />
+            </section>
+        </div>
+    );
 };
 export default Live;

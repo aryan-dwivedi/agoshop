@@ -1,6 +1,15 @@
+import type { VoiceTranscriptItem } from './voiceTranscript';
+
 import { describe, expect, it } from 'vitest';
-import { orderVoiceTranscript, voiceTranscriptKey, type VoiceTranscriptItem, } from './voiceTranscript';
-const item = (uid: string, turnId: number, streamId: number, object: 'user.transcription' | 'assistant.transcription'): VoiceTranscriptItem => ({
+
+import { orderVoiceTranscript, voiceTranscriptKey } from './voiceTranscript';
+
+const item = (
+    uid: string,
+    turnId: number,
+    streamId: number,
+    object: 'user.transcription' | 'assistant.transcription',
+): VoiceTranscriptItem => ({
     uid,
     turn_id: turnId,
     stream_id: streamId,

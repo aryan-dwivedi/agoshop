@@ -27,8 +27,7 @@ type Particle = {
 const rand = (min: number, max: number): number => min + Math.random() * (max - min);
 export const allocateSpawnCounts = (deltas: ReactionDeltas, maxSpawn: number): ReactionDeltas => {
     const entries = Object.entries(deltas).filter(([, delta]) => delta > 0);
-    if (entries.length === 0)
-        return {};
+    if (entries.length === 0) return {};
     const total = entries.reduce((sum, [, delta]) => sum + delta, 0);
     if (total <= maxSpawn) {
         return Object.fromEntries(entries);
@@ -45,8 +44,7 @@ export const allocateSpawnCounts = (deltas: ReactionDeltas, maxSpawn: number): R
     let remainder = maxSpawn - used;
     const byWeight = [...entries].sort((a, b) => b[1] - a[1]);
     for (const [emoji] of byWeight) {
-        if (remainder <= 0)
-            break;
+        if (remainder <= 0) break;
         allocated[emoji] = (allocated[emoji] ?? 0) + 1;
         remainder -= 1;
     }
@@ -60,7 +58,10 @@ export class FlyingReactionsEngine {
     private rafId = 0;
     private lastFrame = 0;
     private running = false;
-    constructor(private readonly canvas: HTMLCanvasElement, private readonly config: FlyingReactionsConfig = DEFAULT_FLYING_REACTIONS_CONFIG) {
+    constructor(
+        private readonly canvas: HTMLCanvasElement,
+        private readonly config: FlyingReactionsConfig = DEFAULT_FLYING_REACTIONS_CONFIG,
+    ) {
         this.pool = Array.from({ length: config.maxParticles }, () => ({
             emoji: '',
             x: 0,
@@ -84,17 +85,14 @@ export class FlyingReactionsEngine {
         this.canvas.style.width = `${width}px`;
         this.canvas.style.height = `${height}px`;
         const ctx = this.canvas.getContext('2d');
-        if (ctx)
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     start(): void {
-        if (this.running)
-            return;
+        if (this.running) return;
         this.running = true;
         this.lastFrame = performance.now();
         const tick = (now: number) => {
-            if (!this.running)
-                return;
+            if (!this.running) return;
             const dt = Math.min(48, now - this.lastFrame);
             this.lastFrame = now;
             this.step(dt);
@@ -105,32 +103,26 @@ export class FlyingReactionsEngine {
     }
     stop(): void {
         this.running = false;
-        if (this.rafId)
-            cancelAnimationFrame(this.rafId);
+        if (this.rafId) cancelAnimationFrame(this.rafId);
         this.rafId = 0;
-        for (const particle of this.pool)
-            particle.active = false;
+        for (const particle of this.pool) particle.active = false;
         this.activeCount = 0;
         const ctx = this.canvas.getContext('2d');
-        if (ctx)
-            ctx.clearRect(0, 0, this.width, this.height);
+        if (ctx) ctx.clearRect(0, 0, this.width, this.height);
     }
     spawn(emoji: string, count = 1): void {
         const capped = Math.min(count, this.config.maxSpawnPerTap);
-        for (let i = 0; i < capped; i += 1)
-            this.activate(emoji);
+        for (let i = 0; i < capped; i += 1) this.activate(emoji);
     }
     ingestDeltas(deltas: ReactionDeltas): void {
         const allocation = allocateSpawnCounts(deltas, this.config.maxSpawnPerTick);
         for (const [emoji, count] of Object.entries(allocation)) {
-            for (let i = 0; i < count; i += 1)
-                this.activate(emoji);
+            for (let i = 0; i < count; i += 1) this.activate(emoji);
         }
     }
     private activate(emoji: string): void {
         const particle = this.pool.find((p) => !p.active);
-        if (!particle)
-            return;
+        if (!particle) return;
         particle.active = true;
         particle.emoji = emoji;
         particle.x = rand(this.width * 0.08, this.width * 0.92);
@@ -147,8 +139,7 @@ export class FlyingReactionsEngine {
     private step(dtMs: number): void {
         const dt = dtMs / 1000;
         for (const particle of this.pool) {
-            if (!particle.active)
-                continue;
+            if (!particle.active) continue;
             particle.age += dtMs;
             particle.x += particle.vx * dt;
             particle.y += particle.vy * dt;
@@ -162,14 +153,11 @@ export class FlyingReactionsEngine {
     }
     private draw(): void {
         const ctx = this.canvas.getContext('2d');
-        if (!ctx)
-            return;
+        if (!ctx) return;
         ctx.clearRect(0, 0, this.width, this.height);
-        if (this.activeCount === 0)
-            return;
+        if (this.activeCount === 0) return;
         for (const particle of this.pool) {
-            if (!particle.active)
-                continue;
+            if (!particle.active) continue;
             const t = particle.age / particle.lifetime;
             const fadeIn = Math.min(1, t / 0.12);
             const fadeOut = t > 0.62 ? 1 - (t - 0.62) / 0.38 : 1;

@@ -1,7 +1,7 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "types": ["node"]
-  },
-  "include": ["src/**/*.ts", "../api/src/types/**/*.d.ts"]
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "types": ["node"]
+    },
+    "include": ["src/**/*.ts", "../../packages/platform/src/types/express.d.ts"]
 }

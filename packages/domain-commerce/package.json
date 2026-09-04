@@ -1,18 +1,21 @@
 {
-  "name": "@shop/domain-commerce",
-  "private": true,
-  "version": "1.0.0",
-  "type": "module",
-  "exports": {
-    ".": "./src/index.ts",
-    "./cart": "./src/cart.ts",
-    "./catalog": "./src/catalog.ts",
-    "./orders": "./src/orders.ts",
-    "./promotions": "./src/promotions.ts"
-  },
-  "dependencies": {
-    "@shop/api": "*",
-    "@shop/db": "*",
-    "@shop/shared": "*"
-  }
+    "name": "@shop/domain-commerce",
+    "private": true,
+    "version": "1.0.0",
+    "type": "module",
+    "exports": {
+        ".": "./src/index.ts",
+        "./cart": "./src/cart.ts",
+        "./catalog": "./src/catalog.ts",
+        "./orders": "./src/orders.ts",
+        "./promotions": "./src/promotions.ts",
+        "./*": "./src/*"
+    },
+    "dependencies": {
+        "@shop/db": "*",
+        "@shop/platform": "*",
+        "@shop/search": "*",
+        "@shop/shared": "*",
+        "drizzle-orm": "^0.38.3"
+    }
 }

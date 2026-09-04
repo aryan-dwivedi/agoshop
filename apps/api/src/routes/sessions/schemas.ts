@@ -1,5 +1,7 @@
-import { z } from 'zod';
 import type { SessionStatus } from '@shop/shared';
+
+import { z } from 'zod';
+
 export const idParam = z.string().uuid();
 export const slugParam = z.string().min(1).max(80);
 export const STATUSES: Record<string, SessionStatus> = {
@@ -20,17 +22,21 @@ export const createBody = z.object({
     discountPercent: z.number().int().min(0).max(90).nullish(),
     sellerId: z.string().uuid().optional(),
 });
-export const createRequest = createBody.extend({ startNow: z.boolean().optional() });
+export const createRequest = createBody.extend({
+    startNow: z.boolean().optional(),
+});
 export const updateBody = createBody
     .partial()
     .omit({ slug: true, sellerId: true, discountPercent: true });
 export const productsBody = z.object({
     items: z
-        .array(z.object({
-        productId: z.string().uuid(),
-        sortOrder: z.number().int().min(0).max(999).optional(),
-        isFeatured: z.boolean().optional(),
-    }))
+        .array(
+            z.object({
+                productId: z.string().uuid(),
+                sortOrder: z.number().int().min(0).max(999).optional(),
+                isFeatured: z.boolean().optional(),
+            }),
+        )
         .min(1)
         .max(50),
 });
@@ -50,15 +56,17 @@ export const pollBody = z.object({
 });
 export const transcriptBody = z.object({
     lines: z
-        .array(z.object({
-        captionId: z.string().min(1).max(128),
-        text: z.string().min(1).max(2000),
-        language: z.string().min(2).max(16),
-        startMs: z.number().int().min(0),
-        speaker: z.string().min(1).max(32).optional(),
-        finalized: z.boolean(),
-        translatedText: z.record(z.string()).optional(),
-    }))
+        .array(
+            z.object({
+                captionId: z.string().min(1).max(128),
+                text: z.string().min(1).max(2000),
+                language: z.string().min(2).max(16),
+                startMs: z.number().int().min(0),
+                speaker: z.string().min(1).max(32).optional(),
+                finalized: z.boolean(),
+                translatedText: z.record(z.string()).optional(),
+            }),
+        )
         .min(1)
         .max(50),
 });

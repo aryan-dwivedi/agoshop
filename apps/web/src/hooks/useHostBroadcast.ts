@@ -1,11 +1,27 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import AgoraRTC, { type ConnectionState, type IAgoraRTCClient, type IAgoraRTCRemoteUser, type ILocalAudioTrack, type ILocalVideoTrack, type IRemoteAudioTrack, type IRemoteVideoTrack, } from 'agora-rtc-sdk-ng';
-import { liveChannelForSlug, type SessionStatus } from '@shop/shared';
-import { api } from '../lib/api';
-import type { CaptionLine } from './useLiveSession';
-import { parseAgoraRttCaption, type AgoraRttCaptionSegment } from './agoraRttCaption';
-import { useHostRecorder, type UseHostRecorderResult } from './useHostRecorder';
 import type { ObsIngestDto } from '../components/host/ObsIngestPanel';
+import type { AgoraRttCaptionSegment } from './agoraRttCaption';
+import type { UseHostRecorderResult } from './useHostRecorder';
+import type { CaptionLine } from './useLiveSession';
+import type { SessionStatus } from '@shop/shared';
+import type {
+    ConnectionState,
+    IAgoraRTCClient,
+    IAgoraRTCRemoteUser,
+    ILocalAudioTrack,
+    ILocalVideoTrack,
+    IRemoteAudioTrack,
+    IRemoteVideoTrack,
+} from 'agora-rtc-sdk-ng';
+
+import AgoraRTC from 'agora-rtc-sdk-ng';
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import { liveChannelForSlug } from '@shop/shared';
+
+import { api } from '../lib/api';
+import { parseAgoraRttCaption } from './agoraRttCaption';
+import { useHostRecorder } from './useHostRecorder';
+
 export type BroadcastSource = 'camera' | 'file' | 'obs';
 export type PreflightHandoff = {
     consent: boolean;
@@ -24,32 +40,33 @@ export const EMPTY_HANDOFF: PreflightHandoff = {
     microphoneId: null,
 };
 export const readPreflightHandoff = (slug: string | undefined): PreflightHandoff => {
-    if (slug === undefined)
-        return EMPTY_HANDOFF;
+    if (slug === undefined) return EMPTY_HANDOFF;
     try {
         const raw = window.sessionStorage.getItem(`broadcast-preflight:${slug}`);
-        if (raw === null)
-            return EMPTY_HANDOFF;
-        return { ...EMPTY_HANDOFF, ...(JSON.parse(raw) as Partial<PreflightHandoff>) };
-    }
-    catch {
+        if (raw === null) return EMPTY_HANDOFF;
+        return {
+            ...EMPTY_HANDOFF,
+            ...(JSON.parse(raw) as Partial<PreflightHandoff>),
+        };
+    } catch {
         return EMPTY_HANDOFF;
     }
 };
-export const writePreflightHandoff = (slug: string | undefined, handoff: PreflightHandoff): void => {
-    if (slug === undefined)
-        return;
+export const writePreflightHandoff = (
+    slug: string | undefined,
+    handoff: PreflightHandoff,
+): void => {
+    if (slug === undefined) return;
     try {
         window.sessionStorage.setItem(`broadcast-preflight:${slug}`, JSON.stringify(handoff));
-    }
-    catch {
-    }
+    } catch {}
 };
 type CapturableVideo = HTMLVideoElement & {
     captureStream?: () => MediaStream;
     mozCaptureStream?: () => MediaStream;
 };
-export type BroadcastState = 'idle' | 'preview' | 'starting' | 'live' | 'ending' | 'ended' | 'error';
+export type BroadcastState =
+    'idle' | 'preview' | 'starting' | 'live' | 'ending' | 'ended' | 'error';
 type TranscriptLineInput = {
     captionId: string;
     text: string;
@@ -102,7 +119,17 @@ export const useHostBroadcast = (opts: {
     microphoneId?: string | null;
     onEnded?: () => void;
 }): UseHostBroadcastResult => {
-    const { appId, slug, sessionId, sessionStatus, startedAtMs, fileUrl = null, cameraId = null, microphoneId = null, onEnded, } = opts;
+    const {
+        appId,
+        slug,
+        sessionId,
+        sessionStatus,
+        startedAtMs,
+        fileUrl = null,
+        cameraId = null,
+        microphoneId = null,
+        onEnded,
+    } = opts;
     const [state, setState] = useState<BroadcastState>('idle');
     const [error, setError] = useState<string | null>(null);
     const [captions, setCaptions] = useState<CaptionLine[]>([]);
@@ -140,60 +167,65 @@ export const useHostBroadcast = (opts: {
     recorderRef.current = recorder;
     const flushCaptions = useCallback(async (): Promise<void> => {
         const id = sessionIdRef.current;
-        if (pendingLinesRef.current.size === 0 || !id)
-            return;
+        if (pendingLinesRef.current.size === 0 || !id) return;
         const lines = [...pendingLinesRef.current.values()];
         pendingLinesRef.current.clear();
         try {
             await api.post(`/api/sessions/${id}/transcript`, { lines });
-        }
-        catch {
-        }
+        } catch {}
     }, []);
-    const ingestCaption = useCallback((segment: AgoraRttCaptionSegment) => {
-        const startMs = Math.max(0, segment.absoluteMs - (startedAtRef.current ?? segment.absoluteMs));
-        const line: CaptionLine = {
-            id: segment.id,
-            text: segment.text,
-            language: segment.language,
-            startMs,
-            speaker: 'host',
-        };
-        setCaptions((current) => {
-            const index = current.findIndex((caption) => caption.id === line.id);
-            if (index < 0)
-                return [...current, line].slice(-MAX_CAPTIONS);
-            const next = current.slice();
-            next[index] = line;
-            return next;
-        });
-        pendingLinesRef.current.set(segment.id, {
-            captionId: segment.id,
-            text: segment.text,
-            language: segment.language,
-            startMs,
-            speaker: 'host',
-            finalized: segment.finalized,
-        });
-        if (flushTimerRef.current === null) {
-            flushTimerRef.current = window.setTimeout(() => {
-                flushTimerRef.current = null;
-                void flushCaptions();
-            }, CAPTION_FORWARD_MS);
-        }
-    }, [flushCaptions]);
-    const handleStreamMessage = useCallback((payload: Uint8Array) => {
-        void (async () => {
-            try {
-                const segments = await parseAgoraRttCaption(payload);
-                for (const segment of segments)
-                    ingestCaption(segment);
+    const ingestCaption = useCallback(
+        (segment: AgoraRttCaptionSegment) => {
+            const startMs = Math.max(
+                0,
+                segment.absoluteMs - (startedAtRef.current ?? segment.absoluteMs),
+            );
+            const line: CaptionLine = {
+                id: segment.id,
+                text: segment.text,
+                language: segment.language,
+                startMs,
+                speaker: 'host',
+            };
+            setCaptions((current) => {
+                const index = current.findIndex((caption) => caption.id === line.id);
+                if (index < 0) return [...current, line].slice(-MAX_CAPTIONS);
+                const next = current.slice();
+                next[index] = line;
+                return next;
+            });
+            pendingLinesRef.current.set(segment.id, {
+                captionId: segment.id,
+                text: segment.text,
+                language: segment.language,
+                startMs,
+                speaker: 'host',
+                finalized: segment.finalized,
+            });
+            if (flushTimerRef.current === null) {
+                flushTimerRef.current = window.setTimeout(() => {
+                    flushTimerRef.current = null;
+                    void flushCaptions();
+                }, CAPTION_FORWARD_MS);
             }
-            catch {
-                setCaptionFormatNotice('Captions are arriving in a binary protocol this client cannot decode — the transcription task was not started with the JSON protocol.');
-            }
-        })();
-    }, [ingestCaption]);
+        },
+        [flushCaptions],
+    );
+    const handleStreamMessage = useCallback(
+        (payload: Uint8Array) => {
+            void (async () => {
+                try {
+                    const segments = await parseAgoraRttCaption(payload);
+                    for (const segment of segments) ingestCaption(segment);
+                } catch {
+                    setCaptionFormatNotice(
+                        'Captions are arriving in a binary protocol this client cannot decode — the transcription task was not started with the JSON protocol.',
+                    );
+                }
+            })();
+        },
+        [ingestCaption],
+    );
     const releaseTracks = useCallback((): void => {
         micRef.current?.stop();
         micRef.current?.close();
@@ -210,288 +242,335 @@ export const useHostBroadcast = (opts: {
         }
     }, []);
     const releaseRemotes = useCallback((): void => {
-        for (const publisher of remotePublishersRef.current)
-            publisher.audioTrack?.stop();
+        for (const publisher of remotePublishersRef.current) publisher.audioTrack?.stop();
         remotePublishersRef.current = [];
         setRemotePublishers([]);
     }, []);
     const readAspect = useCallback((width: number, height: number): void => {
-        if (width > 0 && height > 0)
-            setFrameAspect(width / height);
+        if (width > 0 && height > 0) setFrameAspect(width / height);
     }, []);
-    const captureTracks = useCallback(async (kind: BroadcastSource): Promise<void> => {
-        if (kind === 'obs')
-            return;
-        if (kind === 'camera') {
-            const [mic, camera] = await AgoraRTC.createMicrophoneAndCameraTracks(microphoneId === null ? {} : { microphoneId }, cameraId === null ? {} : { cameraId });
-            micRef.current = mic;
-            cameraRef.current = camera;
-            const settings = camera.getMediaStreamTrack().getSettings();
-            readAspect(settings.width ?? 0, settings.height ?? 0);
-            return;
-        }
-        if (!fileUrl)
-            throw new Error('No file feed is configured for this deployment.');
-        const element = document.createElement('video') as CapturableVideo;
-        element.src = fileUrl;
-        element.loop = true;
-        element.playsInline = true;
-        element.muted = true;
-        element.crossOrigin = 'anonymous';
-        fileElementRef.current = element;
-        await element.play();
-        const capture = element.captureStream ?? element.mozCaptureStream;
-        if (capture === undefined) {
-            throw new Error('This browser cannot capture a video element — publish the camera instead.');
-        }
-        const stream = capture.call(element);
-        const videoTrack = stream.getVideoTracks()[0];
-        const audioTrack = stream.getAudioTracks()[0];
-        if (videoTrack === undefined)
-            throw new Error('The file feed produced no video track.');
-        cameraRef.current = AgoraRTC.createCustomVideoTrack({
-            mediaStreamTrack: videoTrack,
-            width: element.videoWidth || 1280,
-            height: element.videoHeight || 720,
-            frameRate: 30,
-        });
-        readAspect(element.videoWidth || 1280, element.videoHeight || 720);
-        micRef.current =
-            audioTrack === undefined
-                ? null
-                : AgoraRTC.createCustomAudioTrack({ mediaStreamTrack: audioTrack });
-    }, [fileUrl, readAspect, cameraId, microphoneId]);
-    const startPreview = useCallback(async (element: HTMLElement): Promise<void> => {
-        previewElementRef.current = element;
-        try {
-            if (source === 'obs') {
-                setState((current) => (current === 'live' ? current : 'preview'));
-                setError(null);
+    const captureTracks = useCallback(
+        async (kind: BroadcastSource): Promise<void> => {
+            if (kind === 'obs') return;
+            if (kind === 'camera') {
+                const [mic, camera] = await AgoraRTC.createMicrophoneAndCameraTracks(
+                    microphoneId === null ? {} : { microphoneId },
+                    cameraId === null ? {} : { cameraId },
+                );
+                micRef.current = mic;
+                cameraRef.current = camera;
+                const settings = camera.getMediaStreamTrack().getSettings();
+                readAspect(settings.width ?? 0, settings.height ?? 0);
                 return;
             }
-            if (!cameraRef.current)
-                await captureTracks(source);
-            cameraRef.current?.play(element, { fit: 'cover' });
-            setState((current) => (current === 'live' ? current : 'preview'));
-            setError(null);
-        }
-        catch (err) {
-            setState('error');
-            setError(err instanceof Error
-                ? source === 'file'
-                    ? `File feed unavailable: ${err.message}`
-                    : `Camera or microphone unavailable: ${err.message}`
-                : 'devices_unavailable');
-        }
-    }, [captureTracks, source]);
-    const setSource = useCallback(async (next: BroadcastSource): Promise<void> => {
-        if (next === source)
-            return;
-        if (state === 'live' || state === 'starting' || state === 'ending') {
-            setError('End the session before changing the publish source.');
-            return;
-        }
-        releaseTracks();
-        setSourceState(next);
-        setMicEnabled(true);
-        setCameraEnabled(true);
-        setError(null);
-        setObsIngest(null);
-        setObsFeedConnected(false);
-        obsGatewayUidRef.current = null;
-        setState('idle');
-        const element = previewElementRef.current;
-        if (element === null)
-            return;
-        if (next === 'obs') {
-            setState('preview');
-            return;
-        }
-        try {
-            await captureTracks(next);
-            cameraRef.current?.play(element, { fit: 'cover' });
-            setState('preview');
-        }
-        catch (err) {
-            setState('error');
-            setError(err instanceof Error ? err.message : 'source_switch_failed');
-        }
-    }, [captureTracks, releaseTracks, source, state]);
-    const attachRemoteHandlers = useCallback((target: IAgoraRTCClient): void => {
-        const merge = (uid: string, patch: Partial<RemotePublisher>): void => {
-            setRemotePublishers((current) => {
-                const index = current.findIndex((publisher) => publisher.uid === uid);
-                if (index < 0)
-                    return [...current, { uid, videoTrack: null, audioTrack: null, ...patch }];
-                const next = [...current];
-                next[index] = { ...current[index]!, ...patch };
-                return next;
+            if (!fileUrl) throw new Error('No file feed is configured for this deployment.');
+            const element = document.createElement('video') as CapturableVideo;
+            element.src = fileUrl;
+            element.loop = true;
+            element.playsInline = true;
+            element.muted = true;
+            element.crossOrigin = 'anonymous';
+            fileElementRef.current = element;
+            await element.play();
+            const capture = element.captureStream ?? element.mozCaptureStream;
+            if (capture === undefined) {
+                throw new Error(
+                    'This browser cannot capture a video element — publish the camera instead.',
+                );
+            }
+            const stream = capture.call(element);
+            const videoTrack = stream.getVideoTracks()[0];
+            const audioTrack = stream.getAudioTracks()[0];
+            if (videoTrack === undefined) throw new Error('The file feed produced no video track.');
+            cameraRef.current = AgoraRTC.createCustomVideoTrack({
+                mediaStreamTrack: videoTrack,
+                width: element.videoWidth || 1280,
+                height: element.videoHeight || 720,
+                frameRate: 30,
             });
-        };
-        const forget = (uid: string): void => {
-            remotePublishersRef.current.find((publisher) => publisher.uid === uid)?.audioTrack?.stop();
-            setRemotePublishers((current) => current.filter((publisher) => publisher.uid !== uid));
-        };
-        target.on('user-published', (remote: IAgoraRTCRemoteUser, mediaType) => {
-            void (async () => {
-                try {
-                    const remoteUid = String(remote.uid);
-                    const isObsFeed = sourceRef.current === 'obs' && remoteUid === obsGatewayUidRef.current;
-                    await target.subscribe(remote, mediaType);
-                    if (isObsFeed && mediaType === 'video' && remote.videoTrack) {
-                        const element = previewElementRef.current;
-                        if (element)
-                            remote.videoTrack.play(element, { fit: 'cover' });
-                        const settings = remote.videoTrack.getMediaStreamTrack().getSettings();
-                        readAspect(settings.width ?? 1280, settings.height ?? 720);
-                        setObsFeedConnected(true);
-                        setVideoPublished(true);
-                        return;
-                    }
-                    if (isObsFeed && mediaType === 'audio') {
-                        remote.audioTrack?.play();
-                        return;
-                    }
-                    if (mediaType === 'audio') {
-                        remote.audioTrack?.play();
-                        merge(String(remote.uid), { audioTrack: remote.audioTrack ?? null });
-                        return;
-                    }
-                    merge(String(remote.uid), { videoTrack: remote.videoTrack ?? null });
+            readAspect(element.videoWidth || 1280, element.videoHeight || 720);
+            micRef.current =
+                audioTrack === undefined
+                    ? null
+                    : AgoraRTC.createCustomAudioTrack({ mediaStreamTrack: audioTrack });
+        },
+        [fileUrl, readAspect, cameraId, microphoneId],
+    );
+    const startPreview = useCallback(
+        async (element: HTMLElement): Promise<void> => {
+            previewElementRef.current = element;
+            try {
+                if (source === 'obs') {
+                    setState((current) => (current === 'live' ? current : 'preview'));
+                    setError(null);
+                    return;
                 }
-                catch (err) {
-                    setError(err instanceof Error ? err.message : 'cohost_subscribe_failed');
-                }
-            })();
-        });
-        target.on('user-unpublished', (remote: IAgoraRTCRemoteUser, mediaType) => {
-            const uid = String(remote.uid);
-            if (mediaType === 'audio') {
+                if (!cameraRef.current) await captureTracks(source);
+                cameraRef.current?.play(element, { fit: 'cover' });
+                setState((current) => (current === 'live' ? current : 'preview'));
+                setError(null);
+            } catch (err) {
+                setState('error');
+                setError(
+                    err instanceof Error
+                        ? source === 'file'
+                            ? `File feed unavailable: ${err.message}`
+                            : `Camera or microphone unavailable: ${err.message}`
+                        : 'devices_unavailable',
+                );
+            }
+        },
+        [captureTracks, source],
+    );
+    const setSource = useCallback(
+        async (next: BroadcastSource): Promise<void> => {
+            if (next === source) return;
+            if (state === 'live' || state === 'starting' || state === 'ending') {
+                setError('End the session before changing the publish source.');
+                return;
+            }
+            releaseTracks();
+            setSourceState(next);
+            setMicEnabled(true);
+            setCameraEnabled(true);
+            setError(null);
+            setObsIngest(null);
+            setObsFeedConnected(false);
+            obsGatewayUidRef.current = null;
+            setState('idle');
+            const element = previewElementRef.current;
+            if (element === null) return;
+            if (next === 'obs') {
+                setState('preview');
+                return;
+            }
+            try {
+                await captureTracks(next);
+                cameraRef.current?.play(element, { fit: 'cover' });
+                setState('preview');
+            } catch (err) {
+                setState('error');
+                setError(err instanceof Error ? err.message : 'source_switch_failed');
+            }
+        },
+        [captureTracks, releaseTracks, source, state],
+    );
+    const attachRemoteHandlers = useCallback(
+        (target: IAgoraRTCClient): void => {
+            const merge = (uid: string, patch: Partial<RemotePublisher>): void => {
+                setRemotePublishers((current) => {
+                    const index = current.findIndex((publisher) => publisher.uid === uid);
+                    if (index < 0)
+                        return [...current, { uid, videoTrack: null, audioTrack: null, ...patch }];
+                    const next = [...current];
+                    next[index] = { ...current[index]!, ...patch };
+                    return next;
+                });
+            };
+            const forget = (uid: string): void => {
                 remotePublishersRef.current
                     .find((publisher) => publisher.uid === uid)
                     ?.audioTrack?.stop();
+                setRemotePublishers((current) =>
+                    current.filter((publisher) => publisher.uid !== uid),
+                );
+            };
+            target.on('user-published', (remote: IAgoraRTCRemoteUser, mediaType) => {
+                void (async () => {
+                    try {
+                        const remoteUid = String(remote.uid);
+                        const isObsFeed =
+                            sourceRef.current === 'obs' && remoteUid === obsGatewayUidRef.current;
+                        await target.subscribe(remote, mediaType);
+                        if (isObsFeed && mediaType === 'video' && remote.videoTrack) {
+                            const element = previewElementRef.current;
+                            if (element) remote.videoTrack.play(element, { fit: 'cover' });
+                            const settings = remote.videoTrack.getMediaStreamTrack().getSettings();
+                            readAspect(settings.width ?? 1280, settings.height ?? 720);
+                            setObsFeedConnected(true);
+                            setVideoPublished(true);
+                            return;
+                        }
+                        if (isObsFeed && mediaType === 'audio') {
+                            remote.audioTrack?.play();
+                            return;
+                        }
+                        if (mediaType === 'audio') {
+                            remote.audioTrack?.play();
+                            merge(String(remote.uid), {
+                                audioTrack: remote.audioTrack ?? null,
+                            });
+                            return;
+                        }
+                        merge(String(remote.uid), {
+                            videoTrack: remote.videoTrack ?? null,
+                        });
+                    } catch (err) {
+                        setError(err instanceof Error ? err.message : 'cohost_subscribe_failed');
+                    }
+                })();
+            });
+            target.on('user-unpublished', (remote: IAgoraRTCRemoteUser, mediaType) => {
+                const uid = String(remote.uid);
+                if (mediaType === 'audio') {
+                    remotePublishersRef.current
+                        .find((publisher) => publisher.uid === uid)
+                        ?.audioTrack?.stop();
+                }
+                setRemotePublishers((current) =>
+                    current.flatMap((publisher) => {
+                        if (publisher.uid !== uid) return [publisher];
+                        const next: RemotePublisher =
+                            mediaType === 'audio'
+                                ? { ...publisher, audioTrack: null }
+                                : { ...publisher, videoTrack: null };
+                        return next.audioTrack === null && next.videoTrack === null ? [] : [next];
+                    }),
+                );
+            });
+            target.on('user-left', (remote: IAgoraRTCRemoteUser) => forget(String(remote.uid)));
+        },
+        [readAspect],
+    );
+    const mintPass = useCallback(
+        async (
+            channel: string,
+        ): Promise<{
+            uid: number;
+            rtcToken: string;
+        }> => {
+            const minted = await api.post<{
+                channel: string;
+                uid: number;
+                role: string;
+                rtcToken: string;
+            }>('/api/rtc/token', {
+                channel,
+                role: 'host',
+                ...(uidRef.current === null ? {} : { uid: uidRef.current }),
+            });
+            if (minted.role !== 'host' && minted.role !== 'publisher') {
+                throw new Error('You are not authorized to publish in this session.');
             }
-            setRemotePublishers((current) => current.flatMap((publisher) => {
-                if (publisher.uid !== uid)
-                    return [publisher];
-                const next: RemotePublisher = mediaType === 'audio'
-                    ? { ...publisher, audioTrack: null }
-                    : { ...publisher, videoTrack: null };
-                return next.audioTrack === null && next.videoTrack === null ? [] : [next];
-            }));
-        });
-        target.on('user-left', (remote: IAgoraRTCRemoteUser) => forget(String(remote.uid)));
-    }, [readAspect]);
-    const mintPass = useCallback(async (channel: string): Promise<{
-        uid: number;
-        rtcToken: string;
-    }> => {
-        const minted = await api.post<{
-            channel: string;
+            uidRef.current = minted.uid;
+            return { uid: minted.uid, rtcToken: minted.rtcToken };
+        },
+        [],
+    );
+    const mintMonitorPass = useCallback(
+        async (
+            channel: string,
+        ): Promise<{
             uid: number;
-            role: string;
             rtcToken: string;
-        }>('/api/rtc/token', {
-            channel,
-            role: 'host',
-            ...(uidRef.current === null ? {} : { uid: uidRef.current }),
-        });
-        if (minted.role !== 'host' && minted.role !== 'publisher') {
-            throw new Error('You are not authorized to publish in this session.');
-        }
-        uidRef.current = minted.uid;
-        return { uid: minted.uid, rtcToken: minted.rtcToken };
-    }, []);
-    const mintMonitorPass = useCallback(async (channel: string): Promise<{
-        uid: number;
-        rtcToken: string;
-    }> => {
-        const minted = await api.post<{
-            channel: string;
-            uid: number;
-            role: string;
-            rtcToken: string;
-        }>('/api/rtc/token', {
-            channel,
-            role: 'audience',
-            ...(uidRef.current === null ? {} : { uid: uidRef.current }),
-        });
-        uidRef.current = minted.uid;
-        return { uid: minted.uid, rtcToken: minted.rtcToken };
-    }, []);
+        }> => {
+            const minted = await api.post<{
+                channel: string;
+                uid: number;
+                role: string;
+                rtcToken: string;
+            }>('/api/rtc/token', {
+                channel,
+                role: 'audience',
+                ...(uidRef.current === null ? {} : { uid: uidRef.current }),
+            });
+            uidRef.current = minted.uid;
+            return { uid: minted.uid, rtcToken: minted.rtcToken };
+        },
+        [],
+    );
     const renewPass = useCallback(async (): Promise<void> => {
         const active = clientRef.current;
-        if (!active || !slug)
-            return;
+        if (!active || !slug) return;
         try {
             const channel = liveChannelForSlug(slug);
-            const { rtcToken } = sourceRef.current === 'obs' ? await mintMonitorPass(channel) : await mintPass(channel);
+            const { rtcToken } =
+                sourceRef.current === 'obs'
+                    ? await mintMonitorPass(channel)
+                    : await mintPass(channel);
             await active.renewToken(rtcToken);
             setTokenNotice(null);
-        }
-        catch {
-            setTokenNotice('This room’s publishing permission could not be renewed. If the picture stops, end the show and start it again.');
+        } catch {
+            setTokenNotice(
+                'This room’s publishing permission could not be renewed. If the picture stops, end the show and start it again.',
+            );
         }
     }, [mintPass, mintMonitorPass, slug]);
-    const attachConnectionHandlers = useCallback((target: IAgoraRTCClient): void => {
-        target.on('connection-state-change', (current) => setConnectionState(current));
-        target.on('token-privilege-will-expire', () => void renewPass());
-        target.on('token-privilege-did-expire', () => void renewPass());
-    }, [renewPass]);
-    const joinAndPublish = useCallback(async (channel: string): Promise<void> => {
-        if (!appId)
-            throw new Error('This deployment has no live video configured.');
-        const camera = cameraRef.current;
-        const mic = micRef.current;
-        if (!camera)
-            throw new Error('Start the preview before publishing.');
-        const { uid, rtcToken } = await mintPass(channel);
-        const target = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' });
-        clientRef.current = target;
-        target.on('stream-message', (_uid, payload: Uint8Array) => handleStreamMessage(payload));
-        attachRemoteHandlers(target);
-        attachConnectionHandlers(target);
-        await target.setClientRole('host');
-        await target.join(appId, channel, rtcToken, uid);
-        await target.enableDualStream();
-        await target.publish(mic === null ? [camera] : [mic, camera]);
-        setClient(target);
-        setConnectionState(target.connectionState);
-        setVideoPublished(true);
-        setTokenNotice(null);
-    }, [appId, mintPass, handleStreamMessage, attachRemoteHandlers, attachConnectionHandlers]);
-    const joinAsMonitor = useCallback(async (channel: string, gatewayUid: number): Promise<void> => {
-        if (!appId)
-            throw new Error('This deployment has no live video configured.');
-        obsGatewayUidRef.current = String(gatewayUid);
-        const { uid, rtcToken } = await mintMonitorPass(channel);
-        const target = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' });
-        clientRef.current = target;
-        target.on('stream-message', (_uid, payload: Uint8Array) => handleStreamMessage(payload));
-        attachRemoteHandlers(target);
-        attachConnectionHandlers(target);
-        await target.setClientRole('audience');
-        await target.join(appId, channel, rtcToken, uid);
-        setClient(target);
-        setConnectionState(target.connectionState);
-        setTokenNotice(null);
-    }, [appId, mintMonitorPass, handleStreamMessage, attachRemoteHandlers, attachConnectionHandlers]);
+    const attachConnectionHandlers = useCallback(
+        (target: IAgoraRTCClient): void => {
+            target.on('connection-state-change', (current) => setConnectionState(current));
+            target.on('token-privilege-will-expire', () => void renewPass());
+            target.on('token-privilege-did-expire', () => void renewPass());
+        },
+        [renewPass],
+    );
+    const joinAndPublish = useCallback(
+        async (channel: string): Promise<void> => {
+            if (!appId) throw new Error('This deployment has no live video configured.');
+            const camera = cameraRef.current;
+            const mic = micRef.current;
+            if (!camera) throw new Error('Start the preview before publishing.');
+            const { uid, rtcToken } = await mintPass(channel);
+            const target = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' });
+            clientRef.current = target;
+            target.on('stream-message', (_uid, payload: Uint8Array) =>
+                handleStreamMessage(payload),
+            );
+            attachRemoteHandlers(target);
+            attachConnectionHandlers(target);
+            await target.setClientRole('host');
+            await target.join(appId, channel, rtcToken, uid);
+            await target.enableDualStream();
+            await target.publish(mic === null ? [camera] : [mic, camera]);
+            setClient(target);
+            setConnectionState(target.connectionState);
+            setVideoPublished(true);
+            setTokenNotice(null);
+        },
+        [appId, mintPass, handleStreamMessage, attachRemoteHandlers, attachConnectionHandlers],
+    );
+    const joinAsMonitor = useCallback(
+        async (channel: string, gatewayUid: number): Promise<void> => {
+            if (!appId) throw new Error('This deployment has no live video configured.');
+            obsGatewayUidRef.current = String(gatewayUid);
+            const { uid, rtcToken } = await mintMonitorPass(channel);
+            const target = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' });
+            clientRef.current = target;
+            target.on('stream-message', (_uid, payload: Uint8Array) =>
+                handleStreamMessage(payload),
+            );
+            attachRemoteHandlers(target);
+            attachConnectionHandlers(target);
+            await target.setClientRole('audience');
+            await target.join(appId, channel, rtcToken, uid);
+            setClient(target);
+            setConnectionState(target.connectionState);
+            setTokenNotice(null);
+        },
+        [
+            appId,
+            mintMonitorPass,
+            handleStreamMessage,
+            attachRemoteHandlers,
+            attachConnectionHandlers,
+        ],
+    );
     const goLive = useCallback(async (): Promise<void> => {
-        if (!appId || !slug || !sessionId)
-            return;
+        if (!appId || !slug || !sessionId) return;
         if (source === 'obs') {
             setState('starting');
             setError(null);
             try {
                 if (sessionStatus === 'scheduled')
                     await api.post(`/api/sessions/${sessionId}/start`);
-                const ingest = await api.post<ObsIngestDto>(`/api/sessions/${sessionId}/obs-ingest`);
+                const ingest = await api.post<ObsIngestDto>(
+                    `/api/sessions/${sessionId}/obs-ingest`,
+                );
                 setObsIngest(ingest);
                 await joinAsMonitor(liveChannelForSlug(slug), ingest.uid);
                 await recorderRef.current.reportUnsupported();
                 setState('live');
-            }
-            catch (err) {
+            } catch (err) {
                 setState('error');
                 setError(err instanceof Error ? err.message : 'go_live_failed');
             }
@@ -506,29 +585,24 @@ export const useHostBroadcast = (opts: {
         setState('starting');
         setError(null);
         try {
-            if (sessionStatus === 'scheduled')
-                await api.post(`/api/sessions/${sessionId}/start`);
+            if (sessionStatus === 'scheduled') await api.post(`/api/sessions/${sessionId}/start`);
             await joinAndPublish(liveChannelForSlug(slug));
             const recording = recorderRef.current;
             if (recording.supported) {
                 const tracks = [camera.getMediaStreamTrack()];
-                if (mic !== null)
-                    tracks.push(mic.getMediaStreamTrack());
+                if (mic !== null) tracks.push(mic.getMediaStreamTrack());
                 recording.start(new MediaStream(tracks));
-            }
-            else {
+            } else {
                 await recording.reportUnsupported();
             }
             setState('live');
-        }
-        catch (err) {
+        } catch (err) {
             setState('error');
             setError(err instanceof Error ? err.message : 'go_live_failed');
         }
     }, [appId, slug, sessionId, sessionStatus, source, joinAndPublish, joinAsMonitor]);
     const rejoin = useCallback(async (): Promise<void> => {
-        if (!slug)
-            return;
+        if (!slug) return;
         setError(null);
         const previous = clientRef.current;
         clientRef.current = null;
@@ -541,35 +615,28 @@ export const useHostBroadcast = (opts: {
         try {
             if (sourceRef.current === 'obs' && obsIngest !== null) {
                 await joinAsMonitor(liveChannelForSlug(slug), obsIngest.uid);
-            }
-            else {
+            } else {
                 await joinAndPublish(liveChannelForSlug(slug));
             }
             setState('live');
-        }
-        catch (err) {
+        } catch (err) {
             setError(err instanceof Error ? err.message : 'rejoin_failed');
         }
     }, [slug, joinAndPublish, joinAsMonitor, releaseRemotes, obsIngest]);
     const publishVideo = useCallback(async (next: boolean): Promise<void> => {
         const active = clientRef.current;
         const camera = cameraRef.current;
-        if (!active || !camera)
-            return;
+        if (!active || !camera) return;
         try {
-            if (next)
-                await active.publish([camera]);
-            else
-                await active.unpublish([camera]);
+            if (next) await active.publish([camera]);
+            else await active.unpublish([camera]);
             setVideoPublished(next);
-        }
-        catch (err) {
+        } catch (err) {
             setError(err instanceof Error ? err.message : 'publish_change_failed');
         }
     }, []);
     const endSession = useCallback(async (): Promise<void> => {
-        if (!sessionId)
-            return;
+        if (!sessionId) return;
         setState('ending');
         try {
             if (flushTimerRef.current !== null) {
@@ -596,40 +663,39 @@ export const useHostBroadcast = (opts: {
             obsGatewayUidRef.current = null;
             setState('ended');
             onEnded?.();
-        }
-        catch (err) {
+        } catch (err) {
             setState('error');
             setError(err instanceof Error ? err.message : 'end_session_failed');
         }
     }, [sessionId, flushCaptions, releaseTracks, releaseRemotes, onEnded]);
     const toggleMic = useCallback(async (): Promise<void> => {
         const mic = micRef.current;
-        if (!mic)
-            return;
+        if (!mic) return;
         const next = !mic.enabled;
         await mic.setEnabled(next);
         setMicEnabled(next);
     }, []);
     const toggleCamera = useCallback(async (): Promise<void> => {
         const camera = cameraRef.current;
-        if (!camera)
-            return;
+        if (!camera) return;
         const next = !camera.enabled;
         await camera.setEnabled(next);
         setCameraEnabled(next);
     }, []);
-    useEffect(() => () => {
-        if (flushTimerRef.current !== null)
-            window.clearTimeout(flushTimerRef.current);
-        const active = clientRef.current;
-        clientRef.current = null;
-        if (active) {
-            active.removeAllListeners();
-            void active.leave().catch(() => undefined);
-        }
-        releaseTracks();
-        releaseRemotes();
-    }, [releaseTracks, releaseRemotes]);
+    useEffect(
+        () => () => {
+            if (flushTimerRef.current !== null) window.clearTimeout(flushTimerRef.current);
+            const active = clientRef.current;
+            clientRef.current = null;
+            if (active) {
+                active.removeAllListeners();
+                void active.leave().catch(() => undefined);
+            }
+            releaseTracks();
+            releaseRemotes();
+        },
+        [releaseTracks, releaseRemotes],
+    );
     return {
         state,
         error,

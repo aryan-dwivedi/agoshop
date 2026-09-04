@@ -1,0 +1,25 @@
+{
+    "name": "@shop/ai",
+    "private": true,
+    "version": "1.0.0",
+    "type": "module",
+    "exports": {
+        ".": "./src/index.ts",
+        "./*": "./src/*"
+    },
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.30.0",
+        "@shop/agora": "*",
+        "@shop/db": "*",
+        "@shop/domain-commerce": "*",
+        "@shop/domain-live": "*",
+        "@shop/platform": "*",
+        "@shop/shared": "*",
+        "express": "^5.0.1",
+        "openai": "^4.77.0",
+        "zod": "^3.24.1"
+    },
+    "devDependencies": {
+        "@types/express": "^5.0.0"
+    }
+}

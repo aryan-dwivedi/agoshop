@@ -1,8 +1,11 @@
 import type { Response } from 'express';
+
+import { logger } from '@shop/platform/lib/logger.js';
 import { GLOBAL_CHANNEL, sessionChannel, userChannel } from '@shop/shared';
-import { logger } from '../../../api/src/lib/logger.js';
-import { subscriber } from './redis.js';
+
 import { sseClientsGauge } from './metrics.js';
+import { subscriber } from './redis.js';
+
 type Client = {
     res: Response;
     userId: string;
@@ -12,13 +15,11 @@ const clients = new Set<Client>();
 const byChannel = new Map<string, Set<Client>>();
 let wired = false;
 const ensureWired = (): void => {
-    if (wired)
-        return;
+    if (wired) return;
     wired = true;
     subscriber.on('message', (channel, payload) => {
         const targets = byChannel.get(channel);
-        if (!targets || targets.size === 0)
-            return;
+        if (!targets || targets.size === 0) return;
         for (const client of targets) {
             client.res.write(`data: ${payload}\n\n`);
         }
@@ -31,15 +32,13 @@ const attach = (channel: string, client: Client): void => {
     if (!set) {
         set = new Set();
         byChannel.set(channel, set);
-        if (channel !== GLOBAL_CHANNEL)
-            void subscriber.subscribe(channel);
+        if (channel !== GLOBAL_CHANNEL) void subscriber.subscribe(channel);
     }
     set.add(client);
 };
 const detach = (channel: string, client: Client): void => {
     const set = byChannel.get(channel);
-    if (!set)
-        return;
+    if (!set) return;
     set.delete(client);
     if (set.size === 0 && channel !== GLOBAL_CHANNEL) {
         byChannel.delete(channel);
@@ -52,8 +51,7 @@ export const drainSseClients = (): void => {
         try {
             client.res.write(': shutting down\n\n');
             client.res.end();
-        }
-        catch (err) {
+        } catch (err) {
             logger.warn({ err }, 'failed to close SSE client during drain');
         }
     }
@@ -65,8 +63,7 @@ export const addSseClient = (res: Response, userId: string, sessionIds: string[]
     sseClientsGauge.set(clients.size);
     attach(GLOBAL_CHANNEL, client);
     attach(userChannel(userId), client);
-    for (const sessionId of sessionIds)
-        attach(sessionChannel(sessionId), client);
+    for (const sessionId of sessionIds) attach(sessionChannel(sessionId), client);
     const heartbeat = setInterval(() => res.write(': ping\n\n'), 15000);
     res.on('close', () => {
         clearInterval(heartbeat);
@@ -74,7 +71,6 @@ export const addSseClient = (res: Response, userId: string, sessionIds: string[]
         sseClientsGauge.set(clients.size);
         detach(GLOBAL_CHANNEL, client);
         detach(userChannel(userId), client);
-        for (const sessionId of sessionIds)
-            detach(sessionChannel(sessionId), client);
+        for (const sessionId of sessionIds) detach(sessionChannel(sessionId), client);
     });
 };

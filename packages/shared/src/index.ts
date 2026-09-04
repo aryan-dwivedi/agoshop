@@ -6,5 +6,5 @@ export * from './language.js';
 export * from './liveClock.js';
 export * from './money.js';
 export * from './promotions.js';
-export * from './types.js';
+export type * from './types.js';
 export * from './tools.js';

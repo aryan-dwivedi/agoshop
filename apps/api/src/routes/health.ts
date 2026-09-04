@@ -1,12 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Router } from 'express';
+
 import { sql } from 'drizzle-orm';
-import { db } from '../db/client.js';
-import { analyticsStreamBacklog, registry } from '../lib/metrics.js';
-import { isDraining } from '../lib/readiness.js';
-import { keys, redis } from '../lib/redis.js';
+import { Router } from 'express';
+
+import { db } from '@shop/db/client.js';
+import { analyticsStreamBacklog, registry } from '@shop/platform/lib/metrics.js';
+import { isDraining } from '@shop/platform/lib/readiness.js';
+import { keys, redis } from '@shop/platform/lib/redis.js';
+
 export const router = Router();
 const readAppVersion = (): string => {
     const here = dirname(fileURLToPath(import.meta.url));
@@ -21,11 +24,8 @@ const readAppVersion = (): string => {
             const pkg = JSON.parse(readFileSync(path, 'utf8')) as {
                 version?: string;
             };
-            if (typeof pkg.version === 'string')
-                return pkg.version;
-        }
-        catch {
-        }
+            if (typeof pkg.version === 'string') return pkg.version;
+        } catch {}
     }
     return 'unknown';
 };
@@ -41,7 +41,7 @@ router.get('/api/health/ready', async (_req, res, next) => {
         }
         const [dbOk, redisOk] = await Promise.all([
             db
-                .execute(sql `select 1`)
+                .execute(sql`select 1`)
                 .then(() => true)
                 .catch(() => false),
             redis
@@ -56,8 +56,7 @@ router.get('/api/health/ready', async (_req, res, next) => {
             redis: redisOk ? 'up' : 'down',
             version: VERSION,
         });
-    }
-    catch (err) {
+    } catch (err) {
         next(err);
     }
 });
@@ -65,7 +64,7 @@ router.get('/api/health', async (_req, res, next) => {
     try {
         const [dbOk, redisOk] = await Promise.all([
             db
-                .execute(sql `select 1`)
+                .execute(sql`select 1`)
                 .then(() => true)
                 .catch(() => false),
             redis
@@ -80,8 +79,7 @@ router.get('/api/health', async (_req, res, next) => {
             redis: redisOk ? 'up' : 'down',
             version: VERSION,
         });
-    }
-    catch (err) {
+    } catch (err) {
         next(err);
     }
 });
@@ -89,13 +87,10 @@ router.get('/metrics', async (_req, res, next) => {
     try {
         try {
             analyticsStreamBacklog.set(await redis.xlen(keys.analyticsStream));
-        }
-        catch {
-        }
+        } catch {}
         res.setHeader('Content-Type', registry.contentType);
         res.send(await registry.metrics());
-    }
-    catch (err) {
+    } catch (err) {
         next(err);
     }
 });

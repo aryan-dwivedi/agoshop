@@ -1,4 +1,5 @@
 import type { Router } from 'express';
+
 import { router as adminRouter } from './admin.js';
 import { router as aiRouter } from './ai.js';
 import { router as authRouter } from './auth.js';
@@ -7,20 +8,19 @@ import { router as catalogRouter } from './catalog.js';
 import { router as checkoutRouter } from './checkout.js';
 import { router as configRouter } from './config.js';
 import { router as healthRouter } from './health.js';
+import { mcpRouter } from './mcp.js';
 import { router as meRouter } from './me.js';
 import { router as ordersRouter } from './orders.js';
 import { router as pollsRouter } from './polls.js';
+import { router as pstnRouter } from './pstn.js';
 import { router as sellerRouter } from './seller.js';
 import { router as sellersRouter } from './sellers.js';
 import { router as sessionsRouter } from './sessions.js';
+import { router as supportRouter } from './support.js';
 import { router as tokensRouter } from './tokens.js';
 import { router as webhooksRouter } from './webhooks.js';
-import { router as supportRouter } from './support.js';
-import { router as pstnRouter } from './pstn.js';
-import { mcpRouter } from './mcp.js';
-import { completionsRouter } from './completions.js';
-import { router as ttsRouter } from '../ai/ttsRoute.js';
 import { router as wishlistRouter } from './wishlist.js';
+
 export const allRouters: Router[] = [
     healthRouter,
     configRouter,
@@ -36,9 +36,7 @@ export const allRouters: Router[] = [
     sessionsRouter,
     pollsRouter,
     aiRouter,
-    completionsRouter,
     mcpRouter,
-    ttsRouter,
     supportRouter,
     pstnRouter,
     sellerRouter,

@@ -1,11 +1,23 @@
+import type { ProductQuery } from '@shop/domain-commerce/catalog.js';
+import type { RecommendationBasis } from '@shop/domain-commerce/recommendations.js';
+
 import { Router } from 'express';
 import { z } from 'zod';
-import { track } from '../lib/analytics.js';
-import { badRequest, notFound } from '../lib/errors.js';
-import { BUDGETS, rateLimit } from '../lib/ratelimit.js';
-import { compareProducts, getProductBySlug, listCategories, listProducts, productFacets, recordProductView, type ProductQuery, } from '../domain/catalog.js';
-import { searchCatalog } from '../domain/searchBridge.js';
-import { recommend, type RecommendationBasis } from '../domain/recommendations.js';
+
+import {
+    compareProducts,
+    getProductBySlug,
+    listCategories,
+    listProducts,
+    productFacets,
+    recordProductView,
+} from '@shop/domain-commerce/catalog.js';
+import { recommend } from '@shop/domain-commerce/recommendations.js';
+import { searchCatalog } from '@shop/domain-commerce/searchBridge.js';
+import { track } from '@shop/platform/lib/analytics.js';
+import { badRequest, notFound } from '@shop/platform/lib/errors.js';
+import { BUDGETS, rateLimit } from '@shop/platform/lib/ratelimit.js';
+
 export const router = Router();
 const products = rateLimit('products', BUDGETS.products);
 const listQuery = z.object({
@@ -26,15 +38,13 @@ const recommendQuery = z.object({
 });
 const pathSlug = (value: string | string[] | undefined): string => {
     const parsed = z.string().min(1).max(140).safeParse(value);
-    if (!parsed.success)
-        throw notFound('product_not_found');
+    if (!parsed.success) throw notFound('product_not_found');
     return parsed.data;
 };
 router.get('/api/categories', products, async (_req, res, next) => {
     try {
         res.json({ categories: await listCategories() });
-    }
-    catch (err) {
+    } catch (err) {
         next(err);
     }
 });
@@ -48,17 +58,18 @@ router.get('/api/products', products, async (req, res, next) => {
         }
         const { category, ...rest } = parsed.data;
         const query: ProductQuery = { ...rest, categorySlug: category };
-        const listPage = query.q && (!query.sort || query.sort === 'relevance')
-            ? await searchCatalog({
-                q: query.q,
-                categorySlug: query.categorySlug,
-                maxPriceMinorUnits: query.maxPriceMinorUnits,
-                minRating: query.minRating,
-                sort: query.sort ?? 'relevance',
-                page: query.page,
-                pageSize: query.pageSize,
-            })
-            : await listProducts(query);
+        const listPage =
+            query.q && (!query.sort || query.sort === 'relevance')
+                ? await searchCatalog({
+                      q: query.q,
+                      categorySlug: query.categorySlug,
+                      maxPriceMinorUnits: query.maxPriceMinorUnits,
+                      minRating: query.minRating,
+                      sort: query.sort ?? 'relevance',
+                      page: query.page,
+                      pageSize: query.pageSize,
+                  })
+                : await listProducts(query);
         const [page, facets] = await Promise.all([listPage, productFacets(query)]);
         res.json({
             items: page.items,
@@ -67,8 +78,7 @@ router.get('/api/products', products, async (req, res, next) => {
             pageSize: query.pageSize ?? 12,
             facets,
         });
-    }
-    catch (err) {
+    } catch (err) {
         next(err);
     }
 });
@@ -83,8 +93,7 @@ router.get('/api/products/compare', products, async (req, res, next) => {
             throw badRequest('invalid_compare_ids', 'compare needs between 2 and 4 product ids');
         }
         res.json(await compareProducts(ids));
-    }
-    catch (err) {
+    } catch (err) {
         next(err);
     }
 });
@@ -105,22 +114,19 @@ router.get('/api/recommendations', products, async (req, res, next) => {
                 limit: parsed.data.limit,
             }),
         });
-    }
-    catch (err) {
+    } catch (err) {
         next(err);
     }
 });
 router.get('/api/products/:slug', products, async (req, res, next) => {
     try {
         const product = await getProductBySlug(pathSlug(req.params.slug));
-        if (!product)
-            throw notFound('product_not_found');
+        if (!product) throw notFound('product_not_found');
         const userId = req.session?.userId ?? null;
         await recordProductView(product.id, userId);
         track({ type: 'product_view', userId, productId: product.id });
         res.json({ product });
-    }
-    catch (err) {
+    } catch (err) {
         next(err);
     }
 });

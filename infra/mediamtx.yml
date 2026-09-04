@@ -36,6 +36,6 @@ webrtc: no
 srt: no
 
 paths:
-  # Agora Media Push targets rtmp://<host>/live/<sessionSlug>; each slug becomes its
-  # own path, so concurrent sessions do not collide.
-  all_others:
+    # Agora Media Push targets rtmp://<host>/live/<sessionSlug>; each slug becomes its
+    # own path, so concurrent sessions do not collide.
+    all_others:
