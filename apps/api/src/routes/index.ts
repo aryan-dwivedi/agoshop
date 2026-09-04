@@ -20,6 +20,7 @@ import { router as supportRouter } from './support.js';
 import { router as pstnRouter } from './pstn.js';
 import { mcpRouter } from './mcp.js';
 import { completionsRouter } from './completions.js';
+import { router as ttsRouter } from '../ai/ttsRoute.js';
 import { router as wishlistRouter } from './wishlist.js';
 
 /**
@@ -47,6 +48,7 @@ export const allRouters: Router[] = [
   aiRouter,
   completionsRouter,
   mcpRouter,
+  ttsRouter,
   supportRouter,
   pstnRouter,
   sellerRouter,

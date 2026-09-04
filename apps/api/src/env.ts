@@ -60,11 +60,23 @@ const schema = z.object({
   CONVOAI_TURN_TIMEOUT_MS: int(12_000),
   CONVOAI_ASR_VENDOR: z.string().default('ares'),
   CONVOAI_ASR_CREDENTIAL_MODE: z.enum(['managed', 'byok']).default('managed'),
-  CONVOAI_TTS_VENDOR: z.enum(['openai', 'minimax']).default('openai'),
-  CONVOAI_TTS_MODEL: z.string().default('tts-1'),
-  CONVOAI_TTS_VOICE: z.string().default('nova'),
-  /** Natural speaking-rate multiplier forwarded to Agora managed TTS. */
+  CONVOAI_TTS_VENDOR: z.enum(['openai', 'minimax', 'elevenlabs']).default('elevenlabs'),
+  CONVOAI_TTS_MODEL: z.string().default('eleven_multilingual_v2'),
+  /** ElevenLabs voice ID forwarded to Agora BYOK TTS (e.g. Rachel). */
+  CONVOAI_TTS_VOICE: z.string().default('21m00Tcm4TlvDq8ikWAM'),
+  /** Natural speaking-rate multiplier forwarded to the configured TTS vendor. */
   CONVOAI_TTS_SPEED: z.coerce.number().min(0.5).max(2).default(1.6),
+  /**
+   * BYOK TTS endpoint Agora calls. Defaults to `${PUBLIC_API_URL}/api/ai/tts/speech`.
+   * Set to `https://api.openai.com/v1/audio/speech` to call OpenAI directly.
+   */
+  CONVOAI_TTS_URL: z.string().default(''),
+  /** Key Agora presents to the TTS endpoint; defaults to `CONVO_LLM_SHARED_SECRET`. */
+  CONVOAI_TTS_API_KEY: z.string().default(''),
+  /** Primary TTS upstream — ElevenLabs free tier includes monthly characters. */
+  ELEVENLABS_API_KEY: z.string().default(''),
+  /** Optional OpenAI fallback when ElevenLabs is not configured. */
+  OPENAI_API_KEY: z.string().default(''),
   CONVOAI_GEOFENCE_AREA: z
     .enum(['GLOBAL', 'NORTH_AMERICA', 'EUROPE', 'ASIA', 'INDIA', 'JAPAN'])
     .default('INDIA'),

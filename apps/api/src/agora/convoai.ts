@@ -20,7 +20,7 @@ export { CONVOAI_FAILURE_MESSAGE };
  * The lifecycle (admission control, conversation rows, language switching) belongs to
  * `ai/conversations.ts`; this module owns only the wire contract, which must match the
  * verified schema exactly:
- *  - managed ASR plus custom-LLM text in the default mode; Agora managed TTS speaks it;
+ *  - managed ASR plus custom-LLM text; BYOK TTS at `params.url` speaks it;
  *    optional MCP mode retains Agora-managed LLM + MCP tools with the same TTS path;
  *  - a combined RTC+RTM **agent** token whose account equals `agent_rtc_uid`, required
  *    by `advanced_features.enable_rtm`;
@@ -57,11 +57,14 @@ export type ConvoAiJoinInput = {
   expires: number;
 };
 
-/** Agora-managed TTS block for ConvoAI join (OpenAI or minimax vendor). */
+/** BYOK TTS block for ConvoAI join — this project SKU requires `params.url`. */
 export const buildConvoAiTtsBlock = (language: string): Record<string, unknown> => ({
   vendor: env.CONVOAI_TTS_VENDOR,
-  credential_mode: 'managed',
   params: {
+    url:
+      env.CONVOAI_TTS_URL.replace(/\/$/, '') ||
+      `${env.PUBLIC_API_URL.replace(/\/$/, '')}/api/ai/tts/speech`,
+    api_key: env.CONVOAI_TTS_API_KEY || env.CONVO_LLM_SHARED_SECRET,
     model: env.CONVOAI_TTS_MODEL,
     voice: env.CONVOAI_TTS_VOICE,
     language,

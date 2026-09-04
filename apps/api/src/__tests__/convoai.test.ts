@@ -44,7 +44,15 @@ describe('ConvoAI speech handling', () => {
             params?: { max_tokens?: number };
           };
           parameters: unknown;
-          tts?: { credential_mode?: string; params: { speed?: number; response_format?: string; sample_rate?: number } };
+          tts?: {
+            params: {
+              url?: string;
+              api_key?: string;
+              speed?: number;
+              response_format?: string;
+              sample_rate?: number;
+            };
+          };
           turn_detection: unknown;
           interruption: unknown;
         };
@@ -55,13 +63,12 @@ describe('ConvoAI speech handling', () => {
         data_channel: 'rtm',
         audio_scenario: 'chorus',
       });
-      expect(body.properties.tts).toMatchObject({
-        credential_mode: 'managed',
-        params: {
-          speed: 1.6,
-          response_format: 'pcm',
-          sample_rate: 24_000,
-        },
+      expect(body.properties.tts?.params).toMatchObject({
+        url: expect.stringContaining('/api/ai/tts/speech'),
+        api_key: expect.any(String),
+        speed: 1.6,
+        response_format: 'pcm',
+        sample_rate: 24_000,
       });
       expect(body.properties.turn_detection).toEqual({
         mode: 'default',
@@ -109,7 +116,7 @@ describe('ConvoAI speech handling', () => {
     });
   });
 
-  it('configures custom LLM text output with Agora managed TTS', () => {
+  it('configures custom LLM text output with BYOK TTS', () => {
     const body = buildConvoAiJoinBody(input, 'custom') as {
       properties: {
         llm: {
@@ -117,7 +124,7 @@ describe('ConvoAI speech handling', () => {
           output_modalities?: string[];
           params?: { modalities?: string[]; audio?: { voice?: string; format?: string } };
         };
-        tts?: { credential_mode?: string; params?: { voice?: string } };
+        tts?: { params?: { url?: string; api_key?: string; voice?: string } };
       };
     };
 
@@ -128,15 +135,25 @@ describe('ConvoAI speech handling', () => {
     });
     expect(body.properties.llm.params?.modalities).toBeUndefined();
     expect(body.properties.tts).toMatchObject({
-      credential_mode: 'managed',
-      params: { voice: 'nova', response_format: 'pcm', sample_rate: 24_000 },
+      params: {
+        url: expect.stringContaining('/api/ai/tts/speech'),
+        api_key: expect.any(String),
+        voice: process.env.CONVOAI_TTS_VOICE ?? '21m00Tcm4TlvDq8ikWAM',
+        response_format: 'pcm',
+        sample_rate: 24_000,
+      },
     });
   });
 
-  it('builds Agora managed TTS blocks', () => {
+  it('builds BYOK TTS blocks with url and api_key', () => {
     expect(buildConvoAiTtsBlock('en-IN')).toMatchObject({
-      credential_mode: 'managed',
-      params: { voice: 'nova', response_format: 'pcm', sample_rate: 24_000 },
+      params: {
+        url: expect.stringContaining('/api/ai/tts/speech'),
+        api_key: expect.any(String),
+        voice: process.env.CONVOAI_TTS_VOICE ?? '21m00Tcm4TlvDq8ikWAM',
+        response_format: 'pcm',
+        sample_rate: 24_000,
+      },
     });
   });
 
