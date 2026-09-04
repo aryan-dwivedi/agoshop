@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# Local stack / runtime data
+.stack/
+var/
+velapub/
+*.rdb
+dump.rdb
+
+# Online marketplace CSVs are downloaded on first `npm run db:seed` if absent
+apps/api/src/db/data/*.csv
+
+# Local dev TLS (mkcert, ngrok, etc.)
+auto.crt
+auto.key
+
+# Load testing artifacts
+loadtest/.generated/
+loadtest/results/
+
+# Test coverage
+coverage/
+
+# Vite cache
+.vite/
+
+# Turborepo cache
+.turbo/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE / AI assistants
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.claude/
+
+
+# docs
+docs/

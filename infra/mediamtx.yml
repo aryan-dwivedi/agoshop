@@ -1,0 +1,41 @@
+# Local RTMP → HLS origin, so Agora Media Push has a real external destination to
+# push to and `hls.js` has a real manifest to play. This is the free stand-in for a
+# commercial CDN: Agora pushes RTMP(S) here, this packages HLS, nginx-free.
+#
+#   mediamtx infra/mediamtx.yml
+#
+# Agora needs to reach the RTMP port from the internet, and RTMP is raw TCP — a
+# Cloudflare quick tunnel is HTTP-only and cannot carry it. Expose it with:
+#   ngrok tcp 1935        (free plan, needs an authtoken)
+# then set:
+#   MEDIA_PUSH_RTMP_URL=rtmp://<ngrok-host>:<port>/live
+#   MEDIA_PUSH_HLS_URL=https://<hls-tunnel-host>/live      # cloudflared tunnel to :8888
+#   MEDIA_PUSH_ENABLED=true
+
+logLevel: info
+logDestinations: [stdout]
+
+# Ingest
+rtmp: yes
+rtmpAddress: :1935
+rtmpEncryption: 'no'
+
+# Packaging — low-latency HLS off, because hls.js in the CDN tier reads plain
+# VOD-style segments and we want maximum player compatibility for the demo.
+hls: yes
+hlsAddress: :8888
+hlsVariant: mpegts
+hlsSegmentCount: 7
+hlsSegmentDuration: 2s
+hlsAllowOrigin: '*'
+hlsAlwaysRemux: yes
+
+# Everything else off: this is an origin, not a media server product.
+rtsp: no
+webrtc: no
+srt: no
+
+paths:
+  # Agora Media Push targets rtmp://<host>/live/<sessionSlug>; each slug becomes its
+  # own path, so concurrent sessions do not collide.
+  all_others:

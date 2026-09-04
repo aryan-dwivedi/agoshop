@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2020" height="1030" viewBox="0 0 2020 1030">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<defs>
+<marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="context-stroke"/></marker>
+<marker id="arrow-start" markerWidth="10" markerHeight="8" refX="1" refY="4" orient="auto"><path d="M10,0 L0,4 L10,8 z" fill="context-stroke"/></marker>
+</defs>
+<rect x="30" y="125" width="1450" height="855" rx="14" fill="transparent" stroke="#868e96" stroke-width="1" opacity="0.65" stroke-dasharray="8 6"/>
+<text x="50" y="154.3" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="500" fill="#495057" text-anchor="start">1 · SIMPLE SYSTEM FLOW</text>
+<rect x="1505" y="125" width="480" height="855" rx="14" fill="transparent" stroke="#868e96" stroke-width="1" opacity="0.65" stroke-dasharray="8 6"/>
+<text x="1525" y="154.3" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="500" fill="#495057" text-anchor="start">2 · BACK-OF-THE-ENVELOPE</text>
+<rect x="83" y="408" width="230" height="150" rx="14" fill="#e7f5ff" stroke="#1971c2" stroke-width="2" opacity="1.0"/>
+<rect x="94" y="419" width="230" height="150" rx="14" fill="#e7f5ff" stroke="#1971c2" stroke-width="2" opacity="1.0"/>
+<rect x="658" y="388" width="250" height="180" rx="14" fill="#ebfbee" stroke="#2f9e44" stroke-width="2" opacity="1.0"/>
+<rect x="669" y="399" width="250" height="180" rx="14" fill="#ebfbee" stroke="#2f9e44" stroke-width="2" opacity="1.0"/>
+<rect x="105" y="430" width="230" height="150" rx="14" fill="#e7f5ff" stroke="#1971c2" stroke-width="2" opacity="1.0"/>
+<rect x="680" y="410" width="250" height="180" rx="14" fill="#ebfbee" stroke="#2f9e44" stroke-width="2" opacity="1.0"/>
+<rect x="700" y="745" width="230" height="115" rx="14" fill="#fff9db" stroke="#c17d00" stroke-width="2" opacity="1.0"/>
+<rect x="365" y="185" width="390" height="155" rx="14" fill="#f8f0fc" stroke="#9c36b5" stroke-width="2" opacity="1.0"/>
+<ellipse cx="485.0" cy="510.0" rx="75.0" ry="75.0" fill="#ebfbee" stroke="#2f9e44" stroke-width="2"/>
+<ellipse cx="1185.0" cy="410.0" rx="125.0" ry="65.0" fill="#e3fafc" stroke="#0c8599" stroke-width="2"/>
+<ellipse cx="1185.0" cy="600.0" rx="125.0" ry="65.0" fill="#e3fafc" stroke="#0c8599" stroke-width="2"/>
+<ellipse cx="1185.0" cy="807.5" rx="115.0" ry="57.5" fill="#e3fafc" stroke="#0c8599" stroke-width="2"/>
+<ellipse cx="960.0" cy="262.5" rx="115.0" ry="67.5" fill="#fff4e6" stroke="#e8590c" stroke-width="2"/>
+<ellipse cx="1315.0" cy="262.5" rx="110.0" ry="67.5" fill="#fff4e6" stroke="#e8590c" stroke-width="2"/>
+<polyline points="341,505.0 404,510.0" fill="none" stroke="#1971c2" stroke-width="3" marker-end="url(#arrow)"/>
+<polyline points="566,510.0 674,500.0" fill="none" stroke="#2f9e44" stroke-width="3" marker-end="url(#arrow)"/>
+<polyline points="936,462.0 1054,410.0" fill="none" stroke="#0c8599" stroke-width="2" marker-end="url(#arrow)"/>
+<polyline points="936,542.0 1054,600.0" fill="none" stroke="#0c8599" stroke-width="2" marker-end="url(#arrow)"/>
+<polyline points="1185.0,671 1185.0,705 960.0,705 960.0,802 936.0,802.5" fill="none" stroke="#c17d00" stroke-width="2" marker-end="url(#arrow)"/>
+<polyline points="936,802.5 1064,807.5" fill="none" stroke="#c17d00" stroke-width="2" marker-end="url(#arrow)"/>
+<polyline points="220.0,424 220.0,375 330.0,375 330.0,262 359.0,262.5" fill="none" stroke="#9c36b5" stroke-width="3" marker-end="url(#arrow)" marker-start="url(#arrow-start)"/>
+<polyline points="560.0,346 805.0,404" fill="none" stroke="#9c36b5" stroke-width="3" marker-end="url(#arrow)" marker-start="url(#arrow-start)"/>
+<polyline points="805.0,404 805.0,365 960.0,365 960.0,336" fill="none" stroke="#e8590c" stroke-width="2" marker-end="url(#arrow)" marker-start="url(#arrow-start)"/>
+<polyline points="560.0,179 560.0,165 1160.0,165 1160.0,262 1199.0,262.5" fill="none" stroke="#e8590c" stroke-width="2" marker-end="url(#arrow)"/>
+<polyline points="1315.0,189 1315.0,150 65.0,150 65.0,505 99.0,505.0" fill="none" stroke="#e8590c" stroke-width="3" marker-end="url(#arrow)" stroke-dasharray="8 6"/>
+<text x="40" y="58.6" font-family="Arial,Helvetica,sans-serif" font-size="34" font-weight="700" fill="#343a40" text-anchor="start">Vela Live — Interview High-Level Design</text>
+<text x="40" y="92.2" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="500" fill="#495057" text-anchor="start">Commerce stays in our API. Live media, chat and voice travel directly through Agora.</text>
+<text x="220.0" y="486.6" font-family="Arial,Helvetica,sans-serif" font-size="19" font-weight="500" fill="#1e1e1e" text-anchor="middle">Web Clients</text>
+<text x="220.0" y="510.35" font-family="Arial,Helvetica,sans-serif" font-size="19" font-weight="500" fill="#1e1e1e" text-anchor="middle">Customer Storefront</text>
+<text x="220.0" y="534.1" font-family="Arial,Helvetica,sans-serif" font-size="19" font-weight="500" fill="#1e1e1e" text-anchor="middle">Seller Console</text>
+<text x="485.0" y="502.9" font-family="Arial,Helvetica,sans-serif" font-size="21" font-weight="500" fill="#1e1e1e" text-anchor="middle">Load</text>
+<text x="485.0" y="529.15" font-family="Arial,Helvetica,sans-serif" font-size="21" font-weight="500" fill="#1e1e1e" text-anchor="middle">Balancer</text>
+<text x="805.0" y="482.7" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="500" fill="#1e1e1e" text-anchor="middle">Application API</text>
+<text x="805.0" y="505.2" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="500" fill="#1e1e1e" text-anchor="middle">2 stateless replicas</text>
+<text x="805.0" y="527.7" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="500" fill="#1e1e1e" text-anchor="middle">Commerce • Live • AI tools</text>
+<text x="1185.0" y="393.8" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="500" fill="#1e1e1e" text-anchor="middle">Primary Database</text>
+<text x="1185.0" y="415.05" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="500" fill="#1e1e1e" text-anchor="middle">PostgreSQL</text>
+<text x="1185.0" y="436.3" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="500" fill="#1e1e1e" text-anchor="middle">catalog • cart • orders</text>
+<text x="1185.0" y="583.8" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="500" fill="#1e1e1e" text-anchor="middle">Cache + Event Bus</text>
+<text x="1185.0" y="605.05" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="500" fill="#1e1e1e" text-anchor="middle">Redis</text>
+<text x="1185.0" y="626.3" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="500" fill="#1e1e1e" text-anchor="middle">sessions • SSE • presence</text>
+<text x="815.0" y="786.3" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="500" fill="#1e1e1e" text-anchor="middle">Background Worker</text>
+<text x="815.0" y="807.55" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="500" fill="#1e1e1e" text-anchor="middle">single timer owner</text>
+<text x="815.0" y="828.8" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="500" fill="#1e1e1e" text-anchor="middle">jobs • aggregates • retention</text>
+<text x="1185.0" y="801.8" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="500" fill="#1e1e1e" text-anchor="middle">Recording Storage</text>
+<text x="1185.0" y="823.05" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="500" fill="#1e1e1e" text-anchor="middle">shared / object store</text>
+<text x="560.0" y="245.2" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="500" fill="#1e1e1e" text-anchor="middle">Agora Real-time Platform</text>
+<text x="560.0" y="267.7" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="500" fill="#1e1e1e" text-anchor="middle">RTC live video/audio • RTM chat</text>
+<text x="560.0" y="290.2" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="500" fill="#1e1e1e" text-anchor="middle">Voice AI • captions • recording</text>
+<text x="960.0" y="256.2" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="500" fill="#1e1e1e" text-anchor="middle">AI Model Provider</text>
+<text x="960.0" y="278.7" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="500" fill="#1e1e1e" text-anchor="middle">OpenAI-compatible</text>
+<text x="1315.0" y="256.2" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="500" fill="#1e1e1e" text-anchor="middle">CDN / HLS</text>
+<text x="1315.0" y="278.7" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="500" fill="#1e1e1e" text-anchor="middle">mass audience</text>
+<text x="337" y="480.6" font-family="Arial,Helvetica,sans-serif" font-size="14" font-weight="500" fill="#1971c2" text-anchor="start">HTTPS + SSE</text>
+<text x="570" y="480.6" font-family="Arial,Helvetica,sans-serif" font-size="14" font-weight="500" fill="#2f9e44" text-anchor="start">route requests</text>
+<text x="930" y="394.6" font-family="Arial,Helvetica,sans-serif" font-size="14" font-weight="500" fill="#0c8599" text-anchor="start">source of truth</text>
+<text x="936" y="570.6" font-family="Arial,Helvetica,sans-serif" font-size="14" font-weight="500" fill="#0c8599" text-anchor="start">cache • pub/sub</text>
+<text x="1005" y="692.6" font-family="Arial,Helvetica,sans-serif" font-size="14" font-weight="500" fill="#c17d00" text-anchor="start">jobs + events</text>
+<text x="945" y="787.6" font-family="Arial,Helvetica,sans-serif" font-size="14" font-weight="500" fill="#c17d00" text-anchor="start">recording retention</text>
+<text x="118" y="360.6" font-family="Arial,Helvetica,sans-serif" font-size="14" font-weight="500" fill="#9c36b5" text-anchor="start">RTC media + RTM chat</text>
+<text x="410" y="364.6" font-family="Arial,Helvetica,sans-serif" font-size="14" font-weight="500" fill="#9c36b5" text-anchor="start">control + signed AI callback</text>
+<text x="820" y="350.6" font-family="Arial,Helvetica,sans-serif" font-size="14" font-weight="500" fill="#e8590c" text-anchor="start">LLM + tool loop</text>
+<text x="930" y="154.6" font-family="Arial,Helvetica,sans-serif" font-size="14" font-weight="500" fill="#e8590c" text-anchor="start">RTMP push</text>
+<text x="250" y="139.6" font-family="Arial,Helvetica,sans-serif" font-size="14" font-weight="500" fill="#e8590c" text-anchor="start">HLS playback when audience grows</text>
+<text x="75" y="933.5" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="500" fill="#9c36b5" text-anchor="start">Direct media path</text>
+<text x="225" y="933.5" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="500" fill="#495057" text-anchor="start">keeps video off our API servers</text>
+<text x="610" y="933.5" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="500" fill="#2f9e44" text-anchor="start">Business path</text>
+<text x="730" y="933.5" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="500" fill="#495057" text-anchor="start">keeps pricing, inventory and orders authoritative</text>
+<text x="1540" y="195.7" font-family="Arial,Helvetica,sans-serif" font-size="23" font-weight="700" fill="#343a40" text-anchor="start">Assumptions</text>
+<text x="1540" y="230.3" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="500" fill="#495057" text-anchor="start">• 10M daily active users</text>
+<text x="1540" y="251.55" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="500" fill="#495057" text-anchor="start">• 20 API actions / user / day</text>
+<text x="1540" y="272.8" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="500" fill="#495057" text-anchor="start">• 10% watch live for 20 min / day</text>
+<text x="1540" y="294.05" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="500" fill="#495057" text-anchor="start">• 5× peak-over-average factor</text>
+<text x="1540" y="315.3" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="500" fill="#495057" text-anchor="start">• 1.5 Mbps HLS video bitrate</text>
+<text x="1540" y="336.55" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="500" fill="#495057" text-anchor="start">• 6 chat/reaction events / viewer / min</text>
+<text x="1540" y="425.7" font-family="Arial,Helvetica,sans-serif" font-size="23" font-weight="700" fill="#2f9e44" text-anchor="start">API traffic</text>
+<text x="1540" y="461.2" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="500" fill="#343a40" text-anchor="start">10M × 20 = 200M requests/day</text>
+<text x="1540" y="483.7" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="500" fill="#343a40" text-anchor="start">200M ÷ 86,400 ≈ 2.3K average QPS</text>
+<text x="1540" y="506.2" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="500" fill="#343a40" text-anchor="start">2.3K × 5 ≈ 12K peak QPS</text>
+<text x="1540" y="575.7" font-family="Arial,Helvetica,sans-serif" font-size="23" font-weight="700" fill="#9c36b5" text-anchor="start">Live concurrency</text>
+<text x="1540" y="611.2" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="500" fill="#343a40" text-anchor="start">1M viewers × 20 ÷ 1,440</text>
+<text x="1540" y="633.7" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="500" fill="#343a40" text-anchor="start">≈ 14K average concurrent</text>
+<text x="1540" y="656.2" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="500" fill="#343a40" text-anchor="start">≈ 70K peak concurrent</text>
+<text x="1540" y="740.7" font-family="Arial,Helvetica,sans-serif" font-size="23" font-weight="700" fill="#e8590c" text-anchor="start">Bandwidth + events</text>
+<text x="1540" y="776.2" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="500" fill="#343a40" text-anchor="start">70K × 1.5 Mbps ≈ 105 Gbps peak</text>
+<text x="1540" y="798.7" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="500" fill="#343a40" text-anchor="start">1M × 20 min × 1.5 Mbps ≈ 225 TB/day</text>
+<text x="1540" y="821.2" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="500" fill="#343a40" text-anchor="start">70K × 6 ÷ 60 ≈ 7K events/sec</text>
+<text x="1540" y="909.4" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="500" fill="#495057" text-anchor="start">Decision: API scales horizontally; CDN carries mass video;</text>
+<text x="1540" y="929.4" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="500" fill="#495057" text-anchor="start">Redis absorbs hot ephemeral traffic; PostgreSQL remains truth.</text>
+</svg>

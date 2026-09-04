@@ -1,0 +1,148 @@
+/**
+ * agoshop design tokens.
+ *
+ * The product is commerce-first and light by default. Live video is a discovery and
+ * selling feature, not the visual system: only the video canvas and controls layered
+ * directly over video use the dark theme.
+ */
+
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+
+  /* Walmart-inspired retail palette: bright blue, ink navy, spark yellow. */
+  --bg: #ffffff;
+  --surface: #f2f8fd;
+  --elev: #ffffff;
+  --menu: #ffffff;
+  --border: #d5e5f5;
+  --border-ctl: #6f839b;
+
+  /* text */
+  --text-1: #001e60;
+  --text-2: #2d3f55;
+  --text-3: #5f6c7b;
+
+  /* commerce action */
+  --accent: #0071dc;
+  --accent-text: #0053a6;
+  --accent-press: #004f9a;
+  --accent-ink: #ffffff;
+  --accent-wash: rgb(0 113 220 / 0.1);
+
+  /* live and destructive */
+  --live: #d91e36;
+  --live-ink: #ffffff;
+  --live-wash: rgb(217 30 54 / 0.08);
+  --danger-text: #b61b32;
+
+  /* success */
+  --success: #2a8703;
+  --success-wash: rgb(42 135 3 / 0.1);
+
+  /* controls over video */
+  --chip: rgb(0 30 96 / 0.86);
+  --chip-hairline: rgb(255 255 255 / 0.2);
+  --on-video-shadow: 0 1px 3px rgb(0 0 0 / 0.55);
+
+  --focus: #0071dc;
+
+  /* typography */
+  --font-sans: 'Inter Variable', Inter, 'Noto Sans Devanagari', system-ui, sans-serif;
+  --font-display: 'Manrope Variable', Manrope, 'Inter Variable', system-ui, sans-serif;
+
+  /* 4pt spacing */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-10: 40px;
+  --s-12: 48px;
+  --s-16: 64px;
+
+  /* shape */
+  --r-chip: 9999px;
+  --r-ctl: 10px;
+  --r-panel: 12px;
+  --r-sheet: 18px;
+
+  /* elevation */
+  --e-1: 0 1px 2px rgb(0 30 96 / 0.08), 0 3px 10px rgb(0 30 96 / 0.05);
+  --e-sheet: 0 24px 64px -20px rgb(0 30 96 / 0.3);
+  --e-drag: 0 12px 32px -12px rgb(0 30 96 / 0.22);
+
+  /* motion */
+  --d-echo: 80ms;
+  --d-ctl: 140ms;
+  --d-panel: 220ms;
+  --d-stage: 320ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-emphatic: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* layout */
+  --page-max: 1520px;
+  --bar-h: 64px;
+  --pin-bar-h: 96px;
+  --sidebar-w: 430px;
+
+  /* shopper controls */
+  --ctl-h: 44px;
+  --ctl-h-lg: 48px;
+  --row-h: 56px;
+}
+
+/**
+ * Dark is opt-in for media canvases and control layers that sit directly on video.
+ * Page chrome, product content, checkout, assistant, and Studio stay light.
+ */
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #101210;
+  --surface: #181b18;
+  --elev: #202420;
+  --menu: #252925;
+  --border: #303530;
+  --border-ctl: #747c74;
+
+  --text-1: #f7f8f6;
+  --text-2: #b2b8b0;
+  --text-3: #969e94;
+
+  --accent: #7da0ff;
+  --accent-text: #a9beff;
+  --accent-press: #6488ec;
+  --accent-ink: #101728;
+  --accent-wash: rgb(125 160 255 / 0.14);
+
+  --live: #ff4057;
+  --live-ink: #ffffff;
+  --live-wash: rgb(255 64 87 / 0.14);
+  --danger-text: #ff7a8a;
+
+  --success: #55ce91;
+  --success-wash: rgb(85 206 145 / 0.13);
+
+  --focus: #9ab3ff;
+  --e-1: none;
+  --e-sheet: 0 24px 64px -20px rgb(0 0 0 / 0.68);
+  --e-drag: 0 12px 32px -12px rgb(0 0 0 / 0.52);
+}
+
+/** Studio is denser, but uses the same light commerce system. */
+[data-surface='studio'] {
+  --ctl-h: 34px;
+  --ctl-h-lg: 38px;
+  --ctl-h-sm: 28px;
+  --row-h: 36px;
+}
+
+/** Broadcast controls remain finger-safe without making the whole room dark. */
+[data-surface='studio'][data-room='broadcast'] {
+  --ctl-h: 46px;
+  --ctl-h-lg: 52px;
+}

@@ -1,0 +1,76 @@
+(render_proxy_headers) {
+	header_up X-Forwarded-For {http.request.header.X-Forwarded-For}
+	header_up X-Forwarded-Proto {http.request.header.X-Forwarded-Proto}
+}
+
+:{$PORT:10000} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	@assets path /assets/* /studio/assets/* /support/assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+
+	@events path /api/events*
+	handle @events {
+		reverse_proxy http://{$SSE_UPSTREAM:agoshop-sse:10000} {
+			import render_proxy_headers
+		}
+	}
+
+	@ai_callback path_regexp ai_callback ^/api/ai/convo/[^/]+/chat/completions$
+	handle @ai_callback {
+		reverse_proxy http://{$AI_UPSTREAM:agoshop-ai:10000} {
+			import render_proxy_headers
+		}
+	}
+
+	@tts path /api/ai/tts/*
+	handle @tts {
+		reverse_proxy http://{$AI_UPSTREAM:agoshop-ai:10000} {
+			import render_proxy_headers
+		}
+	}
+
+	@mcp path /mcp
+	handle @mcp {
+		reverse_proxy http://{$AI_UPSTREAM:agoshop-ai:10000} {
+			import render_proxy_headers
+		}
+	}
+
+	@api path /api/* /media/*
+	handle @api {
+		reverse_proxy http://{$API_UPSTREAM:agoshop-api:10000} {
+			import render_proxy_headers
+		}
+	}
+
+	redir /studio /studio/
+	handle_path /studio/* {
+		root * {$STATIC_ROOT:/srv}/seller
+		try_files {path} /seller.html
+		file_server
+	}
+
+	redir /support /support/
+	handle_path /support/* {
+		root * {$STATIC_ROOT:/srv}/support
+		try_files {path} /support.html
+		file_server
+	}
+
+	handle {
+		root * {$STATIC_ROOT:/srv}/customer
+		try_files {path} /index.html
+		file_server
+	}
+
+	log
+}

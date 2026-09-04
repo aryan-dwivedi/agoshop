@@ -1,0 +1,26 @@
+{
+  "name": "@shop/worker",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./background": "./src/background.ts",
+    "./leader": "./src/leader.ts"
+  },
+  "scripts": {
+    "dev": "node --env-file=../../.env --import tsx --watch src/index.ts",
+    "build": "node ../../scripts/build-service.mjs src/index.ts dist/index.js",
+    "start": "node dist/index.js",
+    "start:dev": "node --env-file=../../.env --import tsx src/index.ts"
+  },
+  "dependencies": {
+    "@shop/db": "*",
+    "@shop/api": "*",
+    "@shop/shared": "*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  }
+}

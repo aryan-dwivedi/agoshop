@@ -1,0 +1,49 @@
+{
+  "name": "live-commerce-platform",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "packageManager": "npm@11.5.1",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "concurrently -n api,bg,sse,ai,shop,seller,support -c cyan,magenta,yellow,blue,green,gray,white \"npm:dev:server\" \"npm:dev:background\" \"npm:dev:sse\" \"npm:dev:ai\" \"npm:dev:web\" \"npm:dev:seller\" \"npm:dev:support\"",
+    "dev:server": "npm run dev --workspace @shop/api",
+    "dev:background": "npm run dev --workspace @shop/worker",
+    "dev:worker": "npm run dev --workspace @shop/worker",
+    "dev:sse": "npm run dev --workspace @shop/sse-gateway",
+    "dev:ai": "npm run dev --workspace @shop/ai-service",
+    "dev:web": "npm run dev --workspace @shop/web",
+    "dev:seller": "npm run dev:seller --workspace @shop/web",
+    "dev:support": "npm run dev:support --workspace @shop/web",
+    "stack:up": "node scripts/stack.mjs up",
+    "stack:down": "node scripts/stack.mjs down",
+    "stack:status": "node scripts/stack.mjs status",
+    "db:push": "npm run db:push --workspace @shop/api",
+    "db:seed": "npm run db:seed --workspace @shop/api",
+    "test": "vitest run",
+    "typecheck": "tsc -b apps/api apps/ai-service apps/worker apps/sse-gateway apps/web packages/db packages/shared packages/search packages/domain-commerce packages/domain-live",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "build": "turbo run build",
+    "loadtest": "node loadtest/run.mjs",
+    "loadtest:seed": "npm run loadtest:seed --workspace @shop/api",
+    "loadtest:reset": "npm run loadtest:reset --workspace @shop/api"
+  },
+  "devDependencies": {
+    "@shop/config-eslint": "*",
+    "@types/node": "^22.10.2",
+    "concurrently": "^9.1.0",
+    "eslint": "^9.17.0",
+    "prettier": "^3.4.2",
+    "turbo": "^2.3.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^3.2.4"
+  }
+}
