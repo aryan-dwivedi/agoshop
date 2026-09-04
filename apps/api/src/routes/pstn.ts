@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
 
-import { env } from '@shop/platform/env.js';
 import { badRequest } from '@shop/platform/lib/errors.js';
 import { logger } from '@shop/platform/lib/logger.js';
 import { ensureIdentity } from '@shop/platform/middleware/session.js';
@@ -27,8 +26,8 @@ router.post('/api/pstn/callback', ensureIdentity, async (req, res, next) => {
         res.json({
             status: 'queued',
             message:
-                'Callback request received. Configure PSTN_GATEWAY_URL and a SIP trunk to complete bridging.',
-            gatewayConfigured: Boolean(env.PSTN_GATEWAY_URL),
+                'Callback request received. PSTN bridging is not configured in this deployment.',
+            gatewayConfigured: false,
         });
     } catch (err) {
         next(err);

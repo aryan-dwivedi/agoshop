@@ -43,26 +43,10 @@ const schema = z
         CONVOAI_ENABLED: bool.default('true'),
         CONVOAI_MAX_CONCURRENT_AGENTS: int(15),
         CONVOAI_IDLE_TIMEOUT_SECONDS: int(120),
-        CONVOAI_TTS_VENDOR: z.enum(['openai', 'minimax']).default('minimax'),
-        CONVOAI_TTS_MODEL: z.string().default('speech-02-turbo'),
-        CONVOAI_TTS_VOICE: z.string().default('English_Reserved_Woman'),
-        CONVOAI_TTS_SPEED: z.coerce.number().min(0.5).max(2).default(1.6),
-        CONVOAI_GEOFENCE_AREA: z
-            .enum(['GLOBAL', 'NORTH_AMERICA', 'EUROPE', 'ASIA', 'INDIA', 'JAPAN'])
-            .default('INDIA'),
         CONVOAI_SUPPORTED_LANGUAGES: csv('en-US,hi-IN,es-ES'),
         CONVO_LLM_SHARED_SECRET: z.string().min(16),
         CONVO_CALLBACK_TTL_SECONDS: int(7200),
         AGORA_MANAGED_LLM_MODEL: z.string().default('gpt-4o-mini'),
-        PSTN_GATEWAY_URL: z.string().default(''),
-        CONVOAI_SYSTEM_PROMPT: z
-            .string()
-            .default(
-                'You are the voice shopping assistant for an Indian live-commerce storefront. ' +
-                    'Speak in one or two short sentences. Use tools for every factual claim. ' +
-                    'Call get_conversation_context at the start of a session. ' +
-                    'For order disputes or delivery problems you cannot resolve, use escalate_to_human.',
-            ),
         LLM_PROVIDER: z.enum(LLM_PROVIDER_IDS).default('mock'),
         LLM_BASE_URL: z.string().default('https://openrouter.ai/api/v1'),
         LLM_API_KEY: z.string().default(''),
@@ -102,7 +86,6 @@ const schema = z
         SEARCH_PROVIDER: z.enum(['postgres', 'opensearch']).default('postgres'),
         OPENSEARCH_URL: z.string().default(''),
         ANALYTICS_BACKLOG_WATERMARK: int(150000),
-        AGORA_API_BASE: z.string().default('https://api.agora.io'),
     })
     .superRefine((data, ctx) => {
         if (data.LLM_PROVIDER !== 'mock' && data.LLM_API_KEY.trim().length === 0) {
@@ -138,7 +121,6 @@ export const isRecordingViaAgora =
 export const features = {
     convoai: env.CONVOAI_ENABLED,
     mediaPush: env.MEDIA_PUSH_ENABLED,
-    mediaGateway: env.MEDIA_GATEWAY_ENABLED,
     recording: env.RECORDING_PROVIDER !== 'off',
     transcription: env.TRANSCRIPTION_PROVIDER !== 'off',
 };

@@ -5,7 +5,6 @@ if (!process.env.PUBLIC_API_URL) {
         process.loadEnvFile('.env');
     } catch {}
 }
-process.env.CONVOAI_TTS_VENDOR ??= 'minimax';
 const { buildConvoAiJoinBody, buildConvoAiTtsBlock, joinConvoAiAgent } =
     await import('@shop/agora/convoai.js');
 const input = {
@@ -63,9 +62,11 @@ describe('ConvoAI speech handling', () => {
     it('builds managed TTS blocks', () => {
         expect(buildConvoAiTtsBlock('en-IN')).toMatchObject({
             credential_mode: 'managed',
+            vendor: 'minimax',
             params: {
-                voice: process.env.CONVOAI_TTS_VOICE ?? 'English_Reserved_Woman',
+                voice: 'English_Reserved_Woman',
                 speed: 1.6,
+                language: 'en-IN',
             },
         });
     });

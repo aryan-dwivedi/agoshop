@@ -9,6 +9,13 @@ import { agoraBasicAuth, mintAgentRtcRtmToken } from './tokens.js';
 
 export { CONVOAI_FAILURE_MESSAGE };
 const BASE = 'https://api.agora.io/api/conversational-ai-agent/v2/projects';
+/** Agora managed TTS defaults — configured in the join body, not via app env vars. */
+const MANAGED_TTS = {
+    vendor: 'minimax',
+    model: 'speech-02-turbo',
+    voice: 'English_Reserved_Woman',
+    speed: 1.6,
+} as const;
 export type ConvoAiJoinInput = {
     conversationId: string;
     channel: string;
@@ -21,13 +28,13 @@ export type ConvoAiJoinInput = {
     expires: number;
 };
 export const buildConvoAiTtsBlock = (language: string): Record<string, unknown> => ({
-    vendor: env.CONVOAI_TTS_VENDOR,
+    vendor: MANAGED_TTS.vendor,
     credential_mode: 'managed',
     params: {
-        model: env.CONVOAI_TTS_MODEL,
-        voice: env.CONVOAI_TTS_VOICE,
+        model: MANAGED_TTS.model,
+        voice: MANAGED_TTS.voice,
         language,
-        speed: env.CONVOAI_TTS_SPEED,
+        speed: MANAGED_TTS.speed,
     },
 });
 export const buildConvoAiJoinBody = (input: ConvoAiJoinInput): Record<string, unknown> => {
@@ -62,7 +69,7 @@ export const buildConvoAiJoinBody = (input: ConvoAiJoinInput): Record<string, un
         system_messages: [
             {
                 role: 'system',
-                content: input.systemPrompt || env.CONVOAI_SYSTEM_PROMPT,
+                content: input.systemPrompt,
             },
         ],
         greeting_message: input.greeting,
@@ -115,7 +122,7 @@ export const buildConvoAiJoinBody = (input: ConvoAiJoinInput): Record<string, un
                 enable: true,
                 mode: 'start_of_speech',
             },
-            geofence: { area: env.CONVOAI_GEOFENCE_AREA },
+            geofence: { area: 'INDIA' },
             asr: {
                 vendor: 'ares',
                 language: input.language,

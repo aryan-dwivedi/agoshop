@@ -1,5 +1,5 @@
-# The portable deployment artifact: postgres, redis, two stateless API replicas, two
-# worker replicas (leader-elected singleton loops), and nginx in front.
+# The portable deployment artifact: postgres, redis, two API replicas, two AI replicas,
+# two SSE gateways, two workers (leader-elected singleton loops), and nginx in front.
 #
 # Run from the repo root:  docker compose -f infra/docker-compose.yml --env-file .env up --build
 #
@@ -27,8 +27,8 @@ x-api-env: &api-env
     SESSION_COOKIE_SECRET: ${SESSION_COOKIE_SECRET:?set SESSION_COOKIE_SECRET in .env}
     AGORA_APP_ID: ${AGORA_APP_ID:?set AGORA_APP_ID in .env}
     AGORA_APP_CERTIFICATE: ${AGORA_APP_CERTIFICATE:?set AGORA_APP_CERTIFICATE in .env}
-    AGORA_CUSTOMER_ID: ${AGORA_CUSTOMER_ID:-}
-    AGORA_CUSTOMER_SECRET: ${AGORA_CUSTOMER_SECRET:-}
+    AGORA_CUSTOMER_ID: ${AGORA_CUSTOMER_ID:?set AGORA_CUSTOMER_ID in .env}
+    AGORA_CUSTOMER_SECRET: ${AGORA_CUSTOMER_SECRET:?set AGORA_CUSTOMER_SECRET in .env}
     AGORA_WEBHOOK_SECRET: ${AGORA_WEBHOOK_SECRET:-}
     CONVO_LLM_SHARED_SECRET: ${CONVO_LLM_SHARED_SECRET:?set CONVO_LLM_SHARED_SECRET in .env}
     LLM_API_KEY: ${LLM_API_KEY:-}

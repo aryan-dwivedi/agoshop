@@ -48,4 +48,4 @@ export const agoraBasicAuth = (): string | null => {
     const raw = `${env.AGORA_CUSTOMER_ID}:${env.AGORA_CUSTOMER_SECRET}`;
     return `Basic ${Buffer.from(raw, 'utf8').toString('base64')}`;
 };
-export const AGORA_REST_BASE = env.AGORA_API_BASE.replace(/\/+$/, '');
+export const AGORA_REST_BASE = 'https://api.agora.io';

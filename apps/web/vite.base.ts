@@ -55,7 +55,7 @@ export const webConfig = (app: WebApp): UserConfig => {
             allowedHosts: ['.ngrok-free.app', '.ngrok.io'],
             proxy: {
                 '/api/events': { target: 'http://localhost:8789', changeOrigin: true },
-                '/mcp': { target: 'http://localhost:8787', changeOrigin: true },
+                '/mcp': { target: 'http://localhost:8790', changeOrigin: true },
                 '/api': { target: 'http://localhost:8787', changeOrigin: true },
                 '/media': { target: 'http://localhost:8787', changeOrigin: true },
             },

@@ -12,12 +12,15 @@ COPY apps/api/package.json apps/api/package.json
 COPY packages/shared/package.json packages/shared/package.json
 COPY packages/db/package.json packages/db/package.json
 COPY packages/search/package.json packages/search/package.json
+COPY packages/platform/package.json packages/platform/package.json
+COPY packages/agora/package.json packages/agora/package.json
+COPY packages/ai/package.json packages/ai/package.json
+COPY packages/domain-commerce/package.json packages/domain-commerce/package.json
+COPY packages/domain-live/package.json packages/domain-live/package.json
 RUN npm ci --include=dev
 
 COPY tsconfig.base.json tsconfig.json ./
-COPY packages/shared packages/shared
-COPY packages/db packages/db
-COPY packages/search packages/search
+COPY packages packages
 COPY apps/api apps/api
 
 RUN npm run build --workspace @shop/api

@@ -1,10 +1,8 @@
-import type { NextFunction, Request, Response } from 'express';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import { z } from 'zod';
 
 import { env } from '@shop/platform/env.js';
-import { unauthorized } from '@shop/platform/lib/errors.js';
 
 const MAX_FUTURE_SKEW_SECONDS = 24 * 60 * 60;
 export const signCallback = (conversationId: string, expiresUnixSeconds: number): string =>
@@ -53,20 +51,4 @@ export const verifyCallback = (
 export const callbackConversationId = (value: unknown): string | null => {
     const parsed = z.string().uuid().safeParse(value);
     return parsed.success ? parsed.data : null;
-};
-export const requireCallbackAuth = (req: Request, _res: Response, next: NextFunction): void => {
-    const conversationId = callbackConversationId(req.params.conversationId);
-    const result = conversationId
-        ? verifyCallback(
-              conversationId,
-              req.header('X-Convo-Expires') ?? undefined,
-              req.header('X-Convo-Signature') ?? undefined,
-          )
-        : ({ ok: false, reason: 'malformed_conversation_id' } as const);
-    if (!result.ok) {
-        req.log.warn({ reason: result.reason }, 'ai callback authorization rejected');
-        next(unauthorized('invalid_callback_signature'));
-        return;
-    }
-    next();
 };
