@@ -10,7 +10,7 @@ Start here: [`docs/hld/hld-one-page.excalidraw`](docs/hld/hld-one-page.excalidra
 - **Live shopping** — a seller goes live from the browser over Agora RTC; viewers join, chat (server-mediated), react, vote in polls and follow the host's pinned product. Scheduled / live / recorded sessions are all discoverable.
 - **Voice AI** — inside a live room, a replay, or **anywhere on the storefront**, the shopper opens a private voice conversation. The assistant answers from the real catalog, shows tappable recommendations while speaking, compares products, checks delivery and payment options, adds to cart, and hands off to checkout.
 - **The live-only discount** — one `promotions` row, one pure evaluator, one relational eligibility resolver. It applies while the session is live, disappears from open carts the moment it ends, and can never be applied on a replay.
-- **Scale primitives, built and measured** — chat sharding, a one-way RTC→CDN delivery-tier transition, two stateless API replicas behind nginx, aggregated high-frequency signals, and a k6 suite that measures them.
+- **Scale primitives** — chat sharding, a one-way RTC→CDN delivery-tier transition, two stateless API replicas behind nginx, and aggregated high-frequency signals.
 
 ## Prerequisites
 
@@ -23,7 +23,6 @@ Start here: [`docs/hld/hld-one-page.excalidraw`](docs/hld/hld-one-page.excalidra
 | ngrok                                 | so Agora can reach the custom-LLM callback                                      |
 | MinIO _(or any S3-compatible bucket)_ | stores session recordings; `brew install minio` runs it locally                 |
 | ffmpeg                                | speech-format encoding; also builds media fixtures and the simulated-HLS ladder |
-| k6 _(optional)_                       | the load suite                                                                  |
 | MediaMTX _(optional)_                 | free local RTMP→HLS origin for the CDN tier — `infra/mediamtx.yml`              |
 
 **Credentials.** You need an Agora App ID + App Certificate + Customer ID/Secret with **Conversational AI Engine** and **Real-Time Speech-to-Text** enabled, and an **OpenRouter** API key. Voice TTS is **Agora-managed** (OpenAI or minimax vendor via ConvoAI — no separate TTS API key). Cloud Recording and Media Push remain optional paid Agora add-ons.
@@ -80,64 +79,17 @@ The seller console owns these routes on :5174:
 
 ## Deploy on Render
 
-The root [`render.yaml`](render.yaml) is a Render Blueprint for the complete application:
-
-- one public edge service that serves the storefront at `/`, Studio at `/studio`, and
-  Support at `/support`;
-- private API, AI, and SSE services connected over Render's private network;
-- one background worker;
-- managed PostgreSQL 16 and a persistent Render Key Value instance;
-- a persistent disk for uploaded recordings.
-
-Keeping every browser surface on one origin makes the generated `onrender.com` domain
-work without custom DNS and preserves the host-only session cookie. Render terminates
-TLS; the edge container serves static assets and routes `/api`, `/mcp`, and `/media` to
-the private services.
+The root [`render.yaml`](render.yaml) is a Render Blueprint that collapses the stack
+into **one free web service** plus free Postgres and free Key Value. API, SSE, worker,
+and the static edge all run in a single container (`infra/Dockerfile.free`). Every
+browser surface shares one origin (`/`, `/studio`, `/support`), so the generated
+`onrender.com` domain works without custom DNS and preserves the host-only session
+cookie.
 
 ### Create the Blueprint
 
-1. Push this repository to GitHub or GitLab.
-2. In Render, choose **New → Blueprint**, connect the repository, and use `render.yaml`.
-3. Supply every value Render marks **sync: false**:
-   - `PUBLIC_API_URL` and `WEB_ORIGIN`: the public edge URL, for example
-     `https://agoshop.onrender.com`;
-   - the Agora App ID, App Certificate, Customer ID, Customer Secret, and webhook
-     secret;
-   - `LLM_API_KEY`.
-4. Apply the Blueprint.
-
-The API image runs `db-push.js` before every deploy and `db-seed.js` once after its
-first successful deploy. The initial hook creates the demo catalog and accounts; it is
-not rerun on later releases.
-
-After deployment:
-
-```text
-https://<edge-host>.onrender.com/          customer storefront
-https://<edge-host>.onrender.com/studio/   seller console
-https://<edge-host>.onrender.com/support/  support console
-https://<edge-host>.onrender.com/api/health
-```
-
-If Render assigns a different hostname from the one entered during Blueprint creation,
-update `PUBLIC_API_URL` and `WEB_ORIGIN` in the `agoshop-runtime` environment group and
-redeploy the API, AI, SSE, and worker services. When attaching a custom domain, update
-those two variables to its HTTPS origin as well.
-
-The Blueprint uses paid compute because private services, a background worker, and a
-persistent recording disk cannot run as a reliable complete stack on Render's free
-tier. The AI service uses the larger `standard` plan for the local speech model; the
-other application services use `starter`.
-
-### Deploy on Render (free tier)
-
-[`render-free.yaml`](render-free.yaml) collapses the stack into **one free web
-service** plus free Postgres and free Key Value. API, SSE, worker, and the static
-edge all run in a single container (`infra/Dockerfile.free`).
-
 1. Push this repository to GitHub.
-2. In Render, choose **New → Blueprint** and select **`render-free.yaml`** (not
-   `render.yaml`).
+2. In Render, choose **New → Blueprint**, connect the repository, and use `render.yaml`.
 3. When prompted, supply the Agora credentials and `LLM_API_KEY` (`sync: false` in
    the Blueprint). `PUBLIC_API_URL` and `WEB_ORIGIN` are wired from
    `RENDER_EXTERNAL_URL` automatically.
@@ -154,13 +106,21 @@ edge all run in a single container (`infra/Dockerfile.free`).
 | 512 MB RAM, no persistent disk | Voice uses Agora managed TTS (no Kokoro in-process); recordings are ephemeral |
 | No private services / workers | Everything runs in-process in the one web container |
 
-After deploy, open `https://<your-service>.onrender.com/` and log in with the demo
-accounts below. Point Agora's custom-LLM callback at
+After deploy:
+
+```text
+https://<your-service>.onrender.com/          customer storefront
+https://<your-service>.onrender.com/studio/     seller console
+https://<your-service>.onrender.com/support/    support console
+https://<your-service>.onrender.com/api/health
+```
+
+Log in with the demo accounts below. Point Agora's custom-LLM callback at
 `https://<your-service>.onrender.com` (no ngrok needed).
 
 ### The second replica
 
-`npm run dev` starts one API. To run the two-replica topology the load test measures:
+`npm run dev` starts one API. To run the two-replica topology:
 
 ```bash
 PORT=8787 npm run start --workspace @shop/server
@@ -238,7 +198,6 @@ The eleven journey stages, in the order the plan's manual verification steps run
 ```bash
 npm test          # 16 evaluator unit tests + 3 integration checks against real PG/Redis
 npm run typecheck # server, web and shared
-npm run loadtest  # k6 L1–L7 (needs RTC_TIER_MAX_VIEWERS=150; see docs/scale-and-capacity.md)
 ```
 
 The integration checks are also runnable individually and print their own assertions:
@@ -295,7 +254,7 @@ Nothing below is claimed as working when it cannot be. This table is repeated ve
 | ConvoAI voice pipeline (ARES ASR + Agora managed TTS)          | **Built** — the custom callback streams text; Agora speaks it; optional `mcp` mode retains Agora-managed LLM + MCP tools                                                                                                 | public API URL in dev            |
 | Host captions (Real-Time STT v7)                               | **Verified with real credentials** — join → `RUNNING` → query → leave, 5/5 (`apps/api/src/agora/__checks__/rtt.check.ts`)                                                                                                                                                                  | —                                |
 | Session recording → object storage → replay                    | **Verified end to end** against MinIO: upload → object stored → public `GET 200`, `206` on range requests → `DELETE` removes object + local copy + row                                                                                                                                     | —                                |
-| Chat sharding, moderation authority, stateless routing         | **Built and load-tested** below the default 500 REST req/s per App ID                                                                                                                                                                                                                      | an Agora quota increase for more |
+| Chat sharding, moderation authority, stateless routing         | **Built** below the default 500 REST req/s per App ID                                                                                                                                                                                                                                      | an Agora quota increase for more |
 | Media Push → real CDN/HLS, end to end                          | **`unverified — external RTMP/HLS origin required`.** The converter call, the threshold, the single transition event and the client HLS handoff are built and exercised against a **`simulated-origin`** HLS file. That is _not_ evidence that video traversed Agora Media Push.           | CDN RTMP ingest + HLS origin     |
 | Agora Cloud Recording                                          | **Not used — deliberately dropped.** A **paid add-on** (`400 invalid_appid` until purchased), and it adds nothing over browser capture + a real object store. Kept behind `RECORDING_PROVIDER=agora`, including the `vendor: 11` S3-compatible `storageConfig`, for a customer who has it. | the paid add-on                  |
 | PSTN                                                           | **Stub routes only** (`POST /api/pstn/incoming`, `POST /api/pstn/callback`). In-app human handoff via support dashboard is built.                                                                                                                                                          | phone number / SIP trunk         |
@@ -324,7 +283,6 @@ apps/web/src                 ONE tree, THREE Vite entries
 packages/shared/src
   promotions.ts  the only place discount semantics exist
   tools.ts       the AI tool contract (JSON schema + zod + mutating classification)
-loadtest/        seed, reset, k6/L1–L7
 infra/           docker-compose.yml, nginx.conf, Dockerfile
 ```
 

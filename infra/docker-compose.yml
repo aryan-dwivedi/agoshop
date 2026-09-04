@@ -1,10 +1,6 @@
 # The portable deployment artifact: postgres, redis, two stateless API replicas, two
 # worker replicas (leader-elected singleton loops), and nginx in front.
 #
-# `scripts/stack.mjs` (npm run stack:up) is the native equivalent for a host without
-# Docker — same topology, same ports, same shared recordings directory — so the demo can
-# be run either way.
-#
 # Run from the repo root:  docker compose -f infra/docker-compose.yml --env-file .env up --build
 #
 # Two invariants this file exists to enforce:
@@ -135,8 +131,7 @@ services:
 
   api2:
     <<: *api
-    # Same image, same env, same volume — the replicas differ in nothing, which is the
-    # property nginx round-robin and k6 L2 rely on.
+    # Same image, same env, same volume — the replicas differ in nothing.
   # Explicit one-shot jobs for first deploys and schema upgrades. They use the API
   # build stage because it contains the TypeScript sources and migration tooling.
   migrate: &migrate
@@ -222,7 +217,7 @@ services:
     image: nginx:1.27-alpine
     ports: ['127.0.0.1:8080:8080']
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx.compose.conf:/etc/nginx/nginx.conf:ro
       # Read-only here: nginx serves the recordings the API replicas and the worker
       # retention loop write and delete.
       - recordings:/var/lib/live-commerce/recordings:ro

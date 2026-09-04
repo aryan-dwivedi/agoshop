@@ -1,6 +1,6 @@
 # Local RTMP → HLS origin, so Agora Media Push has a real external destination to
 # push to and `hls.js` has a real manifest to play. This is the free stand-in for a
-# commercial CDN: Agora pushes RTMP(S) here, this packages HLS, nginx-free.
+# commercial CDN: Agora pushes RTMP(S) here, this packages HLS, nginx serves the ladder.
 #
 #   mediamtx infra/mediamtx.yml
 #

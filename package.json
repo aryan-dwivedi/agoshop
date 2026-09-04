@@ -21,19 +21,13 @@
     "dev:web": "npm run dev --workspace @shop/web",
     "dev:seller": "npm run dev:seller --workspace @shop/web",
     "dev:support": "npm run dev:support --workspace @shop/web",
-    "stack:up": "node scripts/stack.mjs up",
-    "stack:down": "node scripts/stack.mjs down",
-    "stack:status": "node scripts/stack.mjs status",
     "db:push": "npm run db:push --workspace @shop/api",
     "db:seed": "npm run db:seed --workspace @shop/api",
     "test": "vitest run",
     "typecheck": "tsc -b apps/api apps/ai-service apps/worker apps/sse-gateway apps/web packages/db packages/shared packages/search packages/domain-commerce packages/domain-live",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
-    "build": "turbo run build",
-    "loadtest": "node loadtest/run.mjs",
-    "loadtest:seed": "npm run loadtest:seed --workspace @shop/api",
-    "loadtest:reset": "npm run loadtest:reset --workspace @shop/api"
+    "build": "turbo run build"
   },
   "devDependencies": {
     "@shop/config-eslint": "*",

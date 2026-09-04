@@ -1,5 +1,4 @@
 import type { Router } from 'express';
-
 import { router as adminRouter } from './admin.js';
 import { router as aiRouter } from './ai.js';
 import { router as authRouter } from './auth.js';
@@ -22,36 +21,27 @@ import { mcpRouter } from './mcp.js';
 import { completionsRouter } from './completions.js';
 import { router as ttsRouter } from '../ai/ttsRoute.js';
 import { router as wishlistRouter } from './wishlist.js';
-
-/**
- * The production router set. Every module declares fully-qualified `/api/...` paths,
- * so mount order across modules is irrelevant; ordering *within* a module (for
- * example `/api/products/compare` before `/api/products/:slug`) is that module's job.
- *
- * Tests build a narrower app with `createApp([...])` containing only the slice under
- * test — that is why the app factory takes routers as an argument.
- */
 export const allRouters: Router[] = [
-  healthRouter,
-  configRouter,
-  authRouter,
-  catalogRouter,
-  cartRouter,
-  checkoutRouter,
-  ordersRouter,
-  wishlistRouter,
-  meRouter,
-  adminRouter,
-  tokensRouter,
-  sessionsRouter,
-  pollsRouter,
-  aiRouter,
-  completionsRouter,
-  mcpRouter,
-  ttsRouter,
-  supportRouter,
-  pstnRouter,
-  sellerRouter,
-  sellersRouter,
-  webhooksRouter,
+    healthRouter,
+    configRouter,
+    authRouter,
+    catalogRouter,
+    cartRouter,
+    checkoutRouter,
+    ordersRouter,
+    wishlistRouter,
+    meRouter,
+    adminRouter,
+    tokensRouter,
+    sessionsRouter,
+    pollsRouter,
+    aiRouter,
+    completionsRouter,
+    mcpRouter,
+    ttsRouter,
+    supportRouter,
+    pstnRouter,
+    sellerRouter,
+    sellersRouter,
+    webhooksRouter,
 ];

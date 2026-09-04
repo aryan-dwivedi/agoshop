@@ -3,8 +3,6 @@
   "include": [
     "apps/**/*.ts",
     "apps/**/*.tsx",
-    "packages/**/*.ts",
-    "loadtest/**/*.ts",
-    "scripts/**/*.mjs"
+    "packages/**/*.ts"
   ]
 }

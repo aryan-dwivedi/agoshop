@@ -1,11 +1,10 @@
 #!/bin/sh
-# Single-container process supervisor for Render's free web tier.
-# API already mounts AI hot-path routes; nginx fans out SSE to a local replica.
+
 set -eu
 
 API_PORT=8787
 SSE_PORT=8789
-# Render injects PORT=10000 for the public edge; child services use fixed ports.
+
 EDGE_PORT="${PORT:-10000}"
 
 mkdir -p /tmp/recordings
@@ -63,7 +62,6 @@ terminate() {
 
 trap terminate INT TERM
 
-sed "s/__LISTEN_PORT__/${EDGE_PORT}/g" /etc/nginx/nginx.free.conf > /tmp/nginx.free.conf
+sed "s/__LISTEN_PORT__/${EDGE_PORT}/g" /etc/nginx/nginx.conf > /tmp/nginx.conf
 
-# nginx stays in the foreground on Render's PORT so health checks reach the edge.
-exec nginx -c /tmp/nginx.free.conf -g 'daemon off;'
+exec nginx -c /tmp/nginx.conf -g 'daemon off;'

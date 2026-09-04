@@ -29,10 +29,6 @@ apps/api/src/db/data/*.csv
 auto.crt
 auto.key
 
-# Load testing artifacts
-loadtest/.generated/
-loadtest/results/
-
 # Test coverage
 coverage/
 

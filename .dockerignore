@@ -11,8 +11,6 @@ infra/*.env
 .stack
 var
 coverage
-loadtest/.generated
-loadtest/results
 *.log
 *.rdb
 .DS_Store

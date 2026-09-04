@@ -62,7 +62,7 @@ Letting viewers publish directly to RTM is faster and is what most demos do. It 
 - **No job queue.** Deferred work is a Redis stream with a consumer group, `XACK`ed only after the durable write. Adding BullMQ would add a dependency for one consumer.
 - **No order/fulfilment pipeline.** Checkout is synchronous behind an atomic decrement. The async reservation → capture → fulfilment split a real BBD system needs is designed in `scale-and-capacity.md`; building it is exactly the production commerce engine the brief says to skip.
 - **No tax/shipping engine, no refunds, no seller onboarding.** Mocked or omitted, and listed in the README.
-- **No sticky sessions.** Session records live in Redis, recordings on a shared volume, events in pub/sub — so any replica can serve any request, which is what makes the two-replica load test meaningful.
+- **No sticky sessions.** Session records live in Redis, recordings on a shared volume, events in pub/sub — so any replica can serve any request.
 - **No BYOK ASR/TTS vendor key.** ARES supplies ASR without a customer key. The TTS seam is BYOK because this Agora SKU rejected managed mode, but its default endpoint runs the open-weight Kokoro model inside `ai-service`; a hosted OpenAI-compatible endpoint remains a configuration-only switch.
 
 ## Where the boring choice was deliberately kept

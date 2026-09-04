@@ -1,88 +1,56 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-
 import { EVENTS, type AiProductCard, type ServerEvent } from '@shop/shared';
-
 import { useServerEvents } from '../lib/useServerEvents';
 import { useSheet } from '../components/RightSheet';
 import type { AssistantLine } from './useVoiceAgent';
-
-/**
- * The out-of-band half of an assistant turn.
- *
- * Two things about a turn are known only to the server: whether a tool call actually
- * landed, and which catalog rows the answer was built from. Both arrive on the event
- * stream rather than in the reply body — the voice transport has no reply body at all
- * — so any surface hosting a conversation needs this listener. A shopper who buys by
- * talking must get the same tappable cards as one who typed.
- *
- * A landed tool call is not announced: the product row in the turn is the receipt, and
- * a tool call the shopper did not make themselves still changed their cart, so the
- * cart and wishlist reads are invalidated and the top bar's total moves. That is the
- * whole effect — server truth being reflected, never a client prediction.
- */
-
-/** Only the tool name is read: what it did to the cart is re-read from the server. */
-type AiToolExecuted = { conversationId: string; tool: string };
-
-type AiProductsShown = { conversationId: string; turnId: number; products: AiProductCard[] };
-
-export type UseAssistantEventsResult = {
-  /**
-   * `agent.lines` with each voice line's cards merged in. A text turn already carries
-   * its own; a voice turn learns them from `ai.products_shown`, matched on turn id.
-   */
-  lines: AssistantLine[];
+type AiToolExecuted = {
+    conversationId: string;
+    tool: string;
 };
-
+type AiProductsShown = {
+    conversationId: string;
+    turnId: number;
+    products: AiProductCard[];
+};
+export type UseAssistantEventsResult = {
+    lines: AssistantLine[];
+};
 export const useAssistantEvents = (opts: {
-  conversationId: string | null;
-  lines: AssistantLine[];
+    conversationId: string | null;
+    lines: AssistantLine[];
 }): UseAssistantEventsResult => {
-  const { conversationId, lines } = opts;
-  const queryClient = useQueryClient();
-  const openSheet = useSheet((state) => state.openSheet);
-  const [voiceProducts, setVoiceProducts] = useState<Record<number, AiProductCard[]>>({});
-
-  useEffect(() => setVoiceProducts({}), [conversationId]);
-
-  const onEvent = useCallback(
-    (event: ServerEvent) => {
-      if (event.event === EVENTS.aiProductsShown) {
-        const shown = event.data as AiProductsShown;
-        if (shown.conversationId !== conversationId) return;
-        setVoiceProducts((current) => ({ ...current, [shown.turnId]: shown.products }));
-        return;
-      }
-      if (event.event !== EVENTS.aiToolExecuted) return;
-      const data = event.data as AiToolExecuted;
-      if (data.conversationId !== conversationId) return;
-      if (data.tool !== 'add_to_cart' && data.tool !== 'add_to_wishlist') return;
-      // Wishlisting flips the `has_wishlisted` promotion segment, so cart pricing can
-      // move off either tool — the same invalidation the product page does by hand.
-      if (data.tool === 'add_to_wishlist') {
-        void queryClient.invalidateQueries({ queryKey: ['wishlist'] });
-        void queryClient.invalidateQueries({ queryKey: ['recommendations'] });
-      }
-      void queryClient.invalidateQueries({ queryKey: ['cart'] });
-      if (data.tool === 'add_to_cart') openSheet('cart');
-    },
-    [conversationId, openSheet, queryClient],
-  );
-
-  // This stream lives exactly as long as an open conversation does.
-  useServerEvents({ enabled: conversationId !== null, onEvent });
-
-  // Merged at render time rather than by mutating the transcript the toolkit owns.
-  const merged = useMemo(
-    () =>
-      lines.map((line) =>
-        line.role === 'assistant' && line.turnId !== null && voiceProducts[line.turnId]
-          ? { ...line, products: voiceProducts[line.turnId] as AiProductCard[] }
-          : line,
-      ),
-    [lines, voiceProducts],
-  );
-
-  return { lines: merged };
+    const { conversationId, lines } = opts;
+    const queryClient = useQueryClient();
+    const openSheet = useSheet((state) => state.openSheet);
+    const [voiceProducts, setVoiceProducts] = useState<Record<number, AiProductCard[]>>({});
+    useEffect(() => setVoiceProducts({}), [conversationId]);
+    const onEvent = useCallback((event: ServerEvent) => {
+        if (event.event === EVENTS.aiProductsShown) {
+            const shown = event.data as AiProductsShown;
+            if (shown.conversationId !== conversationId)
+                return;
+            setVoiceProducts((current) => ({ ...current, [shown.turnId]: shown.products }));
+            return;
+        }
+        if (event.event !== EVENTS.aiToolExecuted)
+            return;
+        const data = event.data as AiToolExecuted;
+        if (data.conversationId !== conversationId)
+            return;
+        if (data.tool !== 'add_to_cart' && data.tool !== 'add_to_wishlist')
+            return;
+        if (data.tool === 'add_to_wishlist') {
+            void queryClient.invalidateQueries({ queryKey: ['wishlist'] });
+            void queryClient.invalidateQueries({ queryKey: ['recommendations'] });
+        }
+        void queryClient.invalidateQueries({ queryKey: ['cart'] });
+        if (data.tool === 'add_to_cart')
+            openSheet('cart');
+    }, [conversationId, openSheet, queryClient]);
+    useServerEvents({ enabled: conversationId !== null, onEvent });
+    const merged = useMemo(() => lines.map((line) => line.role === 'assistant' && line.turnId !== null && voiceProducts[line.turnId]
+        ? { ...line, products: voiceProducts[line.turnId] as AiProductCard[] }
+        : line), [lines, voiceProducts]);
+    return { lines: merged };
 };

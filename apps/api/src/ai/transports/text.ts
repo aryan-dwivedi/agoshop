@@ -1,7 +1,5 @@
 import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
-
 import { detectLanguage, LANGUAGE_AUTO, resolveSpokenLanguage } from '@shop/shared';
-
 import { db } from '../../db/client.js';
 import { aiConversations, aiMessages } from '../../db/schema.js';
 import { env } from '../../env.js';
@@ -17,249 +15,162 @@ import { runConversationTurn } from '../executor.js';
 import { buildLiveContextMessage, buildSystemPrompt } from '../systemPrompt.js';
 import type { ChatMessage } from '../providers/index.js';
 import type { TextTurnHistoryMessage, TextTurnResult, VoiceTransport } from './index.js';
-
-/**
- * THE DEGRADED TEXT TRANSPORT — explicitly labelled as such.
- *
- * This is what the client falls back to when admission control refuses a ConvoAI slot
- * (`503 ai_capacity`), so the shopping journey never dead-ends. It is the SAME
- * assistant: same conversation row, same tool surface, same executor, same
- * `aiToolCalls` deduplication, same transcript rows, same analytics. The only
- * differences are that no audio exists and the response is one non-streaming JSON
- * body instead of SSE frames.
- *
- * It is never presented as proof of voice, and never as proof of multi-language voice:
- * a text turn consumes no agent, no RTC channel and no ASR/TTS.
- */
-
-/** A provider must never leave the browser waiting on an unbounded JSON request. */
-const TEXT_TURN_TIMEOUT_MS = 25_000;
-
-/** Turn ids come from Agora on the voice path; the text path counts its own turns. */
+const TEXT_TURN_TIMEOUT_MS = 25000;
 const nextTurnId = async (conversation: ConversationRecord): Promise<number> => {
-  const [row] = await db
-    .select({ max: sql<number | null>`max(${aiMessages.turnId})` })
-    .from(aiMessages)
-    .where(eq(aiMessages.conversationId, conversation.id));
-  return (row?.max ?? -1) + 1;
+    const [row] = await db
+        .select({ max: sql<number | null> `max(${aiMessages.turnId})` })
+        .from(aiMessages)
+        .where(eq(aiMessages.conversationId, conversation.id));
+    return (row?.max ?? -1) + 1;
 };
-
-/**
- * The text client carries a bounded transcript for strict privacy mode, where message
- * bodies are deliberately not persisted. Standard mode uses the server-owned copy.
- */
 const MAX_TEXT_HISTORY_MESSAGES = 12;
-
-const loadTextHistory = async (
-  conversationId: string,
-  clientHistory: TextTurnHistoryMessage[],
-): Promise<TextTurnHistoryMessage[]> => {
-  if (!persistBodies) return clientHistory.slice(-MAX_TEXT_HISTORY_MESSAGES);
-
-  const rows = await db
-    .select({ role: aiMessages.role, content: aiMessages.content })
-    .from(aiMessages)
-    .where(
-      and(
-        eq(aiMessages.conversationId, conversationId),
-        inArray(aiMessages.role, ['user', 'assistant']),
-        isNotNull(aiMessages.content),
-      ),
-    )
-    .orderBy(desc(aiMessages.id))
-    .limit(MAX_TEXT_HISTORY_MESSAGES);
-
-  return rows
-    .reverse()
-    .flatMap((row) =>
-      row.content !== null && (row.role === 'user' || row.role === 'assistant')
+const loadTextHistory = async (conversationId: string, clientHistory: TextTurnHistoryMessage[]): Promise<TextTurnHistoryMessage[]> => {
+    if (!persistBodies)
+        return clientHistory.slice(-MAX_TEXT_HISTORY_MESSAGES);
+    const rows = await db
+        .select({ role: aiMessages.role, content: aiMessages.content })
+        .from(aiMessages)
+        .where(and(eq(aiMessages.conversationId, conversationId), inArray(aiMessages.role, ['user', 'assistant']), isNotNull(aiMessages.content)))
+        .orderBy(desc(aiMessages.id))
+        .limit(MAX_TEXT_HISTORY_MESSAGES);
+    return rows
+        .reverse()
+        .flatMap((row) => row.content !== null && (row.role === 'user' || row.role === 'assistant')
         ? [{ role: row.role, content: row.content }]
-        : [],
-    );
+        : []);
 };
-
 type ResolvedProductReference = {
-  productId: string;
-  title: string;
-  variantId: string | null;
+    productId: string;
+    title: string;
+    variantId: string | null;
 };
-
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
-
-/**
- * Tool messages cannot be replayed by themselves on a later OpenAI turn: the protocol
- * requires the original assistant `tool_calls` message and its call id beside each
- * result. Preserve the useful part instead — canonical catalog identifiers — as a
- * bounded system note. This prevents a follow-up such as "standard" from forcing the
- * model to invent `m36_5g_standard` after the prior search result has left its window.
- */
-const collectProductReferences = (
-  value: unknown,
-  references: Map<string, ResolvedProductReference>,
-): void => {
-  if (Array.isArray(value)) {
-    for (const item of value) collectProductReferences(item, references);
-    return;
-  }
-  if (value === null || typeof value !== 'object') return;
-
-  const record = value as Record<string, unknown>;
-  const productId =
-    typeof record.product_id === 'string'
-      ? record.product_id
-      : typeof record.productId === 'string'
-        ? record.productId
+const collectProductReferences = (value: unknown, references: Map<string, ResolvedProductReference>): void => {
+    if (Array.isArray(value)) {
+        for (const item of value)
+            collectProductReferences(item, references);
+        return;
+    }
+    if (value === null || typeof value !== 'object')
+        return;
+    const record = value as Record<string, unknown>;
+    const productId = typeof record.product_id === 'string'
+        ? record.product_id
+        : typeof record.productId === 'string'
+            ? record.productId
+            : null;
+    const title = typeof record.title === 'string' ? record.title.trim() : '';
+    const variantId = typeof record.variant_id === 'string' && UUID.test(record.variant_id)
+        ? record.variant_id
         : null;
-  const title = typeof record.title === 'string' ? record.title.trim() : '';
-  const variantId =
-    typeof record.variant_id === 'string' && UUID.test(record.variant_id)
-      ? record.variant_id
-      : null;
-
-  if (productId && UUID.test(productId) && title.length > 0) {
-    const existing = references.get(productId);
-    references.set(productId, {
-      productId,
-      title,
-      variantId: variantId ?? existing?.variantId ?? null,
-    });
-  }
-
-  for (const child of Object.values(record)) collectProductReferences(child, references);
+    if (productId && UUID.test(productId) && title.length > 0) {
+        const existing = references.get(productId);
+        references.set(productId, {
+            productId,
+            title,
+            variantId: variantId ?? existing?.variantId ?? null,
+        });
+    }
+    for (const child of Object.values(record))
+        collectProductReferences(child, references);
 };
-
 const loadResolvedProductContext = async (conversationId: string): Promise<ChatMessage | null> => {
-  if (!persistBodies) return null;
-
-  const rows = await db
-    .select({ result: aiMessages.toolResult })
-    .from(aiMessages)
-    .where(
-      and(
-        eq(aiMessages.conversationId, conversationId),
-        eq(aiMessages.role, 'tool'),
-        isNotNull(aiMessages.toolResult),
-      ),
-    )
-    .orderBy(desc(aiMessages.id))
-    .limit(12);
-
-  const references = new Map<string, ResolvedProductReference>();
-  for (const row of rows) collectProductReferences(row.result, references);
-  const recent = [...references.values()].slice(0, 12);
-  if (recent.length === 0) return null;
-
-  return {
-    role: 'system',
-    content: [
-      'Canonical catalog references resolved earlier in this conversation. Reuse these exact opaque IDs; never derive an ID from a product title. Search again if the requested item is absent:',
-      ...recent.map(
-        (reference) =>
-          `- "${reference.title}": product_id=${reference.productId}` +
-          (reference.variantId ? `, default_variant_id=${reference.variantId}` : ''),
-      ),
-    ].join('\n'),
-  };
-};
-
-export const textTransport: VoiceTransport = {
-  id: 'text',
-  degraded: true,
-
-  async start(conversation: ConversationRecord): Promise<{ agentId: null }> {
-    // No agent, so no admission slot is consumed — that is the entire point of the
-    // fallback. Any slot the conversation was holding is handed back.
-    await releaseSlot(conversation.id);
-    await db
-      .update(aiConversations)
-      .set({ transport: 'text', status: 'running' })
-      .where(eq(aiConversations.id, conversation.id));
-    track({
-      type: 'ai_conversation_started',
-      userId: conversation.userId,
-      sessionId: conversation.liveSessionId,
-      payload: { conversationId: conversation.id, transport: 'text', degraded: true },
-    });
-    return { agentId: null };
-  },
-
-  stop(conversationId, opts): Promise<void> {
-    return stopConversation(conversationId, opts);
-  },
-
-  /** Nothing to keep alive: no agent, no lease. */
-  heartbeat(): Promise<{ refreshed: boolean }> {
-    return Promise.resolve({ refreshed: true });
-  },
-
-  /** There is no speech to barge in on; interrupting a text turn is a no-op. */
-  interrupt(): Promise<void> {
-    return Promise.resolve();
-  },
-
-  async sendUserTurn(
-    conversation: ConversationRecord,
-    text: string,
-    clientHistory: TextTurnHistoryMessage[] = [],
-  ): Promise<TextTurnResult> {
-    const trimmed = text.trim();
-    if (trimmed.length === 0) throw badRequest('empty_message', 'text is required');
-    if (trimmed.length > 2000) throw badRequest('message_too_long', 'text must be ≤ 2000 chars');
-
-    const turnId = await nextTurnId(conversation);
-    const [history, resolvedProducts] = await Promise.all([
-      loadTextHistory(conversation.id, clientHistory),
-      loadResolvedProductContext(conversation.id),
-    ]);
-
-    // Identical prefixing to the voice path: the persistent role prompt, then a
-    // freshly computed live-context message, so a discount that just expired is
-    // reflected in this very turn.
-    const messages: ChatMessage[] = [
-      { role: 'system', content: await buildSystemPrompt(conversation) },
-      await buildLiveContextMessage(conversation),
-      ...(resolvedProducts ? [resolvedProducts] : []),
-      ...history,
-      { role: 'user', content: trimmed },
-    ];
-
-    const llmMode = await getConversationLlmMode(conversation.id);
-
-    const result = await runConversationTurn({
-      conversation,
-      messages,
-      turnId,
-      signal: AbortSignal.timeout(TEXT_TURN_TIMEOUT_MS),
-      // Nothing streams on this transport; the reply is returned whole.
-      onText: () => {},
-    });
-
-    logger.info(
-      {
-        conversationId: conversation.id,
-        turnId,
-        transport: 'text',
-        llmMode,
-        rounds: result.rounds,
-        tools: result.executed.map((e) => e.name),
-      },
-      'text assistant turn completed',
-    );
-
-    // The client labels every transcript line with this code, so it must be a real one:
-    // an `auto` conversation reports the language THIS turn was written in, which may
-    // differ from the previous turn's.
-    const language =
-      conversation.language === LANGUAGE_AUTO
-        ? (detectLanguage(trimmed, env.CONVOAI_SUPPORTED_LANGUAGES) ??
-          resolveSpokenLanguage(LANGUAGE_AUTO, env.CONVOAI_SUPPORTED_LANGUAGES))
-        : conversation.language;
-
+    if (!persistBodies)
+        return null;
+    const rows = await db
+        .select({ result: aiMessages.toolResult })
+        .from(aiMessages)
+        .where(and(eq(aiMessages.conversationId, conversationId), eq(aiMessages.role, 'tool'), isNotNull(aiMessages.toolResult)))
+        .orderBy(desc(aiMessages.id))
+        .limit(12);
+    const references = new Map<string, ResolvedProductReference>();
+    for (const row of rows)
+        collectProductReferences(row.result, references);
+    const recent = [...references.values()].slice(0, 12);
+    if (recent.length === 0)
+        return null;
     return {
-      reply: result.text,
-      language,
-      toolCalls: result.executed.map((e) => ({ name: e.name, outcome: e.outcome })),
-      products: result.products,
+        role: 'system',
+        content: [
+            'Canonical catalog references resolved earlier in this conversation. Reuse these exact opaque IDs; never derive an ID from a product title. Search again if the requested item is absent:',
+            ...recent.map((reference) => `- "${reference.title}": product_id=${reference.productId}` +
+                (reference.variantId ? `, default_variant_id=${reference.variantId}` : '')),
+        ].join('\n'),
     };
-  },
+};
+export const textTransport: VoiceTransport = {
+    id: 'text',
+    degraded: true,
+    async start(conversation: ConversationRecord): Promise<{
+        agentId: null;
+    }> {
+        await releaseSlot(conversation.id);
+        await db
+            .update(aiConversations)
+            .set({ transport: 'text', status: 'running' })
+            .where(eq(aiConversations.id, conversation.id));
+        track({
+            type: 'ai_conversation_started',
+            userId: conversation.userId,
+            sessionId: conversation.liveSessionId,
+            payload: { conversationId: conversation.id, transport: 'text', degraded: true },
+        });
+        return { agentId: null };
+    },
+    stop(conversationId, opts): Promise<void> {
+        return stopConversation(conversationId, opts);
+    },
+    heartbeat(): Promise<{
+        refreshed: boolean;
+    }> {
+        return Promise.resolve({ refreshed: true });
+    },
+    interrupt(): Promise<void> {
+        return Promise.resolve();
+    },
+    async sendUserTurn(conversation: ConversationRecord, text: string, clientHistory: TextTurnHistoryMessage[] = []): Promise<TextTurnResult> {
+        const trimmed = text.trim();
+        if (trimmed.length === 0)
+            throw badRequest('empty_message', 'text is required');
+        if (trimmed.length > 2000)
+            throw badRequest('message_too_long', 'text must be ≤ 2000 chars');
+        const turnId = await nextTurnId(conversation);
+        const [history, resolvedProducts] = await Promise.all([
+            loadTextHistory(conversation.id, clientHistory),
+            loadResolvedProductContext(conversation.id),
+        ]);
+        const messages: ChatMessage[] = [
+            { role: 'system', content: await buildSystemPrompt(conversation) },
+            await buildLiveContextMessage(conversation),
+            ...(resolvedProducts ? [resolvedProducts] : []),
+            ...history,
+            { role: 'user', content: trimmed },
+        ];
+        const llmMode = await getConversationLlmMode(conversation.id);
+        const result = await runConversationTurn({
+            conversation,
+            messages,
+            turnId,
+            signal: AbortSignal.timeout(TEXT_TURN_TIMEOUT_MS),
+            onText: () => { },
+        });
+        logger.info({
+            conversationId: conversation.id,
+            turnId,
+            transport: 'text',
+            llmMode,
+            rounds: result.rounds,
+            tools: result.executed.map((e) => e.name),
+        }, 'text assistant turn completed');
+        const language = conversation.language === LANGUAGE_AUTO
+            ? (detectLanguage(trimmed, env.CONVOAI_SUPPORTED_LANGUAGES) ??
+                resolveSpokenLanguage(LANGUAGE_AUTO, env.CONVOAI_SUPPORTED_LANGUAGES))
+            : conversation.language;
+        return {
+            reply: result.text,
+            language,
+            toolCalls: result.executed.map((e) => ({ name: e.name, outcome: e.outcome })),
+            products: result.products,
+        };
+    },
 };

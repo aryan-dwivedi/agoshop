@@ -1,18 +1,5 @@
 #!/usr/bin/env bash
-# Generates demo media fixtures under RECORDING_LOCAL_DIR:
-#   live-source.mp4, sample-session.mp4, live-<slug>.mp4,
-#   simulated-origin/index.m3u8, simulated-origin/<slug>/index.m3u8,
-#   covers/<slug>.jpg, covers/ended.jpg
-#
-# Env:
-#   RECORDING_LOCAL_DIR       output root (default: var/recordings)
-#   LIVE_SOURCE_VIDEO         single clip copied/stream-copied for every slug
-#   LIVE_SOURCE_MAP           per-slug sources: slug=path;slug=path
-#   SAMPLE_SESSION_SECONDS    replay length (default: 120)
-#   LIVE_SOURCE_SECONDS       synthetic clip length (default: 60)
-#
-# When no source is supplied, a synthetic testsrc clip is generated.
-# Existing room clips are retained when omitted from a later LIVE_SOURCE_MAP.
+
 set -euo pipefail
 
 DIR="${RECORDING_LOCAL_DIR:-var/recordings}"

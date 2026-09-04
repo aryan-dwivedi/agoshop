@@ -2,62 +2,40 @@ import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express, { type Express, type Router } from 'express';
-
 import { env } from './env.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { requestContext } from './middleware/context.js';
 import { loadSession } from './middleware/session.js';
-
-/**
- * App factory. Routers are injected so a test can build an app containing exactly
- * the slice under test; `src/routes/index.ts` supplies the full production set.
- *
- * Compression is skipped for the SSE and streaming-AI paths: `compression` buffers,
- * which would break both the event stream and Agora's custom-LLM callback.
- */
-/** SSE is served by sse-gateway in production; keep the path out of compression for tests. */
 const STREAMING_PATHS = ['/api/events', '/api/ai/', '/mcp'];
-
 export const createApp = (routers: Router[]): Express => {
-  const app = express();
-  app.disable('x-powered-by');
-  app.set('trust proxy', env.TRUST_PROXY_HOPS);
-
-  app.use(requestContext);
-  app.use(
-    cors({
-      origin: env.WEB_ORIGIN.split(',').map((o) => o.trim()),
-      credentials: true,
-      exposedHeaders: ['x-request-id', 'Idempotent-Replay', 'Retry-After'],
-    }),
-  );
-  app.use(
-    compression({
-      filter: (req, res) => {
-        if (STREAMING_PATHS.some((p) => req.path.startsWith(p))) return false;
-        return compression.filter(req, res);
-      },
-    }),
-  );
-  // The Agora webhook needs the raw body for HMAC verification.
-  app.use('/api/webhooks/agora', express.raw({ type: '*/*', limit: '1mb' }));
-  app.use(express.json({ limit: '1mb' }));
-  app.use(cookieParser(env.SESSION_COOKIE_SECRET));
-  // Nginx owns this route in the composed stack. The API serves the same shared
-  // recording directory for native development, where Vite proxies `/media` here.
-  app.use(
-    '/media/recordings',
-    express.static(env.RECORDING_LOCAL_DIR, {
-      fallthrough: true,
-      index: false,
-      maxAge: '60s',
-    }),
-  );
-  app.use(loadSession);
-
-  for (const router of routers) app.use(router);
-
-  app.use(notFoundHandler);
-  app.use(errorHandler);
-  return app;
+    const app = express();
+    app.disable('x-powered-by');
+    app.set('trust proxy', env.TRUST_PROXY_HOPS);
+    app.use(requestContext);
+    app.use(cors({
+        origin: env.WEB_ORIGIN.split(',').map((o) => o.trim()),
+        credentials: true,
+        exposedHeaders: ['x-request-id', 'Idempotent-Replay', 'Retry-After'],
+    }));
+    app.use(compression({
+        filter: (req, res) => {
+            if (STREAMING_PATHS.some((p) => req.path.startsWith(p)))
+                return false;
+            return compression.filter(req, res);
+        },
+    }));
+    app.use('/api/webhooks/agora', express.raw({ type: '*/*', limit: '1mb' }));
+    app.use(express.json({ limit: '1mb' }));
+    app.use(cookieParser(env.SESSION_COOKIE_SECRET));
+    app.use('/media/recordings', express.static(env.RECORDING_LOCAL_DIR, {
+        fallthrough: true,
+        index: false,
+        maxAge: '60s',
+    }));
+    app.use(loadSession);
+    for (const router of routers)
+        app.use(router);
+    app.use(notFoundHandler);
+    app.use(errorHandler);
+    return app;
 };

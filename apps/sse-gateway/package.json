@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "PORT=8789 node --env-file=../../.env --import tsx --watch src/index.ts",
-    "build": "node ../../scripts/build-service.mjs src/index.ts dist/index.js",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node22 --packages=external --outfile=dist/index.js",
     "start": "node dist/index.js"
   },
   "dependencies": {
@@ -20,6 +20,7 @@
     "@types/cookie-parser": "^1.4.8",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
+    "esbuild": "^0.25.0",
     "tsx": "^4.19.2"
   }
 }

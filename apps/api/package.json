@@ -10,14 +10,12 @@
   "scripts": {
     "dev": "node --env-file=../../.env --import tsx --watch src/index.ts",
     "dev:background": "npm run dev --workspace @shop/worker",
-    "build": "node ../../scripts/build-service.mjs src/index.ts dist/index.js && node ../../scripts/build-service.mjs src/db/push.ts dist/db-push.js && node ../../scripts/build-service.mjs src/db/seed.ts dist/db-seed.js",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node22 --packages=external --outfile=dist/index.js && esbuild src/db/push.ts --bundle --platform=node --format=esm --target=node22 --packages=external --outfile=dist/db-push.js && esbuild src/db/seed.ts --bundle --platform=node --format=esm --target=node22 --packages=external --outfile=dist/db-seed.js",
     "start": "node --env-file=../../.env dist/index.js",
     "start:dev": "node --env-file=../../.env --import tsx src/index.ts",
     "start:background": "npm run start --workspace @shop/worker",
     "db:push": "node --env-file=../../.env --import tsx src/db/push.ts",
     "db:seed": "node --env-file=../../.env --import tsx src/db/seed.ts",
-    "loadtest:seed": "node --env-file=../../.env --import tsx ../../loadtest/seed.ts",
-    "loadtest:reset": "node --env-file=../../.env --import tsx ../../loadtest/reset.ts",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {

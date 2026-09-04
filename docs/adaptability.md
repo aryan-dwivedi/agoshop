@@ -29,7 +29,7 @@ The knobs below are all raisable in seconds; the Agora account defaults are not.
 | 3     | Project regional PCU / bandwidth     | 10,000 PCU / 10 Gbps | The real RTC→CDN offload trigger, not the 1 M-per-channel ceiling                                                                        |
 | 4     | Cloud Recording concurrent workers   | 50 PCW               | Only if every session is recorded server-side; the demo path uses browser `MediaRecorder`                                                |
 
-Sizing arithmetic, per-tier cost and the load-test evidence live in **`docs/scale-and-capacity.md`** — not restated here.
+Sizing arithmetic and per-tier cost live in **`docs/scale-and-capacity.md`** — not restated here.
 
 ### Then the knobs, in this order
 
@@ -79,7 +79,7 @@ Three real implementations, none of them a stub:
 | ------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `openrouter`        | `providers/openrouter.ts`       | Default; the only one exercised against real credentials. Adds OpenRouter's documented deviations to the shared reader: `: OPENROUTER PROCESSING` keepalives skipped, `ignoreTrailingUsageFinish: true` for the usage chunk that repeats `finish_reason`, HTTP-200 mid-stream `error` raised as a provider failure. |
 | `openai-compatible` | `providers/openaiCompatible.ts` | OpenAI direct, Groq, Together, Azure, self-hosted vLLM — **selected purely by `LLM_BASE_URL`**. Owns `streamOpenAiSse`, the SSE framer every HTTP provider shares.                                                                                                                                                  |
-| `mock`              | `providers/mock.ts`             | Deterministic. Selected by the automated checks and the k6 `ai-proxy` scenario so proxy overhead is measurable without model latency, and so fragmented tool calls and callback replay are reproducible.                                                                                                            |
+| `mock`              | `providers/mock.ts`             | Deterministic. Selected by the automated checks so proxy overhead is measurable without model latency, and so fragmented tool calls and callback replay are reproducible.                                                                                                            |
 
 For OpenAI direct, Groq, Together, Azure or vLLM there is **no new code at all** — four env vars:
 
@@ -157,7 +157,7 @@ Run a voice turn on `openrouter`. Stop the API, set `LLM_PROVIDER=mock`, start, 
 | `POST /api/ai/conversations/:id/stop`                 | Idempotent teardown on hangup                               |
 | `POST /api/ai/convo/:conversationId/chat/completions` | Agora's custom-LLM callback — unchanged                     |
 
-The two automated proofs that this is browser-free are not thought experiments. `apps/server/src/ai/__checks__/ai.check.ts` boots a real HTTP server on `127.0.0.1` and drives `/api/ai/convo/:id/chat/completions` end to end, and the load suite's **L6** (`loadtest/k6/ai-proxy.js`) runs 100 VUs against that same callback with valid per-conversation HMAC headers — its own header says "no browser and no model latency… This also exercises the PSTN seam." Signature verification, the fresh live-context system message, tool execution, `aiToolCalls` deduplication and SSE framing are all exercised with no browser present.
+The automated proof that this is browser-free is not a thought experiment. `apps/server/src/ai/__checks__/ai.check.ts` boots a real HTTP server on `127.0.0.1` and drives `/api/ai/convo/:id/chat/completions` end to end with valid per-conversation HMAC headers. Signature verification, the fresh live-context system message, tool execution, `aiToolCalls` deduplication and SSE framing are all exercised with no browser present.
 
 ### The only new components
 
@@ -196,7 +196,7 @@ Every one of: `ai/executor.ts`, `packages/shared/src/tools.ts`, `ai/systemPrompt
 
 ### Two-minute demo (of the seam, not of PSTN)
 
-Run L6: `node loadtest/run.mjs` and point at `loadtest/results/ai-proxy.json`. 100 VUs, no browser, valid HMAC callbacks, tool calls executing, replays deduped. Then say plainly: the missing piece is a number and a trunk, and it is two components, not a rewrite.
+Run `node --env-file=.env --import tsx apps/api/src/ai/__checks__/ai.check.ts`. Valid HMAC callbacks, tool calls executing, replays deduped. Then say plainly: the missing piece is a number and a trunk, and it is two components, not a rewrite.
 
 ---
 
