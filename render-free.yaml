@@ -83,7 +83,7 @@ envVarGroups:
       - key: LLM_API_KEY
         sync: false
       - key: LLM_MODEL
-        value: openai/gpt-4o-mini
+        value: inclusionai/ling-3.0-flash-fin:free
       - key: CONVOAI_ENABLED
         value: 'true'
       - key: CONVOAI_LLM_MODE
