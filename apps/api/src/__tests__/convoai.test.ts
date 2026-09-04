@@ -12,7 +12,9 @@ if (!process.env.PUBLIC_API_URL) {
 
 // The module parses env at evaluation time, so this test intentionally loads it only
 // after supplying the same repository env that server entry points receive.
-const { buildConvoAiJoinBody, joinConvoAiAgent } = await import('../agora/convoai.js');
+const { buildConvoAiJoinBody, buildConvoAiTtsBlock, joinConvoAiAgent } = await import(
+  '../agora/convoai.js'
+);
 
 const input = {
   conversationId: '00000000-0000-4000-8000-000000000001',
@@ -42,7 +44,7 @@ describe('ConvoAI speech handling', () => {
             params?: { max_tokens?: number };
           };
           parameters: unknown;
-          tts?: { params: { speed?: number; response_format?: string; sample_rate?: number } };
+          tts?: { credential_mode?: string; params: { speed?: number; response_format?: string; sample_rate?: number } };
           turn_detection: unknown;
           interruption: unknown;
         };
@@ -53,15 +55,14 @@ describe('ConvoAI speech handling', () => {
         data_channel: 'rtm',
         audio_scenario: 'chorus',
       });
-      if (mode === 'mcp') {
-        expect(body.properties.tts?.params).toMatchObject({
+      expect(body.properties.tts).toMatchObject({
+        credential_mode: 'managed',
+        params: {
           speed: 1.6,
           response_format: 'pcm',
           sample_rate: 24_000,
-        });
-      } else {
-        expect(body.properties.tts).toBeUndefined();
-      }
+        },
+      });
       expect(body.properties.turn_detection).toEqual({
         mode: 'default',
         config: {
@@ -107,7 +108,8 @@ describe('ConvoAI speech handling', () => {
       url: 'https://api.openai.com/v1/chat/completions',
     });
   });
-  it('configures custom LLM replies as direct PCM audio', () => {
+
+  it('configures custom LLM text output with Agora managed TTS', () => {
     const body = buildConvoAiJoinBody(input, 'custom') as {
       properties: {
         llm: {
@@ -115,19 +117,27 @@ describe('ConvoAI speech handling', () => {
           output_modalities?: string[];
           params?: { modalities?: string[]; audio?: { voice?: string; format?: string } };
         };
-        tts?: unknown;
+        tts?: { credential_mode?: string; params?: { voice?: string } };
       };
     };
 
     expect(body.properties.llm).toMatchObject({
       input_modalities: ['text'],
-      output_modalities: ['audio'],
-      params: {
-        modalities: ['audio'],
-        audio: { voice: 'nova', format: 'pcm' },
-      },
+      output_modalities: ['text'],
+      params: { max_tokens: 160 },
     });
-    expect(body.properties.tts).toBeUndefined();
+    expect(body.properties.llm.params?.modalities).toBeUndefined();
+    expect(body.properties.tts).toMatchObject({
+      credential_mode: 'managed',
+      params: { voice: 'nova', response_format: 'pcm', sample_rate: 24_000 },
+    });
+  });
+
+  it('builds Agora managed TTS blocks', () => {
+    expect(buildConvoAiTtsBlock('en-IN')).toMatchObject({
+      credential_mode: 'managed',
+      params: { voice: 'nova', response_format: 'pcm', sample_rate: 24_000 },
+    });
   });
 
   it('recovers the agent created before a retried join conflicts', async () => {

@@ -2,14 +2,13 @@ import { Router } from 'express';
 
 import { completionsHandler } from '@shop/api/ai/completionsRoute.js';
 import { handleMcpRequest } from '@shop/api/mcp/server.js';
-import { router as ttsRouter } from '@shop/api/ai/ttsRoute.js';
 
 /**
  * AI hot-path routes — scaled independently from the main API.
  *
- * Completions (Agora's custom-LLM callback) and TTS are the CPU/latency-sensitive
- * paths nginx routes to `ai_pool`. Conversation admission and lifecycle stay on
- * `@shop/api`.
+ * Completions (Agora's custom-LLM callback) is the CPU/latency-sensitive path nginx
+ * routes to `ai_pool`. Conversation admission and lifecycle stay on `@shop/api`.
+ * Speech is rendered by Agora managed TTS, not in this process.
  */
 export const completionsRouter = Router();
 
@@ -29,4 +28,4 @@ mcpRouter.get('/mcp', (_req, res) => {
   });
 });
 
-export const aiServiceRouters = [completionsRouter, mcpRouter, ttsRouter];
+export const aiServiceRouters = [completionsRouter, mcpRouter];

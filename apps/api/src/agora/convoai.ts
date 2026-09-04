@@ -20,8 +20,8 @@ export { CONVOAI_FAILURE_MESSAGE };
  * The lifecycle (admission control, conversation rows, language switching) belongs to
  * `ai/conversations.ts`; this module owns only the wire contract, which must match the
  * verified schema exactly:
- *  - managed ASR plus direct custom-LLM PCM in the default mode; optional MCP mode
- *    retains the separate OpenAI-compatible TTS endpoint;
+ *  - managed ASR plus custom-LLM text in the default mode; Agora managed TTS speaks it;
+ *    optional MCP mode retains Agora-managed LLM + MCP tools with the same TTS path;
  *  - a combined RTC+RTM **agent** token whose account equals `agent_rtc_uid`, required
  *    by `advanced_features.enable_rtm`;
  *  - a single entry in `remote_rtc_uids` ("currently, only one user ID is supported");
@@ -56,6 +56,20 @@ export type ConvoAiJoinInput = {
   /** Unix seconds. */
   expires: number;
 };
+
+/** Agora-managed TTS block for ConvoAI join (OpenAI or minimax vendor). */
+export const buildConvoAiTtsBlock = (language: string): Record<string, unknown> => ({
+  vendor: env.CONVOAI_TTS_VENDOR,
+  credential_mode: 'managed',
+  params: {
+    model: env.CONVOAI_TTS_MODEL,
+    voice: env.CONVOAI_TTS_VOICE,
+    language,
+    speed: env.CONVOAI_TTS_SPEED,
+    response_format: 'pcm',
+    sample_rate: 24_000,
+  },
+});
 
 /**
  * Pure and separately testable: the join body is the single riskiest payload in the
@@ -119,7 +133,7 @@ export const buildConvoAiJoinBody = (
           api_key: input.signature,
           headers: authHeaders,
           input_modalities: ['text'],
-          output_modalities: ['audio'],
+          output_modalities: ['text'],
           system_messages: [{ role: 'system', content: input.systemPrompt }],
           greeting_message: input.greeting,
           greeting_configs: greetingConfigs,
@@ -129,8 +143,6 @@ export const buildConvoAiJoinBody = (
             model: env.LLM_MODEL,
             temperature: 0.4,
             max_tokens: 160,
-            modalities: ['audio'],
-            audio: { voice: env.CONVOAI_TTS_VOICE, format: 'pcm' },
           },
         };
 
@@ -191,23 +203,7 @@ export const buildConvoAiJoinBody = (
         vendor: env.CONVOAI_ASR_VENDOR,
         language: input.language,
       },
-      ...(llmMode === 'mcp'
-        ? {
-            tts: {
-              vendor: env.CONVOAI_TTS_VENDOR,
-              params: {
-                url: env.CONVOAI_TTS_URL || `${env.PUBLIC_API_URL}/api/ai/tts/speech`,
-                api_key: env.CONVOAI_TTS_API_KEY || env.CONVO_LLM_SHARED_SECRET,
-                model: env.CONVOAI_TTS_MODEL,
-                voice: env.CONVOAI_TTS_VOICE,
-                language: input.language,
-                speed: env.CONVOAI_TTS_SPEED,
-                response_format: 'pcm',
-                sample_rate: 24_000,
-              },
-            },
-          }
-        : {}),
+      tts: buildConvoAiTtsBlock(input.language),
       llm,
     },
   };

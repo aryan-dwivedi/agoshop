@@ -8,7 +8,6 @@ import { env } from '../env.js';
 import { track } from '../lib/analytics.js';
 import { logger } from '../lib/logger.js';
 import { publishToUser } from '../lib/sse.js';
-import { AudioSseWriter } from './audioSseWriter.js';
 import { loadConversation, type ConversationRecord } from './conversations.js';
 import { runConversationTurn } from './executor.js';
 import type { ChatMessage } from './providers/index.js';
@@ -230,16 +229,7 @@ export const completionsHandler = async (req: Request, res: Response): Promise<v
   res.flushHeaders();
 
   const turnController = new AbortController();
-  const disconnectController = new AbortController();
-  const audioMode = parsed.data.modalities?.includes('audio') ?? false;
-  const writer = audioMode
-    ? new AudioSseWriter(res, model, {
-        language: conversation.language,
-        voice: parsed.data.audio?.voice ?? env.CONVOAI_TTS_VOICE,
-        speed: env.CONVOAI_TTS_SPEED,
-        signal: disconnectController.signal,
-      })
-    : new SseWriter(res, model);
+  const writer = new SseWriter(res, model);
   const keepalive = setInterval(() => writer.keepalive(), KEEPALIVE_MS);
   let timedOut = false;
   const turnTimeout = setTimeout(() => {
@@ -247,26 +237,23 @@ export const completionsHandler = async (req: Request, res: Response): Promise<v
     turnController.abort(new Error('voice_turn_timeout'));
   }, TURN_TIMEOUT_MS);
 
-  // A disconnected Agora client must not leave provider work, synthesis or timers running.
+  // A disconnected Agora client must not leave provider work or timers running.
   res.on('close', () => {
     clearInterval(keepalive);
     clearTimeout(turnTimeout);
-    if (!res.writableEnded) {
-      turnController.abort();
-      disconnectController.abort();
-    }
+    if (!res.writableEnded) turnController.abort();
   });
   writer.role();
 
   try {
     const lastRequestMessage = parsed.data.messages.at(-1);
     const directSpeech =
-      audioMode && lastRequestMessage?.role === 'assistant'
+      lastRequestMessage?.role === 'assistant'
         ? flattenContent(lastRequestMessage.content)?.trim()
         : null;
     if (directSpeech) {
-      // In audio-only mode Agora sends greetings and explicit speak requests back as
-      // assistant messages. They need synthesis, not another model round.
+      // Agora may echo greeting or speak requests as assistant messages; stream text
+      // back and let managed TTS render the audio.
       writer.text(directSpeech);
       await writer.finish();
       return;

@@ -31,14 +31,6 @@ export const llmLatencySeconds = new Histogram({
   registers: [registry],
 });
 
-export const ttsLatencySeconds = new Histogram({
-  name: 'tts_latency_seconds',
-  help: 'Speech synthesis latency by engine and output format',
-  labelNames: ['engine', 'format'] as const,
-  buckets: [0.1, 0.25, 0.5, 1, 2, 4, 8, 15, 30],
-  registers: [registry],
-});
-
 export const toolLatencySeconds = new Histogram({
   name: 'tool_latency_seconds',
   help: 'Tool execution latency',

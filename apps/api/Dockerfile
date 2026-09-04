@@ -26,7 +26,7 @@ RUN npm run build --workspace @shop/api
 FROM node:24-bookworm-slim
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends espeak-ng ffmpeg curl ca-certificates \
+  && apt-get install -y --no-install-recommends ffmpeg curl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -48,9 +48,6 @@ COPY apps/api/package.json apps/api/package.json
 COPY packages/shared packages/shared
 COPY packages/db packages/db
 COPY packages/search packages/search
-COPY scripts scripts
-RUN node scripts/cache-tts-model.mjs
-
 RUN mkdir -p /var/lib/live-commerce/recordings/simulated-origin
 
 EXPOSE 8787

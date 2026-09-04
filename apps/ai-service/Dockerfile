@@ -1,4 +1,4 @@
-# Stateless AI replicas: custom-LLM callbacks and self-hosted TTS.
+# Stateless AI replicas: custom-LLM callbacks (text → Agora managed TTS).
 FROM node:24-bookworm-slim AS build
 
 RUN apt-get update \
@@ -25,7 +25,7 @@ RUN npm run build --workspace @shop/ai-service
 FROM node:24-bookworm-slim
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends espeak-ng ffmpeg curl ca-certificates \
+  && apt-get install -y --no-install-recommends curl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -39,8 +39,6 @@ COPY packages/db/package.json packages/db/package.json
 RUN npm ci --omit=dev
 
 COPY --from=build /app/apps/ai-service/dist ./apps/ai-service/dist
-COPY scripts scripts
-RUN node scripts/cache-tts-model.mjs
 
 EXPOSE 8790
 

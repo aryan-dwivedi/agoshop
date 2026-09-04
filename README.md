@@ -26,7 +26,7 @@ Start here: [`docs/hld/hld-one-page.excalidraw`](docs/hld/hld-one-page.excalidra
 | k6 _(optional)_                       | the load suite                                                                  |
 | MediaMTX _(optional)_                 | free local RTMP→HLS origin for the CDN tier — `infra/mediamtx.yml`              |
 
-**Credentials.** You need an Agora App ID + App Certificate + Customer ID/Secret with **Conversational AI Engine** and **Real-Time Speech-to-Text** enabled, and an **OpenRouter** API key. You do **not** need an OpenAI/ElevenLabs key: the BYOK TTS endpoint runs the Apache-licensed Kokoro neural model locally, while ARES supplies ASR. Cloud Recording and Media Push remain optional paid Agora add-ons.
+**Credentials.** You need an Agora App ID + App Certificate + Customer ID/Secret with **Conversational AI Engine** and **Real-Time Speech-to-Text** enabled, and an **OpenRouter** API key. Voice TTS is **Agora-managed** (OpenAI or minimax vendor via ConvoAI — no separate TTS API key). Cloud Recording and Media Push remain optional paid Agora add-ons.
 
 ### Agora Console (enable before demo)
 
@@ -151,7 +151,7 @@ edge all run in a single container (`infra/Dockerfile.free`).
 | ----- | ------ |
 | Spin-down after ~15 min idle | First request after idle can take ~1 minute |
 | Postgres expires after 30 days | Upgrade the database before expiry to keep data |
-| 512 MB RAM, no persistent disk | Voice TTS loads on demand and may be slow; recordings are ephemeral |
+| 512 MB RAM, no persistent disk | Voice uses Agora managed TTS (no Kokoro in-process); recordings are ephemeral |
 | No private services / workers | Everything runs in-process in the one web container |
 
 After deploy, open `https://<your-service>.onrender.com/` and log in with the demo
@@ -257,11 +257,11 @@ node --env-file=.env --import tsx apps/api/src/mcp/__checks__/mcp.check.ts
 3. Open the **support dashboard** at `http://localhost:5175` (`npm run dev:support -w @shop/web`), sign in as `support@demo.test` / `demo1234`, accept the ticket, and join the shopper's `ai-<conversationId>` RTC channel.
 4. The shopper UI shows a handoff notice while waiting for the agent.
 
-## Voice AI: direct streaming audio + optional Agora-managed MCP
+## Voice AI: custom LLM + Agora managed TTS
 
-`CONVOAI_LLM_MODE=custom` is the default voice path. Agora streams ASR text to the signed completions callback (`POST /api/ai/convo/:id/chat/completions`); the callback runs the model and shopping tools, groups text dynamically from linguistic word boundaries and the model's live token cadence, synthesizes each resulting phrase with Kokoro, and returns 40 ms PCM frames through Agora's direct-audio SSE protocol. There are no character-count chunk thresholds. The first phrase can play while the model is still generating the rest of the answer without restarting prosody on every word. Per-conversation HMAC headers (`X-Convo-Id`, `X-Convo-Expires`, `X-Convo-Signature`) scope every callback to one shopper session.
+`CONVOAI_LLM_MODE=custom` is the default voice path. Agora streams ASR text to the signed completions callback (`POST /api/ai/convo/:id/chat/completions`); the callback runs the model and shopping tools and streams **text** deltas over SSE. Agora's managed TTS (`CONVOAI_TTS_VOICE`, `CONVOAI_TTS_SPEED`) renders speech in the RTC channel. Per-conversation HMAC headers (`X-Convo-Id`, `X-Convo-Expires`, `X-Convo-Signature`) scope every callback to one shopper session.
 
-`CONVOAI_LLM_MODE=mcp` remains available. It uses Agora's managed LLM, calls catalog tools over streamable HTTP at `POST /mcp`, and uses the configured separate TTS endpoint. Text turns on the same conversation route tools through the MCP loopback first. If an MCP join or tool transport fails, the session falls back to the custom path automatically.
+`CONVOAI_LLM_MODE=mcp` remains available. It uses Agora's managed LLM, calls catalog tools over streamable HTTP at `POST /mcp`, and uses the same Agora managed TTS path. Text turns on the same conversation route tools through the MCP loopback first. If an MCP join or tool transport fails, the session falls back to the custom path automatically.
 
 **Optional MCP-mode Agora Console setup:**
 
@@ -292,7 +292,7 @@ Nothing below is claimed as working when it cannot be. This table is repeated ve
 
 | Capability                                                     | Status                                                                                                                                                                                                                                                                                     | Missing prerequisite             |
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------- |
-| ConvoAI voice pipeline (ARES ASR + direct streamed Kokoro PCM) | **Built and live-verified** — the custom callback emits transcript deltas and 40 ms PCM frames as short model phrases arrive; optional `mcp` mode retains Agora-managed LLM + separate TTS                                                                                                 | public API URL in dev            |
+| ConvoAI voice pipeline (ARES ASR + Agora managed TTS)          | **Built** — the custom callback streams text; Agora speaks it; optional `mcp` mode retains Agora-managed LLM + MCP tools                                                                                                 | public API URL in dev            |
 | Host captions (Real-Time STT v7)                               | **Verified with real credentials** — join → `RUNNING` → query → leave, 5/5 (`apps/api/src/agora/__checks__/rtt.check.ts`)                                                                                                                                                                  | —                                |
 | Session recording → object storage → replay                    | **Verified end to end** against MinIO: upload → object stored → public `GET 200`, `206` on range requests → `DELETE` removes object + local copy + row                                                                                                                                     | —                                |
 | Chat sharding, moderation authority, stateless routing         | **Built and load-tested** below the default 500 REST req/s per App ID                                                                                                                                                                                                                      | an Agora quota increase for more |
@@ -300,7 +300,7 @@ Nothing below is claimed as working when it cannot be. This table is repeated ve
 | Agora Cloud Recording                                          | **Not used — deliberately dropped.** A **paid add-on** (`400 invalid_appid` until purchased), and it adds nothing over browser capture + a real object store. Kept behind `RECORDING_PROVIDER=agora`, including the `vendor: 11` S3-compatible `storageConfig`, for a customer who has it. | the paid add-on                  |
 | PSTN                                                           | **Stub routes only** (`POST /api/pstn/incoming`, `POST /api/pstn/callback`). In-app human handoff via support dashboard is built.                                                                                                                                                          | phone number / SIP trunk         |
 
-If `MEDIA_PUSH_ENABLED=false` (the default), every surface — UI badge, API response and analytics — says `simulated-origin`. Direct voice audio uses Kokoro's `af_bella` female English voice, language-specific female Hindi/Spanish voices, loudness normalization and `CONVOAI_TTS_SPEED=1.6`. In optional `mcp` mode, `CONVOAI_TTS_URL` and `CONVOAI_TTS_API_KEY` select the compatible external TTS endpoint.
+If `MEDIA_PUSH_ENABLED=false` (the default), every surface — UI badge, API response and analytics — says `simulated-origin`. Voice audio uses Agora managed TTS (`CONVOAI_TTS_VOICE`, `CONVOAI_TTS_SPEED`).
 
 ## Repository map
 
@@ -336,7 +336,7 @@ infra/           docker-compose.yml, nginx.conf, Dockerfile
 | `RTM_CHAT_SHARD_TARGET`         | `2`                     | viewers per chat shard. `clamp(ceil(expectedPeakViewers / target), 1, 49)` is frozen at go-live and never recomputed                                                     |
 | `CONVOAI_MAX_CONCURRENT_AGENTS` | `15`                    | under Agora's documented default of 20 per App ID. On exhaustion the client degrades to a labelled text transport                                                        |
 | `CONVOAI_TURN_TIMEOUT_MS`       | `12000`                 | bounds a stalled spoken turn and returns a retryable voice response instead of waiting indefinitely                                                                      |
-| `CONVOAI_LLM_MODE`              | `custom`                | `custom` = direct streamed PCM in short natural phrases; `mcp` = managed LLM + `/mcp` tools and separate TTS                                                             |
+| `CONVOAI_LLM_MODE`              | `custom`                | `custom` = stream model text for Agora TTS; `mcp` = managed LLM + `/mcp` tools                                                                                          |
 | `MCP_ENDPOINT_URL`              | _(PUBLIC_API)/mcp_      | public URL Agora calls for MCP (set to ngrok URL in dev)                                                                                                                 |
 | `LLM_PROVIDER`                  | `openrouter`            | `openrouter` · `openai-compatible` · `mock` (used by tests and the load suite)                                                                                           |
 | `PRIVACY_MODE`                  | `standard`              | `strict` stops persisting transcript and AI message bodies, and requires viewer recording consent before video renders                                                   |

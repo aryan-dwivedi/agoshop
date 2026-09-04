@@ -6,7 +6,7 @@
 # - Services spin down after ~15 minutes of inactivity (cold starts ~1 minute).
 # - Free Postgres expires 30 days after creation (upgrade to keep data).
 # - No persistent disk; session recordings are ephemeral.
-# - 512 MB RAM: voice AI / TTS may be slow on first use.
+# - 512 MB RAM: voice uses Agora managed TTS (no local speech stack).
 services:
   - type: web
     runtime: docker
@@ -90,8 +90,6 @@ envVarGroups:
         value: custom
       - key: CONVOAI_ASR_CREDENTIAL_MODE
         value: byok
-      - key: CONVOAI_TTS_CREDENTIAL_MODE
-        value: byok
       - key: RECORDING_PROVIDER
         value: browser
       - key: RECORDING_LOCAL_DIR
@@ -108,7 +106,5 @@ envVarGroups:
         value: 'true'
       - key: PG_POOL_MAX
         value: '5'
-      - key: TTS_WARMUP_AT_BOOT
-        value: 'false'
       - key: NODE_OPTIONS
         value: '--max-old-space-size=256'

@@ -60,20 +60,11 @@ const schema = z.object({
   CONVOAI_TURN_TIMEOUT_MS: int(12_000),
   CONVOAI_ASR_VENDOR: z.string().default('ares'),
   CONVOAI_ASR_CREDENTIAL_MODE: z.enum(['managed', 'byok']).default('managed'),
-  CONVOAI_TTS_CREDENTIAL_MODE: z.enum(['managed', 'byok']).default('managed'),
-  /** Managed TTS supports only these two vendors; there is no BYOK key in this project. */
   CONVOAI_TTS_VENDOR: z.enum(['openai', 'minimax']).default('openai'),
   CONVOAI_TTS_MODEL: z.string().default('tts-1'),
   CONVOAI_TTS_VOICE: z.string().default('nova'),
-  /** Natural speaking-rate multiplier forwarded to both hosted and BYOK TTS. */
+  /** Natural speaking-rate multiplier forwarded to Agora managed TTS. */
   CONVOAI_TTS_SPEED: z.coerce.number().min(0.5).max(2).default(1.6),
-  /**
-   * This SKU has no managed TTS, so `params.url` is mandatory. Defaults to the
-   * self-hosted OpenAI-compatible endpoint at `${PUBLIC_API_URL}/api/ai/tts/speech`;
-   * point it at a real vendor and supply its key to switch, with no code change.
-   */
-  CONVOAI_TTS_URL: z.string().default(''),
-  CONVOAI_TTS_API_KEY: z.string().default(''),
   CONVOAI_GEOFENCE_AREA: z
     .enum(['GLOBAL', 'NORTH_AMERICA', 'EUROPE', 'ASIA', 'INDIA', 'JAPAN'])
     .default('INDIA'),
@@ -81,7 +72,7 @@ const schema = z.object({
 
   CONVO_LLM_SHARED_SECRET: z.string().min(16),
   CONVO_CALLBACK_TTL_SECONDS: int(7200),
-  /** `custom` streams direct PCM audio; `mcp` uses Agora-managed LLM plus the separate TTS endpoint. */
+  /** `custom` streams model text for Agora TTS; `mcp` uses Agora-managed LLM plus MCP tools. */
   CONVOAI_LLM_MODE: z.enum(['mcp', 'custom']).default('custom'),
   /** Public URL Agora calls for MCP tool execution. Defaults to `${PUBLIC_API_URL}/mcp`. */
   MCP_ENDPOINT_URL: z.string().default(''),
@@ -156,9 +147,6 @@ const schema = z.object({
 
   /** Stub endpoints used by the side-service contract tests (A7). */
   AGORA_API_BASE: z.string().default('https://api.agora.io'),
-
-  /** Eager Kokoro load at boot; disable on memory-constrained hosts (Render free tier). */
-  TTS_WARMUP_AT_BOOT: bool.default('true'),
 });
 
 export type Env = z.infer<typeof schema>;

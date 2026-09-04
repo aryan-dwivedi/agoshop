@@ -171,8 +171,6 @@ envVarGroups:
         value: custom
       - key: CONVOAI_ASR_CREDENTIAL_MODE
         value: byok
-      - key: CONVOAI_TTS_CREDENTIAL_MODE
-        value: byok
       - key: RECORDING_PROVIDER
         value: browser
       - key: RECORDING_LOCAL_DIR
