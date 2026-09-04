@@ -78,7 +78,15 @@ envVarGroups:
             value: browser
           - key: RECORDING_LOCAL_DIR
             value: /tmp/recordings
+          - key: TRANSCRIPTION_PROVIDER
+            value: agora
+          - key: TRANSCRIPTION_LANGUAGES
+            value: en-US
           - key: PG_POOL_MAX
             value: '5'
           - key: NODE_OPTIONS
             value: '--max-old-space-size=256'
+          - key: MEDIA_GATEWAY_ENABLED
+            value: 'true'
+          - key: MEDIA_GATEWAY_REGION
+            value: ap

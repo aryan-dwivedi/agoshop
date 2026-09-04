@@ -27,7 +27,6 @@ COPY apps/api apps/api
 COPY apps/sse-gateway apps/sse-gateway
 COPY apps/worker apps/worker
 COPY apps/web apps/web
-COPY scripts scripts
 
 RUN npm run build --workspace @shop/api \
   && npm run build --workspace @shop/sse-gateway \
@@ -69,7 +68,6 @@ COPY apps/api/src/db/extra.sql ./apps/api/extra.sql
 COPY packages/shared packages/shared
 COPY packages/db packages/db
 COPY packages/search packages/search
-COPY scripts scripts
 COPY --from=build /app/apps/web/dist/customer /srv/customer
 COPY --from=build /app/apps/web/dist/seller /srv/seller
 COPY --from=build /app/apps/web/dist/support /srv/support

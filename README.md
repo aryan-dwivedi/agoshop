@@ -37,7 +37,7 @@ Turn **ON** in your project (each takes ~5 minutes to propagate):
 | **Conversational AI Engine** | Intelligence          | Voice shopping assistant                         |
 | **Real-Time Speech-to-Text** | Intelligence          | Host captions                                    |
 | **Co-host Authentication**   | Infrastructure        | Publisher vs subscriber token roles              |
-| **Media Gateway**            | Media Services        | OBS / RTMP ingest (`MEDIA_GATEWAY_ENABLED=true`) |
+| **Media Gateway**            | Media Services        | OBS / RTMP ingest (enabled by default) |
 
 Also ensure **Primary Certificate** is enabled on the project.
 
@@ -177,7 +177,7 @@ The eleven journey stages, in the order the plan's manual verification steps run
 1. **Browse** — home rails, a category with facets, a search, a PDP: variants, specs, PIN-code check, comparison, wishlist.
 2. **Ask the assistant from the storefront** — the dock is on every page. _"I need a gift under ₹5,000 with long battery life"_ → _"narrow it to two and compare"_ → _"add the better one"_. `get_live_offer` returns `active:false` here, and the cart line carries **no** discount: the live rule is session-bound, not global.
 3. **Discover live** — `/live` shows Upcoming, Live now and Watch again.
-4. **Go live** — Tab A: `seller@demo.test` → the console's `/host/<ready-to-go-live>` on :5174 → pick a publish source (**Camera & mic**, **Video file**, or **OBS / RTMP** with `MEDIA_GATEWAY_ENABLED=true`) → start the preview → accept the recording notice → **Go live**. Tab B: `shopper@demo.test` → `/live/<slug>` on the storefront sees the host feed over RTC and the viewer count rises. Open the viewer room _before_ anyone goes live and it plays the labelled standby feed instead of a black rectangle.
+4. **Go live** — Tab A: `seller@demo.test` → the console's `/host/<ready-to-go-live>` on :5174 → pick a publish source (**Camera & mic**, **Video file**, or **OBS / RTMP**) → start the preview → accept the recording notice → **Go live**. Tab B: `shopper@demo.test` → `/live/<slug>` on the storefront sees the host feed over RTC and the viewer count rises. Open the viewer room _before_ anyone goes live and it plays the labelled standby feed instead of a black rectangle.
    Two other ways to start, both from the console's `/sessions` → **Schedule a session**: attach an mp4/webm and pick **Premiere the video** to have the server flip the room live at its start time with nobody at a console (`startDuePremieres`, background, every 5 s), or pick **Go live right now** to have the session created already live. A viewer who opens a room before its start time gets the cover art and a countdown on the server's clock, not a black rectangle.
    **Co-host:** in the broadcast sidebar, invite `support@demo.test`. They open the room (no pre-flight), publish camera/mic, and appear in the host's PiP — a second publisher, not a second owner. Agora **Co-host Authentication** enforces `PUBLISHER` tokens; the app decides who may receive one.
    **OBS:** choose **OBS / RTMP** in pre-flight, go live, copy the RTMP server + stream key into OBS, start streaming. The host monitor shows the feed when Media Gateway connects. Browser replay is not captured for OBS shows.
@@ -291,8 +291,11 @@ infra/           docker-compose.yml, nginx.conf, Dockerfile
 | `LLM_PROVIDER`                  | `mock`                  | `mock` for dev/Render free tier; set `openrouter` + `LLM_API_KEY` for real text chat                                                                                     |
 | `PRIVACY_MODE`                  | `standard`              | `strict` stops persisting transcript and AI message bodies, and requires viewer recording consent before video renders                                                   |
 | `MAX_TOTAL_DISCOUNT_PCT`        | `50`                    | cap applied to the winning promotion candidate                                                                                                                           |
-| `TRANSCRIPTION_PROVIDER`        | `agora`                 | Real-Time STT v7 host captions are enabled for live video; set `off` only for local environments without Agora customer credentials                                      |
-| `MEDIA_GATEWAY_ENABLED`         | `false`                 | `true` enables OBS/RTMP ingest via Agora Media Gateway (`POST /api/sessions/:id/obs-ingest`)                                                                             |
+| `TRANSCRIPTION_PROVIDER`        | `agora`                 | Real-Time STT v7 host captions and transcript replay; set `off` only to disable locally                                                                                    |
+| `TRANSCRIPTION_LANGUAGES`       | `en-US`                 | comma-separated caption languages (up to 4)                                                                                                                                |
+| `ANALYTICS_RETENTION_DAYS`      | `90`                    | analytics events retained in Postgres; drain runs continuously in the background worker (always on)                                                                        |
+| `MEDIA_GATEWAY_ENABLED`         | `true`                  | OBS/RTMP ingest via Agora Media Gateway (`POST /api/sessions/:id/obs-ingest`); set `false` only to disable locally |
 | `MEDIA_GATEWAY_REGION`          | `ap`                    | Agora region for streaming-key minting (`ap`, `na`, `eu`, `cn`)                                                                                                          |
+| `RECORDING_PROVIDER`            | `browser`               | browser capture on every show (`POST /api/sessions/:id/recording`); set `off` only to disable locally; `agora`/`auto` for Cloud Recording + object store               |
 | `VITE_CUSTOMER_ORIGIN`          | `http://localhost:5173` | storefront origin `apps/web/src/lib/origins.ts` builds console→storefront links from; set it when the storefront is not on :5173                                         |
 | `VITE_SELLER_ORIGIN`            | `http://localhost:5174` | seller-console origin used for storefront→console links                                                                                                                  |

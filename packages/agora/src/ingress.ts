@@ -6,7 +6,7 @@ export const requireMediaGateway = (enabled: boolean): void => {
     if (!enabled) {
         throw unavailable(
             'media_gateway_disabled',
-            'Media Gateway is disabled. Set MEDIA_GATEWAY_ENABLED=true and enable it in Agora Console.',
+            'Media Gateway is disabled. Set MEDIA_GATEWAY_ENABLED=true or remove the override that set it to false.',
         );
     }
 };

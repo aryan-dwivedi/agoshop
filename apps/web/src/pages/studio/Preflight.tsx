@@ -298,7 +298,7 @@ const Preflight = (): JSX.Element => {
                                         OBS / Media Gateway
                                     </p>
                                     <p className="text-13 text-t3">
-                                        Requires MEDIA_GATEWAY_ENABLED=true
+                                        RTMP credentials appear after you go live
                                     </p>
                                 </div>
                                 <CheckCircle2 className="h-5 w-5 text-success" />

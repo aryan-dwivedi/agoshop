@@ -19,7 +19,6 @@ COPY packages/shared packages/shared
 COPY packages/db packages/db
 COPY packages/search packages/search
 COPY apps/api apps/api
-COPY scripts scripts
 
 RUN npm run build --workspace @shop/api
 
