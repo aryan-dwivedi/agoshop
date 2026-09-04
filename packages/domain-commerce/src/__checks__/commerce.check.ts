@@ -19,6 +19,7 @@ import { router as meRouter } from '@shop/api/routes/me.js';
 import { router as ordersRouter } from '@shop/api/routes/orders.js';
 import { router as wishlistRouter } from '@shop/api/routes/wishlist.js';
 import { db, pool } from '@shop/db/client.js';
+import { invalidateCatalogCache } from '@shop/domain-commerce/catalog.js';
 import { endSession } from '@shop/domain-live/sessions/lifecycle.js';
 import { closeRedis, keys, redis } from '@shop/platform/lib/redis.js';
 import { drainAnalyticsOnce } from '@shop/worker/background.js';
@@ -69,14 +70,14 @@ const insertFixtures = async (): Promise<void> => {
     const category = await one<{
         id: string;
     }>(sql`
-    insert into categories (slug, name) values (${`${TAG}-cat`}, ${'Check Category'})
+    insert into categories (slug, name) values (${`${TAG}-cat`}, ${`Check Category ${TAG}`})
     returning id
   `);
     fixtures.categoryId = category.id;
     const seller = await one<{
         id: string;
     }>(sql`
-    insert into sellers (slug, display_name) values (${`${TAG}-seller`}, ${'Check Seller'})
+    insert into sellers (slug, display_name) values (${`${TAG}-seller`}, ${`Check Seller ${TAG}`})
     returning id
   `);
     fixtures.sellerId = seller.id;
@@ -166,6 +167,7 @@ const insertFixtures = async (): Promise<void> => {
     on conflict (pincode) do nothing
   `);
     fixtures.pincodeInserted = (pincodeInserted ?? 0) > 0;
+    await invalidateCatalogCache();
     await redis.del(keys.promotionsCache, keys.checkoutPolicyCache);
 };
 const cleanup = async (): Promise<void> => {
@@ -230,7 +232,10 @@ const cleanup = async (): Promise<void> => {
             sql`delete from categories where id = cast(${fixtures.categoryId} as uuid)`,
         );
     }
-    await redis.del(keys.promotionsCache, keys.checkoutPolicyCache);
+    await Promise.all([
+        invalidateCatalogCache(),
+        redis.del(keys.promotionsCache, keys.checkoutPolicyCache),
+    ]);
 };
 type ApiResponse<T> = {
     status: number;
@@ -391,8 +396,8 @@ const run = async (): Promise<void> => {
         );
         pass('GET /api/products?q= matches through to_tsvector/plainto_tsquery');
         for (const [term, source] of [
-            ['Check Seller', 'seller'],
-            ['Check Category', 'category'],
+            [`Check Seller ${TAG}`, 'seller'],
+            [`Check Category ${TAG}`, 'category'],
             [`${TAG}-sku`, 'SKU'],
         ] as const) {
             const discovery = await api.request<{

@@ -6,7 +6,7 @@
 # - Services spin down after ~15 minutes of inactivity (cold starts ~1 minute).
 # - Free Postgres expires 30 days after creation (upgrade to keep data).
 # - No persistent disk; session recordings are ephemeral.
-# - 512 MB RAM: voice uses Agora managed TTS (no Kokoro in-process).
+# - 512 MB RAM: no in-process TTS; ConvoAI uses Agora managed defaults from env.ts.
 services:
     - type: web
       runtime: docker
@@ -60,8 +60,6 @@ envVarGroups:
       envVars:
           - key: NODE_ENV
             value: production
-          - key: TRUST_PROXY_HOPS
-            value: '1'
           - key: SESSION_COOKIE_SECRET
             generateValue: true
           - key: CONVO_LLM_SHARED_SECRET
@@ -76,30 +74,10 @@ envVarGroups:
             sync: false
           - key: AGORA_WEBHOOK_SECRET
             sync: false
-      - key: LLM_PROVIDER
-        value: mock
-      - key: CONVOAI_ENABLED
-        value: 'true'
-      - key: CONVOAI_TTS_VENDOR
-        value: minimax
-      - key: AGORA_MANAGED_LLM_MODEL
-        value: gpt-4o-mini
-      - key: CONVOAI_TTS_VOICE
-        value: English_Reserved_Woman
           - key: RECORDING_PROVIDER
             value: browser
           - key: RECORDING_LOCAL_DIR
             value: /tmp/recordings
-          - key: RECORDING_LOCAL_FILE_PURGE
-            value: 'true'
-          - key: SEARCH_PROVIDER
-            value: postgres
-          - key: CHECKOUT_MODE
-            value: async
-          - key: PRIVACY_MODE
-            value: standard
-          - key: PII_REDACTION
-            value: 'true'
           - key: PG_POOL_MAX
             value: '5'
           - key: NODE_OPTIONS

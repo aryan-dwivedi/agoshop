@@ -16,7 +16,7 @@ The page is intentionally simple enough to redraw and explain in an interview. I
 5. The API exchanges tokens and lifecycle calls with Agora. Agora's voice-agent flow calls the signed AI callback on the API, which invokes the OpenAI-compatible model provider and executes commerce tools.
 6. The optional mass-audience path pushes RTMP from Agora to a CDN and returns HLS to viewers.
 
-These components and flows are derived from the code and deployment definitions in `apps/web`, `apps/server`, and `infra/docker-compose.yml`.
+These components and flows are derived from the code and deployment definitions in `apps/web`, `apps/api`, and `infra/docker-compose.yml`.
 
 ## Back-of-the-envelope panel
 
@@ -27,12 +27,12 @@ The capacity figures are estimates, not measured results. The panel states every
 - 70K viewers × 1.5 Mbps gives about 105 Gbps peak CDN egress; one million daily viewers at that duration and bitrate consume about 225 TB/day.
 - Six chat/reaction events per viewer per minute at peak gives about 7K events/second.
 
-The 1.5 Mbps estimate matches the configured 720p Media Push bitrate in `apps/server/src/agora/mediapush.ts`.
+The 1.5 Mbps estimate matches the configured 720p Media Push bitrate in `packages/agora/src/mediapush.ts`.
 
-## Regenerating
+## Verifying the preview
 
 ```bash
 python3 scripts/make-hld-diagrams.py
 ```
 
-The generator writes both artifacts and fails before writing if any two arrows cross or share a corridor. All arrows remain bound to their nodes in Excalidraw.
+The check confirms that both the editable Excalidraw source and browser-viewable SVG preview are present. The Excalidraw file remains the editable source of truth.

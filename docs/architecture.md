@@ -3,8 +3,8 @@
 > **Interview HLD:** [`hld/hld-one-page.excalidraw`](hld/hld-one-page.excalidraw)
 > (editable) and [`hld/hld-one-page.svg`](hld/hld-one-page.svg) (preview).
 > The one-page view shows the client, load-balancing, stateless API, data, worker,
-> Agora, AI-provider and CDN boundaries plus visible capacity arithmetic. Regenerate
-> it with `python3 scripts/make-hld-diagrams.py`; generation fails if arrows cross.
+> Agora, AI-provider and CDN boundaries plus visible capacity arithmetic. Verify the
+> checked-in preview with `python3 scripts/make-hld-diagrams.py`.
 
 ## 1. What this system is
 

@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 if (!process.env.PUBLIC_API_URL) {
-  try {
-    process.loadEnvFile('.env');
-  } catch {}
+    try {
+        process.loadEnvFile('.env');
+    } catch {}
 }
 process.env.CONVOAI_TTS_VENDOR ??= 'minimax';
 const { buildConvoAiJoinBody, buildConvoAiTtsBlock, joinConvoAiAgent } =

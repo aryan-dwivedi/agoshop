@@ -48,7 +48,3 @@ Thumbs.db
 !.vscode/settings.json
 !.vscode/extensions.json
 .claude/
-
-
-# docs
-docs/
