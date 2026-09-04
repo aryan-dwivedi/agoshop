@@ -147,6 +147,15 @@ const schema = z.object({
 
   /** Stub endpoints used by the side-service contract tests (A7). */
   AGORA_API_BASE: z.string().default('https://api.agora.io'),
+})
+.superRefine((data, ctx) => {
+  if (data.LLM_PROVIDER !== 'mock' && data.LLM_API_KEY.trim().length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['LLM_API_KEY'],
+      message: 'required when LLM_PROVIDER is not mock',
+    });
+  }
 });
 
 export type Env = z.infer<typeof schema>;

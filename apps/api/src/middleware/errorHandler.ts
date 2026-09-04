@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 
+import { LlmProviderError } from '../ai/providers/index.js';
 import { AppError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 
@@ -29,6 +30,28 @@ export const errorHandler = (
         message: err.message,
         requestId: req.requestId,
         ...(err.details ?? {}),
+      },
+    });
+    return;
+  }
+  if (err instanceof LlmProviderError) {
+    log.error({ err, provider: err.provider }, 'llm provider failed');
+    res.status(502).json({
+      error: {
+        code: 'llm_provider_error',
+        message: 'the language model provider rejected the request',
+        requestId: req.requestId,
+      },
+    });
+    return;
+  }
+  if (err instanceof DOMException && err.name === 'TimeoutError') {
+    log.warn({ err }, 'request timed out');
+    res.status(504).json({
+      error: {
+        code: 'turn_timeout',
+        message: 'the assistant took too long to respond',
+        requestId: req.requestId,
       },
     });
     return;
