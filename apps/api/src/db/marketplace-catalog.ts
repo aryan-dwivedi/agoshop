@@ -8,7 +8,7 @@ import { parse } from 'csv-parse/sync';
 
 const DATASET_BASE = 'https://raw.githubusercontent.com/luminati-io/eCommerce-dataset-samples/main';
 const here = dirname(fileURLToPath(import.meta.url));
-const dataDir = join(here, 'data');
+const dataDir = process.env.MARKETPLACE_CSV_DIR?.trim() || join(here, 'data');
 export type MarketplaceSeedVariant = {
     sku: string;
     label: string;
@@ -267,11 +267,29 @@ class CatalogRegistry {
         return slug;
     }
 }
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+const fetchDatasetCsv = async (url: string, attempts = 4): Promise<Response> => {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+        try {
+            return await fetch(url, { signal: AbortSignal.timeout(120_000) });
+        } catch (error) {
+            lastError = error;
+            if (attempt < attempts - 1) await sleep(1000 * (attempt + 1));
+        }
+    }
+    const cause =
+        lastError instanceof Error
+            ? `${lastError.name}: ${lastError.message}`
+            : String(lastError);
+    throw new Error(`seed: failed to download ${url} (${cause})`);
+};
 const ensureDatasetCsv = async (fileName: string): Promise<string> => {
     const path = join(dataDir, fileName);
     if (existsSync(path)) return path;
     await mkdir(dataDir, { recursive: true });
-    const response = await fetch(`${DATASET_BASE}/${fileName}`);
+    const url = `${DATASET_BASE}/${fileName}`;
+    const response = await fetchDatasetCsv(url);
     if (!response.ok) {
         throw new Error(`seed: failed to download ${fileName} (${response.status})`);
     }

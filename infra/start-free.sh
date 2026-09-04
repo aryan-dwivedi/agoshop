@@ -17,7 +17,7 @@ if node --input-type=module -e "
 import pg from 'pg';
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 try {
-  const { rowCount } = await pool.query('select 1 from users limit 1');
+  const { rowCount } = await pool.query('select 1 from products limit 1');
   process.exit(rowCount > 0 ? 0 : 1);
 } finally {
   await pool.end();

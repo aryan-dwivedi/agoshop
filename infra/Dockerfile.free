@@ -31,6 +31,13 @@ COPY apps/sse-gateway apps/sse-gateway
 COPY apps/worker apps/worker
 COPY apps/web apps/web
 
+ARG MARKETPLACE_DATASET_BASE=https://raw.githubusercontent.com/luminati-io/eCommerce-dataset-samples/main
+RUN mkdir -p apps/api/marketplace-data \
+  && curl -fsSL "${MARKETPLACE_DATASET_BASE}/walmart-products.csv" -o apps/api/marketplace-data/walmart-products.csv \
+  && curl -fsSL "${MARKETPLACE_DATASET_BASE}/amazon-products.csv" -o apps/api/marketplace-data/amazon-products.csv \
+  && curl -fsSL "${MARKETPLACE_DATASET_BASE}/lazada-products.csv" -o apps/api/marketplace-data/lazada-products.csv \
+  && curl -fsSL "${MARKETPLACE_DATASET_BASE}/shopee-products.csv" -o apps/api/marketplace-data/shopee-products.csv
+
 RUN npm run build --workspace @shop/api \
   && npm run build --workspace @shop/sse-gateway \
   && npm run build --workspace @shop/worker
@@ -49,6 +56,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV MIGRATIONS_DIR=/app/apps/api/drizzle
 ENV EXTRA_SQL_PATH=/app/apps/api/extra.sql
+ENV MARKETPLACE_CSV_DIR=/app/apps/api/marketplace-data
 ENV RECORDING_LOCAL_DIR=/tmp/recordings
 ENV PG_POOL_MAX=5
 ENV NODE_OPTIONS=--max-old-space-size=256
@@ -64,6 +72,7 @@ COPY packages/search/package.json packages/search/package.json
 RUN npm ci --omit=dev
 
 COPY --from=build /app/apps/api/dist ./apps/api/dist
+COPY --from=build /app/apps/api/marketplace-data ./apps/api/marketplace-data
 COPY --from=build /app/apps/sse-gateway/dist ./apps/sse-gateway/dist
 COPY --from=build /app/apps/worker/dist ./apps/worker/dist
 COPY apps/api/drizzle ./apps/api/drizzle
