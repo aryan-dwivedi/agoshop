@@ -4,13 +4,13 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import {
   formatInr,
-  type CartDto,
   type LiveSessionDto,
 } from '@shop/shared';
 
 import { AssistantPanel } from '../ai/AssistantPanel';
 import { useAssistantSurface } from '../ai/assistantSurface';
 import { api } from '../lib/api';
+import { useCart } from '../hooks/useCart';
 import { sellerUrl } from '../lib/origins';
 import { useServerEvents } from '../lib/useServerEvents';
 import { RtmProvider } from '../realtime/RtmProvider';
@@ -238,11 +238,7 @@ export const Layout = ({ children }: { children: ReactNode }): JSX.Element => {
   // One SSE connection for the app shell: cart total, repricing, order events.
   useServerEvents({ enabled: user !== null });
 
-  const cart = useQuery({
-    queryKey: ['cart'],
-    queryFn: () => api.get<CartDto>('/api/cart'),
-    enabled: user !== null,
-  });
+  const cart = useCart(user !== null);
 
   // Shares the home page's cache key, so the pill costs no extra request there.
   const liveNow = useQuery({

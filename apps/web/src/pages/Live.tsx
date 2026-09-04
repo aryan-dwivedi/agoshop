@@ -1,9 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
 import type { IRemoteAudioTrack } from 'agora-rtc-sdk-ng';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-
-import type { CartDto } from '@shop/shared';
 
 import { useAssistantSurface } from '../ai/assistantSurface';
 import { useVoiceAgent } from '../ai/useVoiceAgent';
@@ -13,6 +10,7 @@ import { LiveTheatre } from '../components/live/LiveTheatre';
 import type { ComposerMode, QuotedLine } from '../components/live/RoomConversation';
 import { useChat } from '../hooks/useChat';
 import { useLiveSession } from '../hooks/useLiveSession';
+import { useCart } from '../hooks/useCart';
 import { useOfflineGuard } from '../hooks/useOfflineGuard';
 import { useVideoQuality } from '../hooks/useVideoQuality';
 import { api } from '../lib/api';
@@ -105,11 +103,7 @@ const Live = (): JSX.Element => {
     setTab('ask');
   }, []);
 
-  const cart = useQuery({
-    queryKey: ['cart'],
-    queryFn: () => api.get<CartDto>('/api/cart'),
-    enabled: Boolean(user),
-  });
+  const cart = useCart(Boolean(user));
 
   const pollId = live.poll?.id ?? null;
   useEffect(() => {

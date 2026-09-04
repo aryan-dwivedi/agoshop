@@ -14,6 +14,7 @@ import { compareProducts } from '../catalog.js';
 import { personalizedOffers, resolveLiveOffer } from '../promotions.js';
 import { recommend } from '../recommendations.js';
 import { checkDelivery } from '../serviceability.js';
+import { endSession } from '../sessions/lifecycle.js';
 import { router as authRouter } from '../../routes/auth.js';
 import { router as adminRouter } from '../../routes/admin.js';
 import { router as cartRouter } from '../../routes/cart.js';
@@ -496,6 +497,19 @@ const run = async (): Promise<void> => {
     assert.equal(liveLine.pricing.discountMinorUnits, PRICE / 5, '20% of one unit');
     assert.ok(liveAdd.body.notices.includes('live_discount_active'));
     pass('live-eligible line receives the live promotion and raises live_discount_active');
+
+    // --- ending the session reprices live lines at the standard rate -------------
+    await endSession(fixtures.liveSessionId);
+    const repriced = await api.request<CartDto>('GET', '/api/cart');
+    assert.equal(repriced.status, 200, JSON.stringify(repriced.body));
+    const endedLine = repriced.body.items.find((i) => i.liveSessionId === fixtures.liveSessionId);
+    assert.ok(endedLine, 'the live-bound line survives session end');
+    assert.equal(endedLine.liveEligible, false);
+    assert.equal(endedLine.pricing.discountMinorUnits, 0, 'live discount must drop');
+    assert.equal(endedLine.pricing.netMinorUnits, PRICE, 'back to shop price');
+    assert.ok(repriced.body.notices.includes('live_discount_expired'));
+    assert.ok(!repriced.body.notices.includes('live_discount_active'));
+    pass('session end drops live discount and raises live_discount_expired');
 
     // --- checkout options come from the policy row, against a real cart total ---
     const options = await api.request<{ methods: string[]; blockedReason: string | null }>(

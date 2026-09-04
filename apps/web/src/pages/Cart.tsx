@@ -10,6 +10,7 @@ import { EmptyState, ErrorState } from '../components/EmptyState';
 import { ProductRail } from '../components/ProductRail';
 import { TagIcon, TruckIcon } from '../components/icons';
 import { api } from '../lib/api';
+import { useCart } from '../hooks/useCart';
 import { useSession } from '../state/session';
 
 /**
@@ -65,9 +66,6 @@ const CartLine = ({
   busy: boolean;
 }): JSX.Element => {
   const appliedCodes = line.applied.map((a) => a.code);
-  const showEnded = line.liveSessionId !== null && !line.liveEligible;
-  const displayedMinorUnits = showEnded ? line.pricing.grossMinorUnits : line.pricing.netMinorUnits;
-  const appliedLabel = appliedCodes.length === 1 ? `After ${appliedCodes[0]}` : 'After discounts';
 
   return (
     <li className="flex flex-col gap-4 p-4 sm:flex-row">
@@ -110,17 +108,13 @@ const CartLine = ({
           </div>
 
           <div className="text-right">
-            <p className="text-19 font-semibold tnum text-t1">{formatInr(displayedMinorUnits)}</p>
-            {showEnded && line.pricing.discountMinorUnits > 0 ? (
-              <p className="text-13 font-medium tnum text-success">
-                {appliedLabel}: {formatInr(line.pricing.netMinorUnits)}
+            <p className="text-19 font-semibold tnum text-t1">
+              {formatInr(line.pricing.netMinorUnits)}
+            </p>
+            {line.pricing.discountMinorUnits > 0 && (
+              <p className="text-13 tnum text-t3 line-through">
+                {formatInr(line.pricing.grossMinorUnits)}
               </p>
-            ) : (
-              line.pricing.discountMinorUnits > 0 && (
-                <p className="text-13 tnum text-t3 line-through">
-                  {formatInr(line.pricing.grossMinorUnits)}
-                </p>
-              )
             )}
             {/* Per unit stays per unit: the line total is the server's, and a client
                 that multiplies its own totals is how a cart starts disagreeing with
@@ -174,11 +168,7 @@ const Cart = (): JSX.Element => {
   const { user } = useSession();
   const queryClient = useQueryClient();
 
-  const cart = useQuery({
-    queryKey: ['cart'],
-    queryFn: () => api.get<CartDto>('/api/cart'),
-    enabled: user !== null,
-  });
+  const cart = useCart(user !== null);
 
   const recommended = useQuery({
     queryKey: ['recommendations', 'recently_viewed'],

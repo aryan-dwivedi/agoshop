@@ -1,10 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Suspense, lazy, useState } from 'react';
 import { Link, useMatch, useNavigate } from 'react-router-dom';
 
 import { formatInr, type CartDto, type CartLineDto, type SuppressedPromotion } from '@shop/shared';
 
 import { api } from '../lib/api';
+import { useCart } from '../hooks/useCart';
 import { useSession } from '../state/session';
 import { ChevronLeft } from './icons';
 import { RightSheet, useSheet } from './RightSheet';
@@ -92,9 +93,6 @@ const Line = ({
   onRemove: () => void;
 }): JSX.Element => {
   const appliedCodes = line.applied.map((a) => a.code);
-  const showEnded = line.liveSessionId !== null && !line.liveEligible;
-  const displayedMinorUnits = showEnded ? line.pricing.grossMinorUnits : line.pricing.netMinorUnits;
-  const appliedLabel = appliedCodes.length === 1 ? `After ${appliedCodes[0]}` : 'After discounts';
 
   return (
     <li className="flex gap-3 px-4 py-3">
@@ -121,17 +119,13 @@ const Line = ({
             <p className="text-13 text-t3">{line.variantLabel}</p>
           </div>
           <div className="shrink-0 text-right">
-            <p className="tnum text-16 font-semibold text-t1">{formatInr(displayedMinorUnits)}</p>
-            {showEnded && line.pricing.discountMinorUnits > 0 ? (
-              <p className="tnum text-12 font-medium text-success">
-                {appliedLabel}: {formatInr(line.pricing.netMinorUnits)}
+            <p className="tnum text-16 font-semibold text-t1">
+              {formatInr(line.pricing.netMinorUnits)}
+            </p>
+            {line.pricing.discountMinorUnits > 0 && (
+              <p className="tnum text-13 text-t3 line-through">
+                {formatInr(line.pricing.grossMinorUnits)}
               </p>
-            ) : (
-              line.pricing.discountMinorUnits > 0 && (
-                <p className="tnum text-13 text-t3 line-through">
-                  {formatInr(line.pricing.grossMinorUnits)}
-                </p>
-              )
             )}
           </div>
         </div>
@@ -190,11 +184,7 @@ export const CartSheet = (): JSX.Element => {
   const [checkout, setCheckout] = useState<{ totalMinorUnits: number } | null>(null);
   const [placed, setPlaced] = useState<{ orderId: string; totalMinorUnits: number } | null>(null);
 
-  const cart = useQuery({
-    queryKey: ['cart'],
-    queryFn: () => api.get<CartDto>('/api/cart'),
-    enabled: user !== null,
-  });
+  const cart = useCart(user !== null);
 
   const setQuantity = useMutation({
     mutationFn: ({ id, quantity }: { id: string; quantity: number }) =>

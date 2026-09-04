@@ -1,9 +1,16 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
-import { EVENTS, type EventName, type ServerEvent } from '@shop/shared';
+import { EVENTS, type CartDto, type EventName, type ServerEvent } from '@shop/shared';
 
 type Handler = (event: ServerEvent) => void;
+
+const isCartDto = (data: unknown): data is CartDto =>
+  typeof data === 'object' &&
+  data !== null &&
+  'items' in data &&
+  'totals' in data &&
+  Array.isArray((data as CartDto).items);
 
 /**
  * One EventSource per page, scoped with repeatable `?sessionId=`.
@@ -39,7 +46,11 @@ export const useServerEvents = (opts: {
       const event = JSON.parse(raw.data) as ServerEvent;
       switch (event.event as EventName) {
         case EVENTS.cartUpdated:
-          void queryClient.invalidateQueries({ queryKey: ['cart'] });
+          if (isCartDto(event.data)) {
+            queryClient.setQueryData(['cart'], event.data);
+          } else {
+            void queryClient.refetchQueries({ queryKey: ['cart'] });
+          }
           break;
         case EVENTS.promotionsChanged:
         case EVENTS.checkoutPolicyChanged:

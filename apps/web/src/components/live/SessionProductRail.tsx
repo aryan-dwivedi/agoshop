@@ -1,10 +1,11 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { formatInr, type CartDto, type SessionProductDto } from '@shop/shared';
+import { formatInr, type SessionProductDto } from '@shop/shared';
 
 import { api, ApiError, idempotencyKey } from '../../lib/api';
+import { useCart } from '../../hooks/useCart';
 import { PriceTag } from '../PriceTag';
 
 /**
@@ -62,11 +63,7 @@ export const SessionProductRail = ({
   const [errorById, setErrorById] = useState<Record<string, string>>({});
   const [addedId, setAddedId] = useState<string | null>(null);
 
-  const cart = useQuery({
-    queryKey: ['cart'],
-    queryFn: () => api.get<CartDto>('/api/cart'),
-    enabled: signedIn,
-  });
+  const cart = useCart(signedIn);
 
   const ordered = [...products].sort((a, b) => {
     const aPinned = a.productId === pinnedProductId ? 0 : 1;

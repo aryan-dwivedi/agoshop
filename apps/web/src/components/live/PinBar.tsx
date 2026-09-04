@@ -2,9 +2,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { formatInr, type CartDto, type OrderDto, type SessionProductDto } from '@shop/shared';
+import { formatInr, type OrderDto, type SessionProductDto } from '@shop/shared';
 
 import { api, ApiError, idempotencyKey } from '../../lib/api';
+import { useCart } from '../../hooks/useCart';
 import { PriceTag } from '../PriceTag';
 
 /**
@@ -97,11 +98,7 @@ export const PinBar = ({
     return () => window.clearTimeout(timer);
   }, [added]);
 
-  const cart = useQuery({
-    queryKey: ['cart'],
-    queryFn: () => api.get<CartDto>('/api/cart'),
-    enabled: signedIn,
-  });
+  const cart = useCart(signedIn);
 
   /**
    * The confirmation the checkout sheet collapses into. `['orders']` is invalidated by

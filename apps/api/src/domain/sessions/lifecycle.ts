@@ -2,6 +2,7 @@ import { and, eq, isNotNull, lte } from 'drizzle-orm';
 
 import { EVENTS, MAX_CHAT_SHARDS } from '@shop/shared';
 
+import { getCart } from '../cart.js';
 import { revokeObsIngest } from '../../agora/mediagateway.js';
 import { createConverter, deleteConverter } from '../../agora/mediapush.js';
 import { startRecording, stopRecording } from '../../agora/recording.js';
@@ -127,8 +128,12 @@ export const endSession = async (sessionId: string) => {
     .from(cartItems)
     .innerJoin(carts, eq(carts.id, cartItems.cartId))
     .where(eq(cartItems.liveSessionId, sessionId));
+  // Push the repriced cart so clients can update immediately without waiting on a refetch.
   await Promise.all(
-    holders.map((h) => publishToUser(h.userId, EVENTS.cartUpdated, { reason: 'session_ended' })),
+    holders.map(async (h) => {
+      const cart = await getCart(h.userId);
+      await publishToUser(h.userId, EVENTS.cartUpdated, cart);
+    }),
   );
 
   await redis.xadd(keys.summaryStream, '*', 'sessionId', sessionId);

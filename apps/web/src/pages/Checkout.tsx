@@ -12,6 +12,7 @@ import {
 } from '../components/PincodeCheck';
 import { PinIcon, TruckIcon } from '../components/icons';
 import { api, ApiError, idempotencyKey } from '../lib/api';
+import { useCart } from '../hooks/useCart';
 import { useSession } from '../state/session';
 
 /**
@@ -140,11 +141,7 @@ export const CheckoutFlow = ({
   const pincodeRef = useRef<HTMLInputElement>(null);
   const methodsRef = useRef<HTMLDivElement>(null);
 
-  const cart = useQuery({
-    queryKey: ['cart'],
-    queryFn: () => api.get<CartDto>('/api/cart'),
-    enabled: user !== null,
-  });
+  const cart = useCart(user !== null);
 
   const pincodeReady = /^\d{6}$/.test(pincode);
 
