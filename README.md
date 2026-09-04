@@ -141,7 +141,9 @@ edge all run in a single container (`infra/Dockerfile.free`).
 3. When prompted, supply the Agora credentials and `LLM_API_KEY` (`sync: false` in
    the Blueprint). `PUBLIC_API_URL` and `WEB_ORIGIN` are wired from
    `RENDER_EXTERNAL_URL` automatically.
-4. Apply the Blueprint. The first deploy runs migrations and seeds the demo catalog.
+4. Apply the Blueprint. Migrations and the first-time seed run automatically when the
+   container starts (`infra/start-free.sh`); free-tier services cannot use Render's
+   pre-deploy hook.
 
 **Free-tier limits to expect:**
 

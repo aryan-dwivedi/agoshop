@@ -16,8 +16,6 @@ services:
     dockerfilePath: ./infra/Dockerfile.free
     dockerContext: .
     healthCheckPath: /api/health/live
-    preDeployCommand: node apps/api/dist/db-push.js
-    initialDeployHook: node apps/api/dist/db-seed.js
     envVars:
       - fromGroup: agoshop-runtime-free
       - key: DATABASE_URL
