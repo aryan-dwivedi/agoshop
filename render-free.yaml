@@ -90,6 +90,16 @@ envVarGroups:
         value: custom
       - key: CONVOAI_ASR_CREDENTIAL_MODE
         value: byok
+      - key: CONVOAI_TTS_VENDOR
+        value: elevenlabs
+      - key: CONVOAI_TTS_MODEL
+        value: eleven_multilingual_v2
+      - key: CONVOAI_TTS_VOICE
+        value: 21m00Tcm4TlvDq8ikWAM
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
       - key: RECORDING_PROVIDER
         value: browser
       - key: RECORDING_LOCAL_DIR

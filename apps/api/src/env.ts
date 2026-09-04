@@ -33,7 +33,7 @@ export const LLM_PROVIDER_IDS = ['openrouter', 'openai-compatible', 'mock'] as c
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: int(8787),
-  /** Public HTTPS origin Agora calls back on (ngrok in dev). */
+  /** Public HTTPS origin Agora calls back on (e.g. https://agoshop.onrender.com). */
   PUBLIC_API_URL: z.string().url(),
   WEB_ORIGIN: z.string().default('http://localhost:5173'),
 
