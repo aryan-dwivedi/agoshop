@@ -1,3 +1,4 @@
+import { warnConvoAiReachability } from '@shop/agora/convoai.js';
 import { env } from '@shop/platform/env.js';
 import { logger } from '@shop/platform/lib/logger.js';
 import { setDraining } from '@shop/platform/lib/readiness.js';
@@ -11,6 +12,7 @@ import { allRouters } from './routes/index.js';
 const app = createApp(allRouters);
 startRecordingFileRetention();
 const server = app.listen(env.PORT, () => {
+    warnConvoAiReachability();
     logger.info(
         { port: env.PORT, provider: env.LLM_PROVIDER, privacyMode: env.PRIVACY_MODE },
         'api listening',

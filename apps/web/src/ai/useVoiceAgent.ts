@@ -479,7 +479,8 @@ export const useVoiceAgent = (opts: {
         async (text: string): Promise<void> => {
             const body = text.trim();
             if (body.length === 0 || textPendingRef.current) return;
-            if (!agoraAvailable) {
+            const voiceCallActive = Boolean(sessionRef.current?.mic);
+            if (!agoraAvailable || !voiceCallActive) {
                 await textAssist.send(body);
                 return;
             }
@@ -487,7 +488,8 @@ export const useVoiceAgent = (opts: {
             setTextPending(true);
             setError(null);
             try {
-                const session = await ensureAgoraSession({ withMic: false });
+                const session = sessionRef.current;
+                if (!session) throw new Error('voice_session_missing');
                 await session.toolkit.sendText(String(session.agentUid), {
                     messageType: ChatMessageType.TEXT,
                     priority: ChatMessagePriority.INTERRUPTED,
@@ -515,7 +517,7 @@ export const useVoiceAgent = (opts: {
                 setTextPending(false);
             }
         },
-        [agoraAvailable, ensureAgoraSession, teardownMedia, textAssist],
+        [agoraAvailable, teardownMedia, textAssist],
     );
     const start = useCallback(async (): Promise<void> => {
         if (phase === 'starting') return;

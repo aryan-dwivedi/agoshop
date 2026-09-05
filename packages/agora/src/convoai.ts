@@ -63,6 +63,32 @@ const mcpServerName = (): string => {
     return env.MCP_SERVER_NAME.trim();
 };
 const mcpEndpoint = (): string => `${env.PUBLIC_API_URL.replace(/\/$/, '')}/mcp`;
+const isLocalPublicApiUrl = (): boolean => {
+    try {
+        const { hostname } = new URL(env.PUBLIC_API_URL);
+        return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+    } catch {
+        return false;
+    }
+};
+export const warnConvoAiReachability = (): void => {
+    const pipelineId = studioPipelineId();
+    if (isLocalPublicApiUrl()) {
+        logger.warn(
+            {
+                publicApiUrl: env.PUBLIC_API_URL,
+                studioPipeline: pipelineId || null,
+            },
+            'PUBLIC_API_URL is localhost — Agora cannot reach /mcp for voice tool calls; use ngrok or deploy, or unset AGORA_STUDIO_PIPELINE_ID for programmatic join',
+        );
+    }
+    if (pipelineId) {
+        logger.warn(
+            { pipelineId },
+            'AGORA_STUDIO_PIPELINE_ID is set — voice uses the Console agent (prompt, MCP, TTS) as-is; code system prompt and per-conversation MCP headers are not sent',
+        );
+    }
+};
 const buildChannelProperties = (input: ConvoAiJoinInput): Record<string, unknown> => ({
     channel: input.channel,
     token: mintAgentRtcRtmToken(input.channel, input.agentUid),
