@@ -3,7 +3,11 @@ import { Redis } from 'ioredis';
 import { env } from '../env.js';
 import { logger } from './logger.js';
 
-export const redis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: 3 });
+export const redis = new Redis(env.REDIS_URL, {
+    maxRetriesPerRequest: 1,
+    connectTimeout: 3000,
+    lazyConnect: true,
+});
 redis.on('error', (err) => logger.error({ err, conn: 'redis' }, 'redis connection error'));
 export const keys = {
     session: (id: string) => `sess:${id}`,

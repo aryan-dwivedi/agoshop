@@ -8,8 +8,7 @@ import {
     compareProducts,
     getProductBySlug,
     listCategories,
-    listProducts,
-    productFacets,
+    listProductsPage,
     recordProductView,
 } from '@shop/domain-commerce/catalog.js';
 import { recommend } from '@shop/domain-commerce/recommendations.js';
@@ -30,6 +29,10 @@ const listQuery = z.object({
     sort: z.enum(['relevance', 'price_asc', 'price_desc', 'rating']).optional(),
     page: z.coerce.number().int().positive().optional(),
     pageSize: z.coerce.number().int().positive().max(48).optional(),
+    includeFacets: z
+        .enum(['0', '1', 'false', 'true'])
+        .optional()
+        .transform((value) => value !== '0' && value !== 'false'),
 });
 const recommendQuery = z.object({
     basedOn: z.enum(['recently_viewed', 'wishlist', 'similar']).optional(),
@@ -56,27 +59,31 @@ router.get('/api/products', products, async (req, res, next) => {
                 issues: parsed.error.issues,
             });
         }
-        const { category, ...rest } = parsed.data;
+        const { category, includeFacets, ...rest } = parsed.data;
         const query: ProductQuery = { ...rest, categorySlug: category };
-        const listPage =
-            query.q && (!query.sort || query.sort === 'relevance')
-                ? await searchCatalog({
-                      q: query.q,
-                      categorySlug: query.categorySlug,
-                      maxPriceMinorUnits: query.maxPriceMinorUnits,
-                      minRating: query.minRating,
-                      sort: query.sort ?? 'relevance',
-                      page: query.page,
-                      pageSize: query.pageSize,
-                  })
-                : await listProducts(query);
-        const [page, facets] = await Promise.all([listPage, productFacets(query)]);
+        const useSearch =
+            Boolean(query.q) && (!query.sort || query.sort === 'relevance');
+        const page = await listProductsPage(query, {
+            includeFacets,
+            list: useSearch
+                ? () =>
+                      searchCatalog({
+                          q: query.q!,
+                          categorySlug: query.categorySlug,
+                          maxPriceMinorUnits: query.maxPriceMinorUnits,
+                          minRating: query.minRating,
+                          sort: query.sort ?? 'relevance',
+                          page: query.page,
+                          pageSize: query.pageSize,
+                      })
+                : undefined,
+        });
         res.json({
             items: page.items,
             total: page.total,
-            page: query.page ?? 1,
-            pageSize: query.pageSize ?? 12,
-            facets,
+            page: page.page,
+            pageSize: page.pageSize,
+            facets: page.facets,
         });
     } catch (err) {
         next(err);

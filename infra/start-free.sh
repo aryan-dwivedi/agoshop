@@ -10,7 +10,11 @@ EDGE_PORT="${PORT:-10000}"
 mkdir -p /tmp/recordings
 
 echo "Applying database migrations..."
-node apps/api/dist/db-push.js
+if ! node apps/api/dist/db-push.js; then
+  echo "Database migration failed; retrying once after 3s..." >&2
+  sleep 3
+  node apps/api/dist/db-push.js
+fi
 
 echo "Checking database seed status..."
 if node --input-type=module -e "

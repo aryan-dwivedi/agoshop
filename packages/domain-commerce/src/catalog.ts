@@ -193,24 +193,34 @@ const resolveMatchMode = async (q: ProductQuery): Promise<MatchMode> => {
         return rows.length > 0 ? 'all' : 'any';
     });
 };
-export const listProducts = async (
+const normalizePageQuery = (
     q: ProductQuery,
-): Promise<{
-    items: ProductDto[];
-    total: number;
-}> => {
+): {
+    normalized: ProductQuery;
+    page: number;
+    pageSize: number;
+} => {
     const page = Math.max(1, Math.trunc(q.page ?? 1));
     const pageSize = Math.min(
         MAX_PAGE_SIZE,
         Math.max(1, Math.trunc(q.pageSize ?? DEFAULT_PAGE_SIZE)),
     );
-    const normalized: ProductQuery = { ...q, page, pageSize };
-    const mode = await resolveMatchMode(normalized);
-    return cached(cacheKeys.productQuery(queryHash({ ...normalized, mode })), 60, async () => {
-        const where = buildWhere(normalized, mode);
+    return { normalized: { ...q, page, pageSize }, page, pageSize };
+};
+const listProductsWithMode = async (
+    q: ProductQuery,
+    mode: MatchMode,
+): Promise<{
+    items: ProductDto[];
+    total: number;
+}> =>
+    cached(cacheKeys.productQuery(queryHash({ ...q, mode })), 60, async () => {
+        const where = buildWhere(q, mode);
+        const page = q.page ?? 1;
+        const pageSize = q.pageSize ?? DEFAULT_PAGE_SIZE;
         const [{ rows }, totals] = await Promise.all([
             db.execute<ProductRow>(
-                sql`${PROJECTION}${FROM}${where}${buildOrder(normalized, mode)} limit ${pageSize} offset ${(page - 1) * pageSize}`,
+                sql`${PROJECTION}${FROM}${where}${buildOrder(q, mode)} limit ${pageSize} offset ${(page - 1) * pageSize}`,
             ),
             db.execute<{
                 total: number;
@@ -218,15 +228,29 @@ export const listProducts = async (
         ]);
         return { items: rows.map(toDto), total: totals.rows[0]?.total ?? 0 };
     });
+export const listProducts = async (
+    q: ProductQuery,
+): Promise<{
+    items: ProductDto[];
+    total: number;
+}> => {
+    const { normalized } = normalizePageQuery(q);
+    const mode = await resolveMatchMode(normalized);
+    return listProductsWithMode(normalized, mode);
 };
-export const productFacets = async (q: ProductQuery): Promise<ProductFacets> => {
+const EMPTY_FACETS: ProductFacets = {
+    categories: [],
+    sellers: [],
+    priceMinorUnits: { min: 0, max: 0 },
+    ratingBuckets: [],
+};
+const productFacetsWithMode = async (q: ProductQuery, mode: MatchMode): Promise<ProductFacets> => {
     const forCategories: ProductQuery = {
         ...q,
         categoryId: undefined,
         categorySlug: undefined,
     };
     const forSellers: ProductQuery = { ...q, sellerId: undefined };
-    const mode = await resolveMatchMode(q);
     return cached(cacheKeys.productQuery(`facets:${queryHash({ ...q, mode })}`), 60, async () => {
         const [cats, sellers, price, ratings] = await Promise.all([
             db.execute<{
@@ -271,6 +295,35 @@ export const productFacets = async (q: ProductQuery): Promise<ProductFacets> => 
             })),
         };
     });
+};
+export const productFacets = async (q: ProductQuery): Promise<ProductFacets> =>
+    productFacetsWithMode(q, await resolveMatchMode(q));
+export type ProductListPage = {
+    items: ProductDto[];
+    total: number;
+    facets: ProductFacets;
+    page: number;
+    pageSize: number;
+};
+export const listProductsPage = async (
+    q: ProductQuery,
+    opts?: {
+        includeFacets?: boolean;
+        list?: () => Promise<{
+            items: ProductDto[];
+            total: number;
+        }>;
+    },
+): Promise<ProductListPage> => {
+    const { normalized, page, pageSize } = normalizePageQuery(q);
+    const mode = await resolveMatchMode(normalized);
+    const [listPage, facets] = await Promise.all([
+        opts?.list ? opts.list() : listProductsWithMode(normalized, mode),
+        opts?.includeFacets === false
+            ? Promise.resolve(EMPTY_FACETS)
+            : productFacetsWithMode(normalized, mode),
+    ]);
+    return { ...listPage, facets, page, pageSize };
 };
 const loadOne = async (column: 'id' | 'slug', value: string): Promise<ProductDto | null> => {
     const predicate =
