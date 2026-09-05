@@ -17,6 +17,26 @@ CREATE INDEX IF NOT EXISTS transcripts_fts_idx
   ON session_transcripts
   USING GIN (to_tsvector('simple', coalesce(text, '')));
 
+-- Catalog search also matches on variant text (SKU, label, attrs). `resolveTextMatch` in
+-- `domain-commerce/catalog.ts` resolves that to a product-id list with one `ilike '%x%'`
+-- scan; trigram indexes turn that scan into an index lookup. Categories and sellers are
+-- small enough that a seq scan there is already free.
+-- Guarded: these are an optimisation, not a correctness requirement, and a role that
+-- cannot install pg_trgm must not take the whole service down at startup.
+DO $trgm$
+BEGIN
+  CREATE EXTENSION IF NOT EXISTS pg_trgm;
+  CREATE INDEX IF NOT EXISTS variants_sku_trgm_idx
+    ON product_variants USING GIN (sku gin_trgm_ops);
+  CREATE INDEX IF NOT EXISTS variants_label_trgm_idx
+    ON product_variants USING GIN (label gin_trgm_ops);
+  CREATE INDEX IF NOT EXISTS variants_attrs_trgm_idx
+    ON product_variants USING GIN ((attrs::text) gin_trgm_ops);
+EXCEPTION WHEN OTHERS THEN
+  RAISE WARNING 'pg_trgm unavailable (%); variant search falls back to a sequential scan', SQLERRM;
+END
+$trgm$;
+
 -- Numeric Agora RTC uids are handed out from one sequence so viewer, agent, recorder
 -- and caption-bot uids can never collide.
 CREATE SEQUENCE IF NOT EXISTS agora_uid_seq START WITH 100000 INCREMENT BY 1;

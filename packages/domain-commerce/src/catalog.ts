@@ -71,10 +71,20 @@ const tsQuery = (text: string, mode: MatchMode): SQL =>
     mode === 'all'
         ? sql`plainto_tsquery('english', ${text})`
         : sql`replace(plainto_tsquery('english', ${text})::text, ' & ', ' | ')::tsquery`;
-const FROM = sql`
+const JOINS = sql`
   from products p
   join categories c on c.id = p.category_id
-  join sellers s on s.id = p.seller_id
+  join sellers s on s.id = p.seller_id`;
+// Only the projection needs the variant documents. Counts, facets and the match-mode
+// probe need nothing but `min_price`, and building a json_agg per row for a scan they
+// throw away is the single most expensive thing this file used to do.
+const PRICE_LATERAL = sql`
+  left join lateral (
+    select min(pv.price_minor_units) as min_price
+    from product_variants pv
+    where pv.product_id = p.id
+  ) v on true`;
+const FROM = sql`${JOINS}
   left join lateral (
     select json_agg(json_build_object(
              'id', pv.id,
@@ -90,6 +100,7 @@ const FROM = sql`
     from product_variants pv
     where pv.product_id = p.id
   ) v on true`;
+const FROM_LEAN = sql`${JOINS}${PRICE_LATERAL}`;
 const PROJECTION = sql`
   select p.id, p.slug, p.title, p.brand, p.description,
          c.slug as category_slug,
@@ -97,30 +108,60 @@ const PROJECTION = sql`
          p.highlights, p.specs, p.images, p.rating, p.rating_count,
          p.base_price_minor_units,
          coalesce(v.variants, '[]'::json) as variants`;
-const buildWhere = (q: ProductQuery, mode: MatchMode): SQL => {
+// Search matches products whose seller, category or variant text mentions the term, not
+// just products whose own document does. Expressed inline that turned into an OR of
+// unindexable `ilike '%x%'` predicates plus a correlated EXISTS, which forced Postgres to
+// discard `products_search_idx` and recompute the tsvector for every row. Resolving those
+// dimensions up front against their own (small, trigram-indexed) tables collapses them to
+// id lists, so every branch of the OR is index-backed — and when nothing matches, the
+// branches vanish and the predicate is a plain GIN lookup.
+export type TextMatch = {
+    categoryIds: string[];
+    sellerIds: string[];
+    productIds: string[];
+};
+const EMPTY_TEXT_MATCH: TextMatch = { categoryIds: [], sellerIds: [], productIds: [] };
+const uuidArray = (ids: string[]): SQL => sql`cast(${`{${ids.join(',')}}`} as uuid[])`;
+const resolveTextMatch = async (term: string | undefined): Promise<TextMatch> => {
+    if (!term) return EMPTY_TEXT_MATCH;
+    return cached(cacheKeys.productQuery(`text:${queryHash(term)}`), 300, async () => {
+        const contains = `%${term}%`;
+        const { rows } = await db.execute<{ kind: string; id: string }>(sql`
+      select 'category' as kind, id::text as id from categories
+       where name ilike ${contains} or slug ilike ${contains}
+      union all
+      select 'seller' as kind, id::text as id from sellers
+       where display_name ilike ${contains} or slug ilike ${contains}
+      union all
+      select distinct 'product' as kind, product_id::text as id from product_variants
+       where sku ilike ${contains} or label ilike ${contains} or attrs::text ilike ${contains}
+    `);
+        const match: TextMatch = { categoryIds: [], sellerIds: [], productIds: [] };
+        for (const row of rows) {
+            if (row.kind === 'category') match.categoryIds.push(row.id);
+            else if (row.kind === 'seller') match.sellerIds.push(row.id);
+            else match.productIds.push(row.id);
+        }
+        return match;
+    });
+};
+const buildWhere = (q: ProductQuery, mode: MatchMode, match: TextMatch): SQL => {
     const clauses: SQL[] = [];
     if (q.categoryId) clauses.push(sql`p.category_id = cast(${q.categoryId} as uuid)`);
     if (q.categorySlug) clauses.push(sql`c.slug = ${q.categorySlug}`);
     if (q.sellerId) clauses.push(sql`p.seller_id = cast(${q.sellerId} as uuid)`);
     if (q.q) {
-        const contains = `%${q.q}%`;
-        clauses.push(sql`(
-      ${FTS} @@ ${tsQuery(q.q, mode)}
-      or c.name ilike ${contains}
-      or c.slug ilike ${contains}
-      or s.display_name ilike ${contains}
-      or s.slug ilike ${contains}
-      or exists (
-        select 1
-        from product_variants search_variant
-        where search_variant.product_id = p.id
-          and (
-            search_variant.sku ilike ${contains}
-            or search_variant.label ilike ${contains}
-            or search_variant.attrs::text ilike ${contains}
-          )
-      )
-    )`);
+        const any: SQL[] = [sql`${FTS} @@ ${tsQuery(q.q, mode)}`];
+        if (match.categoryIds.length > 0) {
+            any.push(sql`p.category_id = any(${uuidArray(match.categoryIds)})`);
+        }
+        if (match.sellerIds.length > 0) {
+            any.push(sql`p.seller_id = any(${uuidArray(match.sellerIds)})`);
+        }
+        if (match.productIds.length > 0) {
+            any.push(sql`p.id = any(${uuidArray(match.productIds)})`);
+        }
+        clauses.push(sql`(${sql.join(any, sql` or `)})`);
     }
     if (typeof q.maxPriceMinorUnits === 'number') {
         clauses.push(
@@ -180,7 +221,7 @@ export const listCategories = async (): Promise<CategoryDto[]> =>
             imageUrl: r.image_url,
         }));
     });
-const resolveMatchMode = async (q: ProductQuery): Promise<MatchMode> => {
+const resolveMatchMode = async (q: ProductQuery, match: TextMatch): Promise<MatchMode> => {
     if (!q.q) return 'all';
     const probe: ProductQuery = {
         ...q,
@@ -189,7 +230,9 @@ const resolveMatchMode = async (q: ProductQuery): Promise<MatchMode> => {
         sort: undefined,
     };
     return cached<MatchMode>(cacheKeys.productQuery(`match:${queryHash(probe)}`), 60, async () => {
-        const { rows } = await db.execute(sql`select 1${FROM}${buildWhere(probe, 'all')} limit 1`);
+        const { rows } = await db.execute(
+            sql`select 1${FROM_LEAN}${buildWhere(probe, 'all', match)} limit 1`,
+        );
         return rows.length > 0 ? 'all' : 'any';
     });
 };
@@ -210,21 +253,21 @@ const normalizePageQuery = (
 const listProductsWithMode = async (
     q: ProductQuery,
     mode: MatchMode,
+    match: TextMatch,
 ): Promise<{
     items: ProductDto[];
     total: number;
 }> =>
     cached(cacheKeys.productQuery(queryHash({ ...q, mode })), 60, async () => {
-        const where = buildWhere(q, mode);
         const page = q.page ?? 1;
         const pageSize = q.pageSize ?? DEFAULT_PAGE_SIZE;
         const [{ rows }, totals] = await Promise.all([
             db.execute<ProductRow>(
-                sql`${PROJECTION}${FROM}${where}${buildOrder(q, mode)} limit ${pageSize} offset ${(page - 1) * pageSize}`,
+                sql`${PROJECTION}${FROM}${buildWhere(q, mode, match)}${buildOrder(q, mode)} limit ${pageSize} offset ${(page - 1) * pageSize}`,
             ),
             db.execute<{
                 total: number;
-            }>(sql`select count(*)::int as total${FROM}${where}`),
+            }>(sql`select count(*)::int as total${FROM_LEAN}${buildWhere(q, mode, match)}`),
         ]);
         return { items: rows.map(toDto), total: totals.rows[0]?.total ?? 0 };
     });
@@ -235,8 +278,9 @@ export const listProducts = async (
     total: number;
 }> => {
     const { normalized } = normalizePageQuery(q);
-    const mode = await resolveMatchMode(normalized);
-    return listProductsWithMode(normalized, mode);
+    const match = await resolveTextMatch(normalized.q);
+    const mode = await resolveMatchMode(normalized, match);
+    return listProductsWithMode(normalized, mode, match);
 };
 const EMPTY_FACETS: ProductFacets = {
     categories: [],
@@ -244,60 +288,89 @@ const EMPTY_FACETS: ProductFacets = {
     priceMinorUnits: { min: 0, max: 0 },
     ratingBuckets: [],
 };
-const productFacetsWithMode = async (q: ProductQuery, mode: MatchMode): Promise<ProductFacets> => {
-    const forCategories: ProductQuery = {
-        ...q,
-        categoryId: undefined,
-        categorySlug: undefined,
+// Each facet counts the result set with its own dimension released, so the four used to
+// run as four independent scans of the same rows — and, alongside the list and count
+// queries, put six concurrent statements against a pool of PG_POOL_MAX (5 in production),
+// where the sixth waited out connectionTimeoutMillis and surfaced as a 500. One `base`
+// CTE holding the shared (text-only) predicate is scanned once; each facet then applies
+// the three dimensions it does not release as a cheap filter over that materialised set.
+const facetFilters = (q: ProductQuery): Record<'category' | 'seller' | 'price' | 'rating', SQL> => {
+    const category: SQL[] = [];
+    if (q.categoryId) category.push(sql`category_id = cast(${q.categoryId} as uuid)`);
+    if (q.categorySlug) category.push(sql`cat_slug = ${q.categorySlug}`);
+    const all = (clauses: SQL[]): SQL =>
+        clauses.length === 0 ? sql`true` : sql.join(clauses, sql` and `);
+    return {
+        category: all(category),
+        seller: q.sellerId ? sql`seller_id = cast(${q.sellerId} as uuid)` : sql`true`,
+        price:
+            typeof q.maxPriceMinorUnits === 'number'
+                ? sql`price <= ${q.maxPriceMinorUnits}`
+                : sql`true`,
+        rating: typeof q.minRating === 'number' ? sql`rating >= ${q.minRating}` : sql`true`,
     };
-    const forSellers: ProductQuery = { ...q, sellerId: undefined };
-    return cached(cacheKeys.productQuery(`facets:${queryHash({ ...q, mode })}`), 60, async () => {
-        const [cats, sellers, price, ratings] = await Promise.all([
-            db.execute<{
-                slug: string;
-                name: string;
-                count: number;
-            }>(
-                sql`select c.slug, c.name, count(*)::int as count${FROM}${buildWhere(forCategories, mode)} group by c.slug, c.name order by c.name asc`,
-            ),
-            db.execute<{
-                id: string;
-                name: string;
-                count: number;
-            }>(
-                sql`select s.id, s.display_name as name, count(*)::int as count${FROM}${buildWhere(forSellers, mode)} group by s.id, s.display_name order by s.display_name asc`,
-            ),
-            db.execute<{
-                min: number | null;
-                max: number | null;
-            }>(sql`select min(coalesce(v.min_price, p.base_price_minor_units))::int as min,
-                   max(coalesce(v.min_price, p.base_price_minor_units))::int as max${FROM}${buildWhere({ ...q, maxPriceMinorUnits: undefined }, mode)}`),
-            db.execute<{
-                min_rating: number;
-                count: number;
-            }>(sql`select b.min_rating, count(p.id)::int as count
-            from (values (4.5), (4.0), (3.5)) as b(min_rating)
-            left join (select p.id, p.rating${FROM}${buildWhere({ ...q, minRating: undefined }, mode)}) p
-                   on p.rating >= b.min_rating
-            group by b.min_rating
-            order by b.min_rating desc`),
-        ]);
+};
+const productFacetsWithMode = async (
+    q: ProductQuery,
+    mode: MatchMode,
+    match: TextMatch,
+): Promise<ProductFacets> =>
+    cached(cacheKeys.productQuery(`facets:${queryHash({ ...q, mode })}`), 60, async () => {
+        const f = facetFilters(q);
+        const textOnly: ProductQuery = {
+            q: q.q,
+            page: undefined,
+            pageSize: undefined,
+            sort: undefined,
+        };
+        const { rows } = await db.execute<{
+            categories: ProductFacets['categories'];
+            sellers: ProductFacets['sellers'];
+            price: ProductFacets['priceMinorUnits'];
+            ratings: ProductFacets['ratingBuckets'];
+        }>(sql`
+      with base as (
+        select p.category_id, c.slug as cat_slug, c.name as cat_name,
+               p.seller_id, s.display_name as sel_name, p.rating,
+               coalesce(v.min_price, p.base_price_minor_units) as price
+        ${FROM_LEAN}${buildWhere(textOnly, mode, match)}
+      )
+      select
+        (select coalesce(json_agg(json_build_object('slug', slug, 'name', name, 'count', count)
+                                  order by name asc), '[]'::json)
+           from (select cat_slug as slug, cat_name as name, count(*)::int as count
+                   from base where ${f.seller} and ${f.price} and ${f.rating}
+                  group by cat_slug, cat_name) t) as categories,
+        (select coalesce(json_agg(json_build_object('id', id, 'name', name, 'count', count)
+                                  order by name asc), '[]'::json)
+           from (select seller_id as id, sel_name as name, count(*)::int as count
+                   from base where ${f.category} and ${f.price} and ${f.rating}
+                  group by seller_id, sel_name) t) as sellers,
+        (select json_build_object('min', coalesce(min(price), 0)::int,
+                                  'max', coalesce(max(price), 0)::int)
+           from base where ${f.category} and ${f.seller} and ${f.rating}) as price,
+        (select coalesce(json_agg(json_build_object('minRating', min_rating, 'count', count)
+                                  order by min_rating desc), '[]'::json)
+           from (select b.min_rating, count(r.rating)::int as count
+                   from (values (4.5::float8), (4.0::float8), (3.5::float8)) as b(min_rating)
+                   left join (select rating from base
+                               where ${f.category} and ${f.seller} and ${f.price}) r
+                          on r.rating >= b.min_rating
+                  group by b.min_rating) t) as ratings
+    `);
+        const row = rows[0];
+        if (!row) return EMPTY_FACETS;
         return {
-            categories: cats.rows,
-            sellers: sellers.rows,
-            priceMinorUnits: {
-                min: price.rows[0]?.min ?? 0,
-                max: price.rows[0]?.max ?? 0,
-            },
-            ratingBuckets: ratings.rows.map((r) => ({
-                minRating: r.min_rating,
-                count: r.count,
-            })),
+            categories: row.categories,
+            sellers: row.sellers,
+            priceMinorUnits: row.price,
+            ratingBuckets: row.ratings,
         };
     });
+export const productFacets = async (q: ProductQuery): Promise<ProductFacets> => {
+    const match = await resolveTextMatch(q.q);
+    return productFacetsWithMode(q, await resolveMatchMode(q, match), match);
 };
-export const productFacets = async (q: ProductQuery): Promise<ProductFacets> =>
-    productFacetsWithMode(q, await resolveMatchMode(q));
 export type ProductListPage = {
     items: ProductDto[];
     total: number;
@@ -316,12 +389,13 @@ export const listProductsPage = async (
     },
 ): Promise<ProductListPage> => {
     const { normalized, page, pageSize } = normalizePageQuery(q);
-    const mode = await resolveMatchMode(normalized);
+    const match = await resolveTextMatch(normalized.q);
+    const mode = await resolveMatchMode(normalized, match);
     const [listPage, facets] = await Promise.all([
-        opts?.list ? opts.list() : listProductsWithMode(normalized, mode),
+        opts?.list ? opts.list() : listProductsWithMode(normalized, mode, match),
         opts?.includeFacets === false
             ? Promise.resolve(EMPTY_FACETS)
-            : productFacetsWithMode(normalized, mode),
+            : productFacetsWithMode(normalized, mode, match),
     ]);
     return { ...listPage, facets, page, pageSize };
 };

@@ -9,6 +9,9 @@ export const pool = new Pool({
     max: env.PG_POOL_MAX,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
+    // A runaway query otherwise holds its connection until the client gives up, starving
+    // the pool and turning one slow statement into pool-wide connection timeouts.
+    statement_timeout: env.PG_STATEMENT_TIMEOUT_MS,
 });
 export const db = drizzle(pool, { schema });
 export type Db = typeof db;

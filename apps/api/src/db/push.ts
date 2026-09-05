@@ -10,15 +10,48 @@ import { db, pool } from './client.js';
 const here = dirname(fileURLToPath(import.meta.url));
 const migrationsFolder = process.env.MIGRATIONS_DIR ?? join(here, '../../drizzle');
 const extraSqlPath = process.env.EXTRA_SQL_PATH ?? join(here, 'extra.sql');
+// Splits on statement terminators while ignoring the semicolons inside a `$$ ... $$`
+// body, so extra.sql can carry DO blocks that guard optional DDL.
+const splitStatements = (source: string): string[] => {
+    const statements: string[] = [];
+    let current = '';
+    let dollarTag: string | null = null;
+    for (let i = 0; i < source.length; i += 1) {
+        if (dollarTag === null && source[i] === '$') {
+            const tag = /^\$[A-Za-z_]*\$/.exec(source.slice(i));
+            if (tag) {
+                dollarTag = tag[0];
+                current += dollarTag;
+                i += dollarTag.length - 1;
+                continue;
+            }
+        } else if (dollarTag !== null && source.startsWith(dollarTag, i)) {
+            current += dollarTag;
+            i += dollarTag.length - 1;
+            dollarTag = null;
+            continue;
+        }
+        if (dollarTag === null && source[i] === ';') {
+            statements.push(current);
+            current = '';
+            continue;
+        }
+        current += source[i];
+    }
+    statements.push(current);
+    return statements;
+};
 const run = async (): Promise<void> => {
     await migrate(db, { migrationsFolder });
     const extra = readFileSync(extraSqlPath, 'utf8');
-    for (const statement of extra.split(';')) {
-        const ddl = statement
-            .split('\n')
-            .filter((line) => !line.trim().startsWith('--'))
-            .join('\n')
-            .trim();
+    // Comments are stripped before splitting: a `;` inside a `--` line would otherwise cut
+    // a statement in two and leave the prose behind as its own broken fragment.
+    const body = extra
+        .split('\n')
+        .filter((line) => !line.trim().startsWith('--'))
+        .join('\n');
+    for (const statement of splitStatements(body)) {
+        const ddl = statement.trim();
         if (ddl.length > 0) await db.execute(sql.raw(ddl));
     }
     const { rows } = await pool.query(`select

@@ -9,6 +9,7 @@ const int = (fallback: number) =>
 const schema = z.object({
     DATABASE_URL: z.string().min(1),
     PG_POOL_MAX: int(20),
+    PG_STATEMENT_TIMEOUT_MS: int(15000),
 });
 export type DbEnv = z.infer<typeof schema>;
 export const env: DbEnv = schema.parse(process.env);
