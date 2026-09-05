@@ -71,49 +71,32 @@ const buildChannelProperties = (input: ConvoAiJoinInput): Record<string, unknown
     enable_string_uid: false,
     idle_timeout: env.CONVOAI_IDLE_TIMEOUT_SECONDS,
 });
-const staticMcpJoinBlock = (input: ConvoAiJoinInput): Record<string, unknown> | null => {
+const buildMcpAuthHeaders = (input: ConvoAiJoinInput): Record<string, string> => {
     const apiKey = staticMcpApiKey();
-    if (apiKey.length === 0) return null;
+    if (apiKey.length > 0) {
+        return {
+            Authorization: `Bearer ${apiKey}`,
+            'X-Convo-Id': input.conversationId,
+        };
+    }
     return {
-        mcp_servers: [
-            {
-                name: mcpServerName(),
-                endpoint: mcpEndpoint(),
-                transport: 'streamable_http',
-                headers: {
-                    Authorization: `Bearer ${apiKey}`,
-                    'X-Convo-Id': input.conversationId,
-                },
-                allowed_tools: MCP_ALLOWED_TOOLS,
-            },
-        ],
-    };
-};
-const buildStudioRtmBlock = (): Record<string, unknown> => ({
-    advanced_features: {
-        enable_rtm: true,
-        enable_tools: true,
-    },
-    parameters: {
-        data_channel: 'rtm',
-        enable_metrics: true,
-        enable_error_message: true,
-    },
-});
-const buildStudioProperties = (input: ConvoAiJoinInput): Record<string, unknown> => {
-    const properties = {
-        ...buildChannelProperties(input),
-        ...buildStudioRtmBlock(),
-    };
-    const llm = staticMcpJoinBlock(input);
-    return llm ? { ...properties, llm } : properties;
-};
-const buildProgrammaticLlmBlock = (input: ConvoAiJoinInput): Record<string, unknown> => {
-    const authHeaders = {
         'X-Convo-Id': input.conversationId,
         'X-Convo-Expires': String(input.expires),
         'X-Convo-Signature': input.signature,
     };
+};
+const buildProgrammaticMcpServers = (input: ConvoAiJoinInput): Record<string, unknown>[] => [
+    {
+        name: mcpServerName(),
+        endpoint: mcpEndpoint(),
+        transport: 'streamable_http',
+        headers: buildMcpAuthHeaders(input),
+        allowed_tools: MCP_ALLOWED_TOOLS,
+    },
+];
+const buildStudioProperties = (input: ConvoAiJoinInput): Record<string, unknown> =>
+    buildChannelProperties(input);
+const buildProgrammaticLlmBlock = (input: ConvoAiJoinInput): Record<string, unknown> => {
     return {
         credential_mode: 'managed',
         vendor: 'openai',
@@ -124,15 +107,7 @@ const buildProgrammaticLlmBlock = (input: ConvoAiJoinInput): Record<string, unkn
             temperature: 0.4,
             max_tokens: 160,
         },
-        mcp_servers: [
-            {
-                name: 'shop',
-                endpoint: mcpEndpoint(),
-                transport: 'streamable_http',
-                headers: authHeaders,
-                allowed_tools: MCP_ALLOWED_TOOLS,
-            },
-        ],
+        mcp_servers: buildProgrammaticMcpServers(input),
         system_messages: [
             {
                 role: 'system',
