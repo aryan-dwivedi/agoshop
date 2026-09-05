@@ -104,6 +104,56 @@ const signedGet = await fetch(`${base}/mcp`, {
     },
 });
 ok('GET with auth is not rejected as 405', signedGet.status !== 405, signedGet.status);
+const staticProbeHeaders = {
+    'content-type': 'application/json',
+    accept: 'application/json, text/event-stream',
+    authorization: 'Bearer mcp-static-check-secret-key',
+};
+const consoleInitialize = await postMcp(
+    {
+        jsonrpc: '2.0',
+        id: 0,
+        method: 'initialize',
+        params: {
+            protocolVersion: '2024-11-05',
+            capabilities: {},
+            clientInfo: { name: 'agora-console', version: '1.0' },
+        },
+    },
+    staticProbeHeaders,
+);
+const consoleInitializeBody = await consoleInitialize.text();
+ok(
+    'static bearer initialize (console probe) → 200',
+    consoleInitialize.status === 200,
+    consoleInitialize.status,
+);
+ok(
+    'initialize response mentions protocol or server',
+    consoleInitializeBody.includes('protocolVersion') ||
+        consoleInitializeBody.includes('shop') ||
+        consoleInitializeBody.includes('result'),
+    consoleInitializeBody.slice(0, 200),
+);
+const consoleToolsList = await postMcp(
+    { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} },
+    staticProbeHeaders,
+);
+const consoleToolsBody = await consoleToolsList.text();
+ok('static bearer tools/list (console probe) → 200', consoleToolsList.status === 200);
+ok(
+    'tools/list includes search_products',
+    consoleToolsBody.includes('search_products'),
+    consoleToolsBody.slice(0, 200),
+);
+const staticGet = await fetch(`${base}/mcp`, {
+    method: 'GET',
+    headers: {
+        accept: 'text/event-stream',
+        authorization: 'Bearer mcp-static-check-secret-key',
+    },
+});
+ok('GET with static bearer is not rejected as 401', staticGet.status !== 401, staticGet.status);
 console.log('\n=== MCP static auth ===');
 const staticHeaders = (id: string): Record<string, string> => ({
     'content-type': 'application/json',

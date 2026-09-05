@@ -62,6 +62,7 @@ const mcpServerName = (): string => {
     }
     return env.MCP_SERVER_NAME.trim();
 };
+const mcpEndpoint = (): string => `${env.PUBLIC_API_URL.replace(/\/$/, '')}/mcp`;
 const buildChannelProperties = (input: ConvoAiJoinInput): Record<string, unknown> => ({
     channel: input.channel,
     token: mintAgentRtcRtmToken(input.channel, input.agentUid),
@@ -71,14 +72,19 @@ const buildChannelProperties = (input: ConvoAiJoinInput): Record<string, unknown
     idle_timeout: env.CONVOAI_IDLE_TIMEOUT_SECONDS,
 });
 const staticMcpJoinBlock = (input: ConvoAiJoinInput): Record<string, unknown> | null => {
-    if (staticMcpApiKey().length === 0) return null;
+    const apiKey = staticMcpApiKey();
+    if (apiKey.length === 0) return null;
     return {
         mcp_servers: [
             {
                 name: mcpServerName(),
+                endpoint: mcpEndpoint(),
+                transport: 'streamable_http',
                 headers: {
+                    Authorization: `Bearer ${apiKey}`,
                     'X-Convo-Id': input.conversationId,
                 },
+                allowed_tools: MCP_ALLOWED_TOOLS,
             },
         ],
     };
@@ -103,7 +109,6 @@ const buildStudioProperties = (input: ConvoAiJoinInput): Record<string, unknown>
     return llm ? { ...properties, llm } : properties;
 };
 const buildProgrammaticLlmBlock = (input: ConvoAiJoinInput): Record<string, unknown> => {
-    const mcpEndpoint = `${env.PUBLIC_API_URL.replace(/\/$/, '')}/mcp`;
     const authHeaders = {
         'X-Convo-Id': input.conversationId,
         'X-Convo-Expires': String(input.expires),
@@ -122,7 +127,7 @@ const buildProgrammaticLlmBlock = (input: ConvoAiJoinInput): Record<string, unkn
         mcp_servers: [
             {
                 name: 'shop',
-                endpoint: mcpEndpoint,
+                endpoint: mcpEndpoint(),
                 transport: 'streamable_http',
                 headers: authHeaders,
                 allowed_tools: MCP_ALLOWED_TOOLS,

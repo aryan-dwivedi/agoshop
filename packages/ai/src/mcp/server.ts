@@ -10,6 +10,7 @@ import { toolSchemas } from '@shop/shared';
 import { loadConversation } from '../conversations.js';
 import { authenticateMcpRequest } from './auth.js';
 import { executeNamedTool } from './executeTool.js';
+import { isMcpProbeMethod, parseMcpRpcMethod } from './request.js';
 
 const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
     get_conversation_context:
@@ -104,12 +105,32 @@ const createShopMcpServer = (conversationId: string, turnId: number): McpServer 
     return server;
 };
 export const handleMcpRequest = async (req: Request, res: Response): Promise<void> => {
+    const rpcMethod = parseMcpRpcMethod(req.body);
     let auth;
     try {
-        auth = await authenticateMcpRequest(req.headers);
+        auth = await authenticateMcpRequest(req.headers, {
+            httpMethod: req.method,
+            rpcMethod,
+        });
     } catch (err) {
-        logger.warn({ err }, 'mcp auth rejected');
-        if (!res.headersSent) res.status(401).json({ error: 'unauthorized' });
+        logger.warn({ err, rpcMethod }, 'mcp auth rejected');
+        if (!res.headersSent) {
+            res.status(401).json({
+                jsonrpc: '2.0',
+                error: { code: -32001, message: 'Unauthorized' },
+                id: null,
+            });
+        }
+        return;
+    }
+    if (auth.probe && rpcMethod !== null && !isMcpProbeMethod(rpcMethod)) {
+        if (!res.headersSent) {
+            res.status(401).json({
+                jsonrpc: '2.0',
+                error: { code: -32001, message: 'missing_conversation_id' },
+                id: null,
+            });
+        }
         return;
     }
     const server = createShopMcpServer(auth.conversation.id, auth.turnId);

@@ -111,7 +111,10 @@ describe('ConvoAI speech handling', () => {
                 llm?: {
                     mcp_servers?: Array<{
                         name?: string;
+                        endpoint?: string;
+                        transport?: string;
                         headers?: Record<string, string>;
+                        allowed_tools?: string[];
                     }>;
                 };
             };
@@ -119,7 +122,13 @@ describe('ConvoAI speech handling', () => {
         expect(body.properties.llm?.mcp_servers).toEqual([
             {
                 name: 'shop',
-                headers: { 'X-Convo-Id': input.conversationId },
+                endpoint: expect.stringMatching(/\/mcp$/),
+                transport: 'streamable_http',
+                headers: {
+                    Authorization: 'Bearer static-test-key',
+                    'X-Convo-Id': input.conversationId,
+                },
+                allowed_tools: expect.arrayContaining(['get_cart', 'search_products']),
             },
         ]);
     });
