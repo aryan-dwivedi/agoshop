@@ -8,19 +8,20 @@ import { formatInr } from '@shop/shared';
 import { api } from '../lib/api';
 import { PinIcon, TruckIcon } from './icons';
 
-export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
     card: 'Card',
     upi: 'UPI',
     cod: 'Cash on delivery',
     emi: 'EMI',
     netbanking: 'Net banking',
 };
-export const BLOCKED_REASON_LABELS: Record<string, string> = {
+const BLOCKED_REASON_LABELS: Record<string, string> = {
     below_min_order: 'This order is below the minimum value for checkout.',
     pincode_required: 'Enter a delivery PIN code to see payment options.',
     pincode_not_serviceable: 'We do not deliver to this PIN code, so checkout is blocked.',
     pincode_blocked: 'Deliveries to this PIN code are paused right now.',
 };
+export { PAYMENT_METHOD_LABELS, BLOCKED_REASON_LABELS };
 export const checkoutOptionsQuery = (
     pincode: string,
 ): {

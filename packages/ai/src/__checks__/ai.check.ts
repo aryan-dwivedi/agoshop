@@ -331,6 +331,53 @@ try {
             policy,
         );
     }
+    console.log('\n9c. delivery and payment tools answer from application data');
+    {
+        const transport = getTransport('text');
+        const delivery = await transport.sendUserTurn!(
+            { ...conversation, transport: 'text' },
+            'Can you deliver to 560001? [[mock:delivery:560001]]',
+        );
+        ok(
+            'check_delivery ran for a serviceable PIN code',
+            delivery.toolCalls.some((c) => c.name === 'check_delivery' && c.outcome === 'ok'),
+            delivery.toolCalls,
+        );
+        ok(
+            'the assistant confirms Bengaluru delivery',
+            delivery.reply.toLowerCase().includes('bengaluru') ||
+                delivery.reply.toLowerCase().includes('deliver'),
+            delivery.reply,
+        );
+        const unserviceable = await transport.sendUserTurn!(
+            { ...conversation, transport: 'text' },
+            'What about 744101? [[mock:delivery:744101]]',
+        );
+        ok(
+            'check_delivery marks Port Blair as not serviceable',
+            unserviceable.toolCalls.some((c) => c.name === 'check_delivery' && c.outcome === 'ok'),
+            unserviceable.toolCalls,
+        );
+        ok(
+            'the assistant says delivery is unavailable',
+            /do not deliver|not serviceable|not in our delivery/i.test(unserviceable.reply),
+            unserviceable.reply,
+        );
+        const payment = await transport.sendUserTurn!(
+            { ...conversation, transport: 'text' },
+            'Can I pay cash on delivery to 560001? [[mock:payment:560001]]',
+        );
+        ok(
+            'get_payment_options ran successfully',
+            payment.toolCalls.some((c) => c.name === 'get_payment_options' && c.outcome === 'ok'),
+            payment.toolCalls,
+        );
+        ok(
+            'the assistant names payment methods in plain language',
+            /upi|cash on delivery|credit card/i.test(payment.reply),
+            payment.reply,
+        );
+    }
     console.log('\n10. the HTTP providers survive OpenRouter\u2019s documented SSE quirks');
     {
         const serveOnce = async (

@@ -4,7 +4,7 @@ import { LlmProviderError } from './index.js';
 
 export const mockStats = { streams: 0, aborted: 0, completed: 0 };
 let callSeq = 0;
-const DIRECTIVE = /\[\[mock:([a-z_]+)(?::([a-z_]+))?(?::([0-9a-fA-F-]{36}))?]]/;
+const DIRECTIVE = /\[\[mock:([a-z_]+)(?::([a-z_]+))?(?::([0-9a-fA-F-]{36}|\d{6}))?]]/;
 type Script =
     | {
           kind: 'text';
@@ -36,6 +36,11 @@ type Script =
           productId: string;
       }
     | {
+          kind: 'tool';
+          tool: 'check_delivery' | 'get_payment_options';
+          pincode: string;
+      }
+    | {
           kind: 'search';
           query: string;
       }
@@ -43,6 +48,11 @@ type Script =
           kind: 'greeting';
       };
 const GREETING = /^[\s!.,]*(?:hi|hey|hello|hiya|namaste|ji|yo|sup|good\s+(?:morning|afternoon|evening))[\s!.,]*$/iu;
+const PINCODE_IN_TEXT = /\b(\d{6})\b/;
+const DELIVERY_INTENT =
+    /\b(?:deliver(?:y|ies)?|ship(?:ping)?|pin\s*code|pincode|serviceable|serviceability)\b/iu;
+const PAYMENT_INTENT =
+    /\b(?:pay(?:ment)?|upi|cod|cash(?:\s+on\s+delivery)?|credit\s+card|debit\s+card|card|emi|net\s*banking)\b/iu;
 const SHOPPING_PREFIX =
     /\b(?:i\s+)?(?:need|want|looking\s+for|find(?:\s+me)?|search(?:\s+for)?|show\s+me|get(?:\s+me)?|buy|any)\s+(.+)/iu;
 const lastUserText = (messages: ChatMessage[]): string => {
@@ -90,17 +100,54 @@ const summarizeSearchResults = (messages: ChatMessage[]): string[] => {
         return ['I found a few options — tap a product card to see details.'];
     }
 };
+const summarizeDeliveryResult = (messages: ChatMessage[]): string[] => {
+    const tool = lastToolResult(messages);
+    if (!tool?.content) return ['I could not verify delivery for that PIN code.'];
+    try {
+        const data = JSON.parse(tool.content) as { summary?: string; serviceable?: boolean };
+        if (typeof data.summary === 'string' && data.summary.length > 0) return [data.summary];
+        return data.serviceable
+            ? ['Yes, we can deliver to that PIN code.']
+            : ['Sorry, we do not deliver to that PIN code.'];
+    } catch {
+        return ['I could not verify delivery for that PIN code.'];
+    }
+};
+const summarizePaymentResult = (messages: ChatMessage[]): string[] => {
+    const tool = lastToolResult(messages);
+    if (!tool?.content) return ['I could not load payment options right now.'];
+    try {
+        const data = JSON.parse(tool.content) as { summary?: string; methodLabels?: string[] };
+        if (typeof data.summary === 'string' && data.summary.length > 0) return [data.summary];
+        if (data.methodLabels && data.methodLabels.length > 0) {
+            return [`You can pay with ${data.methodLabels.join(', ')}.`];
+        }
+        return ['No payment methods are available for that PIN code right now.'];
+    } catch {
+        return ['I could not load payment options right now.'];
+    }
+};
 const chooseScript = (messages: ChatMessage[]): Script => {
     if (messages.some((m) => m.role === 'tool')) return { kind: 'text' };
     const text = lastUserText(messages);
     const match = DIRECTIVE.exec(text);
     if (!match) {
         if (GREETING.test(text.trim())) return { kind: 'greeting' };
+        const pinMatch = PINCODE_IN_TEXT.exec(text);
+        if (pinMatch) {
+            const pincode = pinMatch[1]!;
+            if (PAYMENT_INTENT.test(text)) {
+                return { kind: 'tool', tool: 'get_payment_options', pincode };
+            }
+            if (DELIVERY_INTENT.test(text)) {
+                return { kind: 'tool', tool: 'check_delivery', pincode };
+            }
+        }
         const query = extractSearchQuery(text);
         if (query) return { kind: 'search', query };
         return { kind: 'greeting' };
     }
-    const [, kind, tool, productId] = match;
+    const [, kind, tool, third] = match;
     if (kind === 'slow') return { kind: 'slow' };
     if (kind === 'streaming') return { kind: 'streaming' };
     if (kind === 'deferred') return { kind: 'deferred' };
@@ -108,11 +155,23 @@ const chooseScript = (messages: ChatMessage[]): Script => {
     if (kind === 'references') return { kind: 'references' };
     if (kind === 'history') return { kind: 'history' };
     if (kind === 'error') return { kind: 'error' };
-    if (kind === 'tool' && productId) {
+    if (kind === 'delivery' && third) {
+        return { kind: 'tool', tool: 'check_delivery', pincode: third };
+    }
+    if (kind === 'payment' && third) {
+        return { kind: 'tool', tool: 'get_payment_options', pincode: third };
+    }
+    if (kind === 'tool' && third) {
+        if (tool === 'check_delivery' || tool === 'delivery') {
+            return { kind: 'tool', tool: 'check_delivery', pincode: third };
+        }
+        if (tool === 'get_payment_options' || tool === 'payment') {
+            return { kind: 'tool', tool: 'get_payment_options', pincode: third };
+        }
         return {
             kind: 'tool',
             tool: tool === 'details' ? 'get_product_details' : 'add_to_cart',
-            productId,
+            productId: third,
         };
     }
     return { kind: 'text' };
@@ -252,12 +311,14 @@ async function* run(req: LlmRequest): AsyncGenerator<LlmChunk> {
         if (script.kind === 'text') {
             const answer =
                 closing && closingTool === 'check_delivery'
-                    ? ['Yes — ', 'delivery is available to 560001.']
-                    : closing && closingTool === 'search_products'
-                      ? summarizeSearchResults(req.messages)
-                      : closing
-                        ? CLOSING
-                        : GREETING_REPLY;
+                    ? summarizeDeliveryResult(req.messages)
+                    : closing && closingTool === 'get_payment_options'
+                      ? summarizePaymentResult(req.messages)
+                      : closing && closingTool === 'search_products'
+                        ? summarizeSearchResults(req.messages)
+                        : closing
+                          ? CLOSING
+                          : GREETING_REPLY;
             for (const delta of answer) {
                 if (req.signal.aborted) throw abortError();
                 yield { contentDelta: delta };
@@ -266,13 +327,26 @@ async function* run(req: LlmRequest): AsyncGenerator<LlmChunk> {
             mockStats.completed += 1;
             return;
         }
+        if (script.tool === 'check_delivery') {
+            const args = JSON.stringify({ pincode: script.pincode });
+            yield* emitToolCall('check_delivery', args, req.signal);
+            mockStats.completed += 1;
+            return;
+        }
+        if (script.tool === 'get_payment_options') {
+            const args = JSON.stringify({ pincode: script.pincode });
+            yield* emitToolCall('get_payment_options', args, req.signal);
+            mockStats.completed += 1;
+            return;
+        }
+        const catalogTool = script as Extract<Script, { productId: string }>;
         const args =
-            script.tool === 'add_to_cart'
-                ? `{"product_id":"${script.productId}","quantity":1}`
-                : `{"product_id":"${script.productId}"}`;
+            catalogTool.tool === 'add_to_cart'
+                ? `{"product_id":"${catalogTool.productId}","quantity":1}`
+                : `{"product_id":"${catalogTool.productId}"}`;
         yield { contentDelta: 'Let me ' };
         yield { contentDelta: 'take care of that.' };
-        yield* emitToolCall(script.tool, args, req.signal);
+        yield* emitToolCall(catalogTool.tool, args, req.signal);
         mockStats.completed += 1;
     } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') mockStats.aborted += 1;

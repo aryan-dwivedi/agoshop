@@ -33,6 +33,12 @@ type ReplayPlayerProps = {
 };
 const CAPTION_HOLD_MS = 6000;
 const UNKNOWN_DURATION_SEEK = 1e101;
+const resolveDuration = (video: HTMLVideoElement, floor = 0): number => {
+    const media = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
+    const bufferedEnd =
+        video.buffered.length > 0 ? video.buffered.end(video.buffered.length - 1) : 0;
+    return Math.max(media, bufferedEnd, floor);
+};
 const formatTime = (seconds: number): string => {
     if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
     const whole = Math.floor(seconds);
@@ -100,22 +106,17 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
     );
     const syncDuration = useCallback(
         (video: HTMLVideoElement, probeUnknown = false): void => {
-            if (Number.isFinite(video.duration)) {
-                finishDurationProbe(video, video.duration);
+            const resolved = resolveDuration(video, video.currentTime);
+            if (resolved > 0) {
+                finishDurationProbe(video, resolved);
                 return;
             }
             if (!probeUnknown || durationProbeRef.current !== null) return;
             durationProbeRef.current = video.currentTime;
             setProbingDuration(true);
-            if (video.buffered.length > 0) {
-                finishDurationProbe(video, video.buffered.end(video.buffered.length - 1));
-                return;
-            }
             video.currentTime = UNKNOWN_DURATION_SEEK;
             durationFallbackRef.current = window.setTimeout(() => {
-                const buffered = video.buffered;
-                const bufferedEnd = buffered.length > 0 ? buffered.end(buffered.length - 1) : 0;
-                finishDurationProbe(video, bufferedEnd);
+                finishDurationProbe(video, resolveDuration(video, video.currentTime));
             }, 4000);
         },
         [finishDurationProbe],
@@ -157,10 +158,11 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
         const video = videoRef.current;
         if (!video) return;
         if (durationProbeRef.current !== null) return;
-        const limit = Number.isFinite(video.duration) ? video.duration : seconds;
-        video.currentTime = Math.max(0, Math.min(seconds, limit));
+        const limit = resolveDuration(video, duration);
+        video.currentTime = Math.max(0, Math.min(seconds, limit > 0 ? limit : seconds));
         setCurrentTime(video.currentTime);
-    }, []);
+        if (limit > 0) setDuration((current) => Math.max(current, limit));
+    }, [duration]);
     useImperativeHandle(ref, () => ({ seekTo }), [seekTo]);
     const togglePlayback = useCallback((): void => {
         const video = videoRef.current;
@@ -196,7 +198,8 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
         if (candidate === null || currentMs - candidate.startMs > CAPTION_HOLD_MS) return null;
         return candidate;
     }, [captions, captionsOn, currentTime]);
-    const progress = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
+    const progress =
+        duration > 0 ? Math.min(100, (currentTime / Math.max(duration, currentTime)) * 100) : 0;
     const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
         const target = event.target as HTMLElement;
         if (target.tagName === 'INPUT') return;
@@ -253,18 +256,22 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
                 onDoubleClick={toggleFullscreen}
                 onDurationChange={(event) => syncDuration(event.currentTarget)}
                 onTimeUpdate={(event) => {
-                    if (durationProbeRef.current === null)
-                        setCurrentTime(event.currentTarget.currentTime);
+                    if (durationProbeRef.current !== null) return;
+                    const video = event.currentTarget;
+                    const time = video.currentTime;
+                    setCurrentTime(time);
+                    // Browser-recorded WebM often under-reports duration metadata.
+                    setDuration((current) => resolveDuration(video, Math.max(current, time)));
                 }}
                 onProgress={(event) => {
                     const video = event.currentTarget;
-                    if (Number.isFinite(video.duration) || video.buffered.length === 0) return;
-                    const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+                    const resolved = resolveDuration(video, video.currentTime);
+                    if (resolved <= 0) return;
                     if (durationProbeRef.current !== null) {
-                        finishDurationProbe(video, bufferedEnd);
+                        finishDurationProbe(video, resolved);
                         return;
                     }
-                    setDuration((current) => Math.max(current, bufferedEnd));
+                    setDuration((current) => Math.max(current, resolved));
                 }}
                 onPlay={() => {
                     setPlaying(true);
@@ -279,6 +286,11 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
                 onEnded={() => {
                     setPlaying(false);
                     setControlsVisible(true);
+                    const video = videoRef.current;
+                    if (!video) return;
+                    const time = video.currentTime;
+                    setCurrentTime(time);
+                    setDuration((current) => Math.max(current, time));
                 }}
                 onWaiting={() => setWaiting(true)}
                 onCanPlay={(event) => {
@@ -368,10 +380,10 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
                         type="range"
                         aria-label="Replay position"
                         min={0}
-                        max={duration || 0}
+                        max={Math.max(duration, currentTime) || 0}
                         step={0.1}
-                        value={Math.min(currentTime, duration || 0)}
-                        disabled={duration <= 0}
+                        value={currentTime}
+                        disabled={duration <= 0 && currentTime <= 0}
                         onChange={(event) => seekTo(Number(event.target.value))}
                         className="h-1 w-full cursor-pointer appearance-none rounded-full bg-white/30 accent-white disabled:cursor-not-allowed [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
                         style={{
@@ -445,7 +457,7 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
 
                     <span className="tnum ml-0.5 text-12 font-medium text-white/90 md:text-13">
                         {formatTime(currentTime)} <span className="text-white/55">/</span>{' '}
-                        {formatTime(duration)}
+                        {formatTime(Math.max(duration, currentTime))}
                     </span>
 
                     <div className="ml-auto flex items-center gap-1">

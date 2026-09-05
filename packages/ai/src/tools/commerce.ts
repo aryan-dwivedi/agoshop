@@ -9,7 +9,7 @@ import { personalizedOffers, resolveLiveOffer } from '@shop/domain-commerce/prom
 import { checkDelivery } from '@shop/domain-commerce/serviceability.js';
 import { addToWishlist } from '@shop/domain-commerce/wishlist.js';
 import { publishToUser } from '@shop/platform/lib/sse.js';
-import { EVENTS, minorUnitsToDecimalString } from '@shop/shared';
+import { BLOCKED_REASON_LABELS, EVENTS, PAYMENT_METHOD_LABELS, minorUnitsToDecimalString } from '@shop/shared';
 
 import { publishToolExecuted, speakableCart, toolError } from '../speakable.js';
 
@@ -35,7 +35,26 @@ export const runCommerceTool = async (
     switch (call.name) {
         case 'check_delivery': {
             const result = await checkDelivery(call.args.pincode);
-            return { pincode: call.args.pincode, ...result };
+            const location =
+                result.city && result.state ? `${result.city}, ${result.state}` : call.args.pincode;
+            let summary: string;
+            if (result.serviceable) {
+                const eta =
+                    result.etaDays === null
+                        ? ''
+                        : ` in ${result.etaDays} ${result.etaDays === 1 ? 'day' : 'days'}`;
+                const cod = result.codAvailable
+                    ? ' Cash on delivery is available.'
+                    : ' Cash on delivery is not available.';
+                summary = `We deliver to ${location}${eta}.${cod}`;
+            } else if (result.reason === 'invalid_pincode') {
+                summary = 'That PIN code is not valid — Indian PIN codes are exactly 6 digits.';
+            } else if (result.reason === 'unknown_pincode') {
+                summary = `PIN code ${call.args.pincode} is not in our delivery database.`;
+            } else {
+                summary = `We do not deliver to ${location} right now.`;
+            }
+            return { pincode: call.args.pincode, ...result, summary };
         }
         case 'get_payment_options': {
             let totalMinorUnits: number;
@@ -51,11 +70,24 @@ export const runCommerceTool = async (
                 totalMinorUnits,
                 pincode: call.args.pincode ?? null,
             });
+            const methodLabels = options.methods.map((method) => PAYMENT_METHOD_LABELS[method]);
+            const blockedLabel = options.blockedReason
+                ? (BLOCKED_REASON_LABELS[options.blockedReason] ?? options.blockedReason)
+                : null;
+            const summary =
+                options.methods.length > 0
+                    ? `You can pay with ${methodLabels.join(', ')}.`
+                    : blockedLabel
+                      ? `Checkout is blocked because ${blockedLabel}.`
+                      : 'No payment methods are available right now.';
             return {
                 ...options,
+                methods: options.methods,
+                methodLabels,
                 orderTotalMinorUnits: totalMinorUnits,
                 orderTotalInr: minorUnitsToDecimalString(totalMinorUnits),
                 minOrderInr: minorUnitsToDecimalString(options.minOrderMinorUnits),
+                summary,
             };
         }
         case 'get_live_offer': {

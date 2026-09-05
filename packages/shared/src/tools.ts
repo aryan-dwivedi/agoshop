@@ -149,7 +149,7 @@ export const SHOPPING_TOOLS: OpenAiToolSchema[] = [
         function: {
             name: 'check_delivery',
             description:
-                'Check pincode serviceability only when the shopper explicitly asks about delivery or during checkout. Never request a PIN or call this as a prerequisite for add_to_cart.',
+                'Check whether a 6-digit Indian PIN code is serviceable: city, state, estimated delivery days, and whether cash on delivery is available. Call only when the shopper explicitly asks about delivery to a location or during checkout. Never request a PIN or call this as a prerequisite for add_to_cart.',
             parameters: {
                 type: 'object',
                 properties: { pincode: str },
@@ -162,7 +162,7 @@ export const SHOPPING_TOOLS: OpenAiToolSchema[] = [
         function: {
             name: 'get_payment_options',
             description:
-                'Get payment methods only for an explicit payment or checkout question. Never request a PIN or call this as a prerequisite for add_to_cart.',
+                'List checkout payment methods available for this shopper — credit card, UPI, cash on delivery, EMI and net banking — optionally scoped to a product price or current cart total and a delivery PIN code. Call only for an explicit payment or checkout question. Never request a PIN or call this as a prerequisite for add_to_cart.',
             parameters: {
                 type: 'object',
                 properties: { product_id: productId, pincode: str },

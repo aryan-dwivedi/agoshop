@@ -6,9 +6,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
+import { ASSISTANT_EXAMPLES } from '../ai/browseExamples';
 import { AssistantPanel } from '../ai/AssistantPanel';
 import { useAssistantSurface } from '../ai/assistantSurface';
-import { AskIcon, ChevronRight, SearchIcon } from '../components/icons';
+import { AskIcon, ChatIcon, ChevronRight, SearchIcon } from '../components/icons';
 import { ChatPanel } from '../components/live/ChatPanel';
 import { LiveBadge } from '../components/live/LiveBadge';
 import { ReplayPlayer } from '../components/live/ReplayPlayer';
@@ -78,6 +79,16 @@ const PollResult = ({ poll }: { poll: PollDto }): JSX.Element => (
         </p>
     </div>
 );
+type SidebarTab = 'ask' | 'transcript' | 'chat';
+const SIDEBAR_TABS: readonly {
+    id: SidebarTab;
+    label: string;
+    icon: JSX.Element;
+}[] = [
+    { id: 'ask', label: 'Ask Ago', icon: <AskIcon className="h-4 w-4" /> },
+    { id: 'transcript', label: 'Transcript', icon: <SearchIcon className="h-4 w-4" /> },
+    { id: 'chat', label: 'Chat', icon: <ChatIcon className="h-4 w-4" /> },
+];
 const Replay = (): JSX.Element => {
     const { slug } = useParams<{
         slug: string;
@@ -85,7 +96,7 @@ const Replay = (): JSX.Element => {
     const playerRef = useRef<ReplayPlayerHandle>(null);
     const [query, setQuery] = useState('');
     const [search, setSearch] = useState('');
-    const [assistantOpen, setAssistantOpen] = useState(false);
+    const [tab, setTab] = useState<SidebarTab>('ask');
     const claimPage = useAssistantSurface((state) => state.claimPage);
     const releasePage = useAssistantSurface((state) => state.releasePage);
     const openSignal = useAssistantSurface((state) => state.openSignal);
@@ -94,7 +105,7 @@ const Replay = (): JSX.Element => {
         return releasePage;
     }, [claimPage, releasePage]);
     useEffect(() => {
-        if (openSignal > 0) setAssistantOpen(true);
+        if (openSignal > 0) setTab('ask');
     }, [openSignal]);
     const sessionQuery = useQuery<LiveSessionDto, Error>({
         queryKey: ['session', slug],
@@ -163,7 +174,7 @@ const Replay = (): JSX.Element => {
                 <div className="skeleton h-8 w-72" />
                 <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
                     <div className="skeleton aspect-video w-full" />
-                    <div className="skeleton h-72 w-full" />
+                    <div className="skeleton min-h-[24rem] w-full" />
                 </div>
             </div>
         );
@@ -208,38 +219,26 @@ const Replay = (): JSX.Element => {
                 <span className="truncate text-t2">Replay</span>
             </nav>
 
-            <header className="flex flex-wrap items-start justify-between gap-4">
-                <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-3">
-                        <h1 className="text-28 font-semibold text-t1">{session.title}</h1>
-                        <LiveBadge
-                            status={session.status}
-                            peakViewers={session.peakViewers}
-                        />
-                    </div>
-                    <p className="mt-1 text-14 text-t2">
-                        {session.hostName} · {session.sellerName}
-                        {session.endedAt &&
-                            ` · ${new Date(session.endedAt).toLocaleDateString('en-IN', {
-                                day: 'numeric',
-                                month: 'short',
-                                year: 'numeric',
-                            })}`}
-                    </p>
+            <header className="min-w-0">
+                <div className="flex flex-wrap items-center gap-3">
+                    <h1 className="text-28 font-semibold text-t1">{session.title}</h1>
+                    <LiveBadge
+                        status={session.status}
+                        peakViewers={session.peakViewers}
+                    />
                 </div>
-                {!assistantOpen && (
-                    <button
-                        type="button"
-                        className="btn-standard"
-                        onClick={() => setAssistantOpen(true)}
-                    >
-                        <AskIcon className="h-4 w-4" />
-                        Ask about this show
-                    </button>
-                )}
+                <p className="mt-1 text-14 text-t2">
+                    {session.hostName} · {session.sellerName}
+                    {session.endedAt &&
+                        ` · ${new Date(session.endedAt).toLocaleDateString('en-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                        })}`}
+                </p>
             </header>
 
-            <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
+            <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]">
                 <div className="min-w-0">
                     {recordingUrl ? (
                         <ReplayPlayer
@@ -254,69 +253,142 @@ const Replay = (): JSX.Element => {
                     )}
                 </div>
 
-                <aside className="card flex max-h-[32rem] min-h-[22rem] flex-col overflow-hidden">
-                    <div className="border-b border-line px-4 py-3">
-                        <h2 className="section-title">Find a moment</h2>
-                        <p className="mt-0.5 text-13 text-t3">Search the show transcript</p>
-                    </div>
-                    <form
-                        className="flex gap-2 border-b border-line p-3"
-                        onSubmit={(event) => {
-                            event.preventDefault();
-                            setSearch(query.trim());
-                        }}
+                <aside className="card flex min-h-[24rem] flex-col overflow-hidden lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)]">
+                    <div
+                        role="tablist"
+                        aria-label="Replay panels"
+                        className="relative flex shrink-0 border-b border-line"
                     >
-                        <label className="relative min-w-0 flex-1">
-                            <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-t3" />
-                            <input
-                                className="input pl-9"
-                                value={query}
-                                onChange={(event) => setQuery(event.target.value)}
-                                placeholder="Search transcript"
-                                aria-label="Search the transcript"
+                        {SIDEBAR_TABS.map((segment) => (
+                            <button
+                                key={segment.id}
+                                type="button"
+                                role="tab"
+                                id={`replay-tab-${segment.id}`}
+                                aria-selected={tab === segment.id}
+                                aria-controls={`replay-panel-${segment.id}`}
+                                onClick={() => setTab(segment.id)}
+                                className={`flex h-11 flex-1 items-center justify-center gap-1.5 px-2 text-13 font-medium transition-colors duration-ctl ${tab === segment.id ? 'text-t1' : 'text-t2 hover:text-t1'}`}
+                            >
+                                {segment.icon}
+                                <span className="truncate">{segment.label}</span>
+                            </button>
+                        ))}
+                        <span
+                            aria-hidden
+                            className="absolute bottom-0 left-0 h-0.5 bg-accent transition-transform duration-ctl ease-out"
+                            style={{
+                                width: `${100 / SIDEBAR_TABS.length}%`,
+                                transform: `translateX(${SIDEBAR_TABS.findIndex((segment) => segment.id === tab) * 100}%)`,
+                            }}
+                        />
+                    </div>
+
+                    <div
+                        role="tabpanel"
+                        id="replay-panel-ask"
+                        aria-labelledby="replay-tab-ask"
+                        hidden={tab !== 'ask'}
+                        className={`min-h-0 flex-1 ${tab === 'ask' ? 'flex' : 'hidden'}`}
+                    >
+                        {tab === 'ask' && (
+                            <AssistantPanel
+                                surface="replay"
+                                liveSessionId={session.id}
+                                contextLabel={session.title}
+                                examples={ASSISTANT_EXAMPLES.replay}
+                                seamless
+                                className="min-h-0 w-full flex-1"
                             />
-                        </label>
-                        <button
-                            type="submit"
-                            className="btn-standard px-3"
+                        )}
+                    </div>
+
+                    <div
+                        role="tabpanel"
+                        id="replay-panel-transcript"
+                        aria-labelledby="replay-tab-transcript"
+                        hidden={tab !== 'transcript'}
+                        className={`min-h-0 flex-1 flex-col ${tab === 'transcript' ? 'flex' : 'hidden'}`}
+                    >
+                        <form
+                            className="flex shrink-0 gap-2 border-b border-line p-3"
+                            onSubmit={(event) => {
+                                event.preventDefault();
+                                setSearch(query.trim());
+                            }}
                         >
-                            Search
-                        </button>
-                    </form>
-                    <div className="scroll-thin min-h-0 flex-1 overflow-y-auto p-2">
-                        {displayedTranscript.isLoading && (
-                            <p className="p-2 text-13 text-t3">Loading transcript…</p>
+                            <label className="relative min-w-0 flex-1">
+                                <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-t3" />
+                                <input
+                                    className="input pl-9"
+                                    value={query}
+                                    onChange={(event) => setQuery(event.target.value)}
+                                    placeholder="Search transcript"
+                                    aria-label="Search the transcript"
+                                />
+                            </label>
+                            <button
+                                type="submit"
+                                className="btn-standard px-3"
+                            >
+                                Search
+                            </button>
+                        </form>
+                        <div className="scroll-thin min-h-0 flex-1 overflow-y-auto p-2">
+                            {displayedTranscript.isLoading && (
+                                <p className="p-2 text-13 text-t3">Loading transcript…</p>
+                            )}
+                            {displayedTranscript.isError && (
+                                <p className="p-2 text-13 text-danger">Transcript unavailable.</p>
+                            )}
+                            {displayedTranscript.data?.lines.length === 0 && (
+                                <p className="p-2 text-13 text-t3">
+                                    {search
+                                        ? `No moments match “${search}”.`
+                                        : 'No transcript was captured.'}
+                                </p>
+                            )}
+                            <ul className="space-y-1">
+                                {displayedTranscript.data?.lines.map((line) => (
+                                    <li key={line.id}>
+                                        <button
+                                            type="button"
+                                            className="w-full rounded-ctl px-2 py-2 text-left transition hover:bg-bg"
+                                            onClick={() => {
+                                                playerRef.current?.seekTo(line.startMs / 1000);
+                                            }}
+                                        >
+                                            <span className="tnum text-13 font-semibold text-accent-text">
+                                                {formatClock(line.startMs)}
+                                            </span>
+                                            <span className="mt-0.5 block text-13 leading-relaxed text-t2">
+                                                {line.text}
+                                            </span>
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div
+                        role="tabpanel"
+                        id="replay-panel-chat"
+                        aria-labelledby="replay-tab-chat"
+                        hidden={tab !== 'chat'}
+                        className={`min-h-0 flex-1 ${tab === 'chat' ? 'flex' : 'hidden'}`}
+                    >
+                        {tab === 'chat' && (
+                            <ChatPanel
+                                chat={chat}
+                                canSend={false}
+                                signedIn
+                                readOnly
+                                seamless
+                                emptyHint="No chat was recorded for this show."
+                                className="min-h-0 w-full flex-1"
+                            />
                         )}
-                        {displayedTranscript.isError && (
-                            <p className="p-2 text-13 text-danger">Transcript unavailable.</p>
-                        )}
-                        {displayedTranscript.data?.lines.length === 0 && (
-                            <p className="p-2 text-13 text-t3">
-                                {search
-                                    ? `No moments match “${search}”.`
-                                    : 'No transcript was captured.'}
-                            </p>
-                        )}
-                        <ul className="space-y-1">
-                            {displayedTranscript.data?.lines.map((line) => (
-                                <li key={line.id}>
-                                    <button
-                                        type="button"
-                                        className="w-full rounded-ctl px-2 py-2 text-left transition hover:bg-bg"
-                                        onClick={() => {
-                                            playerRef.current?.seekTo(line.startMs / 1000);
-                                        }}
-                                    >
-                                        <span className="tnum text-13 font-semibold text-accent-text">
-                                            {formatClock(line.startMs)}
-                                        </span>
-                                        <span className="mt-0.5 block text-13 leading-relaxed text-t2">
-                                            {line.text}
-                                        </span>
-                                    </button>
-                                </li>
-                            ))}
-                        </ul>
                     </div>
                 </aside>
             </div>
@@ -338,56 +410,34 @@ const Replay = (): JSX.Element => {
                 />
             </section>
 
-            <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
-                <div className="space-y-5">
-                    {summary && (
-                        <section className="card p-5">
-                            <h2 className="section-title">Show highlights</h2>
-                            <p className="mt-3 text-14 leading-relaxed text-t2">{summary}</p>
-                        </section>
-                    )}
-                    {closedPolls.length > 0 && (
-                        <section className="card p-5">
-                            <h2 className="section-title">Poll results</h2>
-                            <div className="mt-4 grid gap-3 md:grid-cols-2">
-                                {closedPolls.map((poll) => (
-                                    <PollResult
-                                        key={poll.id}
-                                        poll={poll}
-                                    />
-                                ))}
-                            </div>
-                        </section>
-                    )}
-                    {session.products.length > 0 && (
-                        <div className="rounded-panel border border-line bg-accent-wash px-4 py-3">
-                            <p className="text-14 font-semibold text-t1">Live offers have ended</p>
-                            <p className="mt-1 text-13 text-t2">
-                                Products from this replay are now shown at their current shop price.
-                            </p>
+            <div className="space-y-5">
+                {summary && (
+                    <section className="card p-5">
+                        <h2 className="section-title">Show highlights</h2>
+                        <p className="mt-3 text-14 leading-relaxed text-t2">{summary}</p>
+                    </section>
+                )}
+                {closedPolls.length > 0 && (
+                    <section className="card p-5">
+                        <h2 className="section-title">Poll results</h2>
+                        <div className="mt-4 grid gap-3 md:grid-cols-2">
+                            {closedPolls.map((poll) => (
+                                <PollResult
+                                    key={poll.id}
+                                    poll={poll}
+                                />
+                            ))}
                         </div>
-                    )}
-                </div>
-
-                <div className="flex min-h-[32rem] flex-col gap-4 lg:sticky lg:top-20">
-                    {assistantOpen && (
-                        <AssistantPanel
-                            surface="replay"
-                            liveSessionId={session.id}
-                            contextLabel={session.title}
-                            onClose={() => setAssistantOpen(false)}
-                            className="min-h-[24rem]"
-                        />
-                    )}
-                    <ChatPanel
-                        chat={chat}
-                        canSend={false}
-                        signedIn
-                        readOnly
-                        emptyHint="No chat was recorded for this show."
-                        className="min-h-[24rem]"
-                    />
-                </div>
+                    </section>
+                )}
+                {session.products.length > 0 && (
+                    <div className="rounded-panel border border-line bg-accent-wash px-4 py-3">
+                        <p className="text-14 font-semibold text-t1">Live offers have ended</p>
+                        <p className="mt-1 text-13 text-t2">
+                            Products from this replay are now shown at their current shop price.
+                        </p>
+                    </div>
+                )}
             </div>
         </div>
     );

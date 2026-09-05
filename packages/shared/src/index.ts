@@ -5,6 +5,7 @@ export * from './guest.js';
 export * from './language.js';
 export * from './liveClock.js';
 export * from './money.js';
+export * from './payments.js';
 export * from './promotions.js';
 export type * from './types.js';
 export * from './tools.js';
