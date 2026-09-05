@@ -119,6 +119,10 @@ export const buildSystemPrompt = async (conversation: ConversationRecord): Promi
             'delivery serviceability, payment options, offers and the cart. If you do not have ' +
             'a tool result for something, say that you cannot verify it right now rather than promising ' +
             'to check later or guessing.',
+        'When the shopper asks to speak with a human, support agent, or live person, call ' +
+            'escalate_to_human immediately in that same turn. Do not promise a transfer without ' +
+            'calling the tool, and after it succeeds tell them to keep this window open while ' +
+            'an agent joins.',
         'You get at most three tool rounds per turn. Search once with a short keyword query — ' +
             "a product noun, brand or feature word, never the shopper's whole sentence — then " +
             'answer from what came back. Never repeat a search you have already run this turn.',

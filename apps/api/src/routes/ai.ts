@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { z } from 'zod';
 
+import { mintRtcToken } from '@shop/agora/tokens.js';
 import { createConversation, loadOwnedConversation } from '@shop/ai/conversations.js';
+import { getTicketForShopper } from '@shop/ai/support.js';
 import { getTransport, transportForConversation } from '@shop/ai/transports/index.js';
 import { badRequest, conflict } from '@shop/platform/lib/errors.js';
 import { BUDGETS, rateLimit } from '@shop/platform/lib/ratelimit.js';
@@ -126,6 +128,31 @@ router.post('/api/ai/conversations/:id/interrupt', ensureIdentity, async (req, r
         );
         await transportForConversation(conversation).interrupt(conversation);
         res.json({ interrupted: true });
+    } catch (err) {
+        next(err);
+    }
+});
+router.get('/api/ai/conversations/:id/handoff', ensureIdentity, async (req, res, next) => {
+    try {
+        const conversation = await loadOwnedConversation(
+            conversationIdFrom(req.params.id),
+            req.session!.userId,
+        );
+        const ticket = await getTicketForShopper(req.session!.userId, conversation.id);
+        if (
+            !ticket ||
+            (ticket.status !== 'queued' &&
+                ticket.status !== 'assigned' &&
+                ticket.status !== 'active')
+        ) {
+            throw conflict('no_active_handoff', 'no support handoff is active for this conversation');
+        }
+        res.json({
+            conversationId: conversation.id,
+            rtcChannel: conversation.rtcChannel,
+            rtcToken: mintRtcToken(conversation.rtcChannel, conversation.viewerUid, 'publisher'),
+            viewerUid: conversation.viewerUid,
+        });
     } catch (err) {
         next(err);
     }

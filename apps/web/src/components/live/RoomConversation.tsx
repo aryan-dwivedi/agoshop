@@ -201,10 +201,11 @@ export const RoomConversation = ({
         },
         [onAskAbout, onModeChange, onQuotedChange],
     );
-    const humanWaiting = agent.mode === 'voice' && agent.phase === 'human_waiting';
-    const humanLive = agent.mode === 'voice' && agent.phase === 'human_active';
+    const humanWaiting = agent.phase === 'human_waiting';
+    const humanLive = agent.phase === 'human_active';
     const voiceConnecting = agent.phase === 'starting' || humanWaiting;
-    const voiceLive = agent.mode === 'voice' && (agent.phase === 'active' || humanLive);
+    const voiceLive =
+        humanLive || (agent.mode === 'voice' && agent.phase === 'active');
     const dictation = agent.textAssist.dictation;
     const aiMode = assistantEnabled && mode === 'ai';
     const state =

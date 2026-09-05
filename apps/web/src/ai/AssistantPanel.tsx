@@ -228,14 +228,14 @@ export const AssistantPanel = ({
             break;
         }
     }
-    const humanWaiting = agent.mode === 'voice' && agent.phase === 'human_waiting';
-    const humanActive = agent.mode === 'voice' && agent.phase === 'human_active';
+    const humanWaiting = agent.phase === 'human_waiting';
+    const humanActive = agent.phase === 'human_active';
     const voiceBusy =
-        agent.mode === 'voice' &&
-        (agent.phase === 'starting' ||
-            agent.phase === 'active' ||
-            agent.phase === 'human_waiting' ||
-            agent.phase === 'human_active');
+        humanWaiting ||
+        humanActive ||
+        (agent.mode === 'voice' &&
+            (agent.phase === 'starting' ||
+                agent.phase === 'active'));
     const voiceCall = agent.mode === 'voice' && (agent.phase === 'active' || humanActive);
     const micLive = voiceBusy || dictation.listening;
     const thinking =

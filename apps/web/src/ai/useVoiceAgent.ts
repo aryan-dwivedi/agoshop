@@ -52,9 +52,10 @@ type ActiveSession = {
     agentUid: number;
     client: IAgoraRTCClient;
     mic: IMicrophoneAudioTrack | null;
-    toolkit: AgoraVoiceAI;
+    toolkit: AgoraVoiceAI | null;
     releaseRtm: () => void;
-    heartbeat: number;
+    heartbeat: number | null;
+    handoffOnly: boolean;
 };
 const VOICE_UNAVAILABLE = "Voice isn't available here — keep typing and I'll answer.";
 const VOICE_BUSY = "Voice is busy right now — keep typing and I'll answer.";
@@ -72,6 +73,10 @@ export const isToolProtocolText = (text: string): boolean => {
     );
 };
 const HEARTBEAT_MS = 30000;
+const HANDOFF_NOTICE =
+    'Your request is in the support queue. Keep this window open and your microphone on.';
+const HANDOFF_BUSY =
+    'You are already waiting for a support agent. Keep this window open until someone joins.';
 const DUCKED_VOLUME = 15;
 const FULL_VOLUME = 100;
 export type UseVoiceAgentResult = {
@@ -109,6 +114,9 @@ export const useVoiceAgent = (opts: {
     const duckRef = useRef<IRemoteAudioTrack | null>(duckTrack ?? null);
     const sessionRef = useRef<ActiveSession | null>(null);
     const pendingBootstrapRef = useRef<Promise<ActiveSession> | null>(null);
+    const pendingHandoffRef = useRef<Promise<void> | null>(null);
+    const rtcChannelRef = useRef<string | null>(null);
+    const viewerUidRef = useRef<number | null>(null);
     const contextRef = useRef({ surface, liveSessionId, productId });
     const supportAudioRef = useRef<IRemoteAudioTrack | null>(null);
     const supportUidRef = useRef<number | null>(null);
@@ -168,6 +176,8 @@ export const useVoiceAgent = (opts: {
                     },
                 );
                 conversationIdRef.current = conversation.conversationId;
+                rtcChannelRef.current = conversation.rtcChannel;
+                viewerUidRef.current = conversation.viewerUid;
                 setConversationId(conversation.conversationId);
                 return conversation.conversationId;
             } finally {
@@ -177,9 +187,13 @@ export const useVoiceAgent = (opts: {
         pendingTextCreateRef.current = create;
         return create;
     }, []);
+    const joinSupportHandoffRef = useRef<() => Promise<void>>(async () => undefined);
     const textAssist = useTextAssist({
         ensureConversation: ensureTextConversation,
         resolveLanguage,
+        onEscalated: () => {
+            void joinSupportHandoffRef.current();
+        },
     });
     let latestUserText: string | null = null;
     for (let i = voiceLines.length - 1; i >= 0; i -= 1) {
@@ -339,6 +353,8 @@ export const useVoiceAgent = (opts: {
                         language: resolveLanguage(),
                     });
                     conversationIdRef.current = conversation.conversationId;
+                    rtcChannelRef.current = conversation.rtcChannel;
+                    viewerUidRef.current = conversation.viewerUid;
                     setConversationId(conversation.conversationId);
                     const channel =
                         conversation.rtcChannel ||
@@ -389,6 +405,7 @@ export const useVoiceAgent = (opts: {
                         toolkit,
                         releaseRtm,
                         heartbeat,
+                        handoffOnly: false,
                     };
                     sessionRef.current = session;
                     setMode(opts.withMic ? 'voice' : 'text');
@@ -431,6 +448,101 @@ export const useVoiceAgent = (opts: {
         },
         [bindClientHandlers, bindToolkitHandlers, config?.agoraAppId, resolveLanguage],
     );
+    const joinSupportHandoff = useCallback(async (): Promise<void> => {
+        const inFlight = pendingHandoffRef.current;
+        if (inFlight) {
+            await inFlight;
+            return;
+        }
+        if (phaseRef.current === 'human_waiting' || phaseRef.current === 'human_active') {
+            setHandoffNotice(HANDOFF_BUSY);
+            setMode('voice');
+            return;
+        }
+        const conversationId = conversationIdRef.current;
+        if (!conversationId) return;
+        const appId = config?.agoraAppId;
+        const run = (async (): Promise<void> => {
+            setError(null);
+            setHandoffNotice(HANDOFF_NOTICE);
+            setMode('voice');
+            phaseRef.current = 'human_waiting';
+            setPhase('human_waiting');
+            setAgentState(null);
+            if (!appId) {
+                setHandoffNotice(
+                    'Your request is in the support queue. A support agent will join this chat shortly.',
+                );
+                return;
+            }
+            try {
+                const existing = sessionRef.current;
+                if (existing) {
+                    if (!existing.mic) {
+                        const mic = await AgoraRTC.createMicrophoneAudioTrack({
+                            AEC: true,
+                            ANS: true,
+                            AGC: true,
+                            encoderConfig: 'speech_standard',
+                        });
+                        await existing.client.publish([mic]);
+                        existing.mic = mic;
+                        setMicTrack(mic);
+                        duckRef.current?.setVolume(DUCKED_VOLUME);
+                    }
+                    return;
+                }
+                const handoff = await api.get<{
+                    conversationId: string;
+                    rtcChannel: string;
+                    rtcToken: string;
+                    viewerUid: number;
+                }>(`/api/ai/conversations/${conversationId}/handoff`);
+                rtcChannelRef.current = handoff.rtcChannel;
+                viewerUidRef.current = handoff.viewerUid;
+                const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+                bindClientHandlers(client);
+                await client.join(
+                    appId,
+                    handoff.rtcChannel,
+                    handoff.rtcToken,
+                    handoff.viewerUid,
+                );
+                const mic = await AgoraRTC.createMicrophoneAudioTrack({
+                    AEC: true,
+                    ANS: true,
+                    AGC: true,
+                    encoderConfig: 'speech_standard',
+                });
+                await client.publish([mic]);
+                setMicTrack(mic);
+                duckRef.current?.setVolume(DUCKED_VOLUME);
+                const releaseRtm = await rtmRef.current.subscribe(handoff.rtcChannel, () => undefined);
+                sessionRef.current = {
+                    conversationId,
+                    rtcChannel: handoff.rtcChannel,
+                    agentUid: 0,
+                    client,
+                    mic,
+                    toolkit: null,
+                    releaseRtm,
+                    heartbeat: null,
+                    handoffOnly: true,
+                };
+            } catch {
+                setHandoffNotice(
+                    'Your request is queued, but voice could not connect. Keep this window open — a support agent can still join from the dashboard.',
+                );
+            }
+        })();
+        pendingHandoffRef.current = run;
+        try {
+            await run;
+        } finally {
+            pendingHandoffRef.current = null;
+        }
+    }, [bindClientHandlers, config?.agoraAppId]);
+    joinSupportHandoffRef.current = joinSupportHandoff;
     const teardownMedia = useCallback(async (): Promise<void> => {
         const active = sessionRef.current;
         sessionRef.current = null;
@@ -439,10 +551,12 @@ export const useVoiceAgent = (opts: {
         supportUidRef.current = null;
         setSupportAudioReady(false);
         if (!active) return;
-        window.clearInterval(active.heartbeat);
-        active.toolkit.removeAllEventListeners();
-        active.toolkit.unsubscribe();
-        active.toolkit.destroy();
+        if (active.heartbeat !== null) window.clearInterval(active.heartbeat);
+        if (active.toolkit) {
+            active.toolkit.removeAllEventListeners();
+            active.toolkit.unsubscribe();
+            active.toolkit.destroy();
+        }
         active.releaseRtm();
         active.client.removeAllListeners();
         if (active.mic) {
@@ -479,6 +593,10 @@ export const useVoiceAgent = (opts: {
         async (text: string): Promise<void> => {
             const body = text.trim();
             if (body.length === 0 || textPendingRef.current) return;
+            if (phaseRef.current === 'human_waiting' || phaseRef.current === 'human_active') {
+                setHandoffNotice(HANDOFF_BUSY);
+                return;
+            }
             const voiceCallActive = Boolean(sessionRef.current?.mic);
             if (!agoraAvailable || !voiceCallActive) {
                 await textAssist.send(body);
@@ -489,7 +607,10 @@ export const useVoiceAgent = (opts: {
             setError(null);
             try {
                 const session = sessionRef.current;
-                if (!session) throw new Error('voice_session_missing');
+                if (!session?.toolkit) {
+                    await textAssist.send(body);
+                    return;
+                }
                 await session.toolkit.sendText(String(session.agentUid), {
                     messageType: ChatMessageType.TEXT,
                     priority: ChatMessagePriority.INTERRUPTED,
@@ -580,12 +701,7 @@ export const useVoiceAgent = (opts: {
                 };
                 if (data.conversationId && data.conversationId !== conversationIdRef.current)
                     return;
-                phaseRef.current = 'human_waiting';
-                setHandoffNotice(
-                    'Your request is in the support queue. Keep this window open and your microphone on.',
-                );
-                setPhase('human_waiting');
-                setAgentState(null);
+                void joinSupportHandoff();
                 return;
             }
             if (event.event === EVENTS.supportAgentJoined) {
@@ -619,7 +735,7 @@ export const useVoiceAgent = (opts: {
                 void teardownMedia();
             }
         },
-        [teardownMedia],
+        [joinSupportHandoff, teardownMedia],
     );
     useServerEvents({
         enabled: conversationId !== null,

@@ -62,8 +62,9 @@ export type UseTextAssistResult = {
 export const useTextAssist = (opts: {
     ensureConversation: () => Promise<string>;
     resolveLanguage: () => string;
+    onEscalated?: () => void;
 }): UseTextAssistResult => {
-    const { ensureConversation, resolveLanguage } = opts;
+    const { ensureConversation, resolveLanguage, onEscalated } = opts;
     const [messages, setMessages] = useState<TextAssistMessage[]>([]);
     const [pending, setPending] = useState(false);
     const pendingRef = useRef(false);
@@ -98,6 +99,10 @@ export const useTextAssist = (opts: {
                     reply: string;
                     language: string;
                     products?: AiProductCard[];
+                    toolCalls?: {
+                        name: string;
+                        outcome: string;
+                    }[];
                 }>(
                     `/api/ai/convo/${conversationId}/message`,
                     {
@@ -122,6 +127,13 @@ export const useTextAssist = (opts: {
                         products: result.products ?? [],
                     },
                 ]);
+                if (
+                    result.toolCalls?.some(
+                        (call) => call.name === 'escalate_to_human' && call.outcome === 'ok',
+                    )
+                ) {
+                    onEscalated?.();
+                }
             } catch (err) {
                 setError(
                     err instanceof DOMException && err.name === 'TimeoutError'
@@ -133,7 +145,7 @@ export const useTextAssist = (opts: {
                 setPending(false);
             }
         },
-        [ensureConversation, resolveLanguage],
+        [ensureConversation, onEscalated, resolveLanguage],
     );
     const sendRef = useRef(send);
     sendRef.current = send;
