@@ -64,6 +64,10 @@ envVarGroups:
             generateValue: true
           - key: CONVO_LLM_SHARED_SECRET
             generateValue: true
+          - key: MCP_STATIC_API_KEY
+            sync: false
+          - key: MCP_SERVER_NAME
+            value: shop
           - key: AGORA_APP_ID
             sync: false
           - key: AGORA_APP_CERTIFICATE

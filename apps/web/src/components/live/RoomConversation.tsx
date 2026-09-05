@@ -223,11 +223,10 @@ export const RoomConversation = ({
                 ? text
                 : `About this ${quoted.source === 'chat' ? 'chat message' : 'thing the host said'} — ${quoted.author}: "${quoted.text}"\n\n${text}`;
         onQuotedChange(null);
-        if (voiceLive || voiceConnecting) await agent.stop();
-        await agent.textAssist.send(question);
+        await agent.sendText(question);
     };
     const composerDisabled = aiMode
-        ? agent.textAssist.pending
+        ? agent.textPending || agent.textAssist.pending
         : !canSend || chat.blocked !== null || !signedIn;
     return (
         <section className={`relative flex min-h-0 flex-col ${className ?? ''}`}>
@@ -275,11 +274,11 @@ export const RoomConversation = ({
                                         <button
                                             type="button"
                                             className="chip max-w-full text-left"
-                                            disabled={agent.textAssist.pending}
+                                            disabled={agent.textPending || agent.textAssist.pending}
                                             onClick={() => {
                                                 onModeChange('ai');
                                                 pinnedRef.current = true;
-                                                void agent.textAssist.send(example);
+                                                void agent.sendText(example);
                                             }}
                                         >
                                             <AskIcon className="h-3.5 w-3.5 shrink-0" />
@@ -312,7 +311,7 @@ export const RoomConversation = ({
                     ),
                 )}
 
-                {agent.textAssist.pending && (
+                {(agent.textPending || agent.textAssist.pending) && (
                     <div className="flex items-center gap-2 px-3 py-1 text-13 text-t2">
                         <AskIcon className="h-3.5 w-3.5" />
                         Checking the catalog

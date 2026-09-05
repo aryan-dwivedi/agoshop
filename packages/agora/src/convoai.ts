@@ -50,6 +50,18 @@ const studioPipelineId = (): string => {
     }
     return env.AGORA_STUDIO_PIPELINE_ID;
 };
+const staticMcpApiKey = (): string => {
+    if (process.env.MCP_STATIC_API_KEY !== undefined) {
+        return process.env.MCP_STATIC_API_KEY.trim();
+    }
+    return env.MCP_STATIC_API_KEY.trim();
+};
+const mcpServerName = (): string => {
+    if (process.env.MCP_SERVER_NAME !== undefined) {
+        return process.env.MCP_SERVER_NAME.trim();
+    }
+    return env.MCP_SERVER_NAME.trim();
+};
 const buildChannelProperties = (input: ConvoAiJoinInput): Record<string, unknown> => ({
     channel: input.channel,
     token: mintAgentRtcRtmToken(input.channel, input.agentUid),
@@ -58,8 +70,38 @@ const buildChannelProperties = (input: ConvoAiJoinInput): Record<string, unknown
     enable_string_uid: false,
     idle_timeout: env.CONVOAI_IDLE_TIMEOUT_SECONDS,
 });
-const buildStudioProperties = (input: ConvoAiJoinInput): Record<string, unknown> =>
-    buildChannelProperties(input);
+const staticMcpJoinBlock = (input: ConvoAiJoinInput): Record<string, unknown> | null => {
+    if (staticMcpApiKey().length === 0) return null;
+    return {
+        mcp_servers: [
+            {
+                name: mcpServerName(),
+                headers: {
+                    'X-Convo-Id': input.conversationId,
+                },
+            },
+        ],
+    };
+};
+const buildStudioRtmBlock = (): Record<string, unknown> => ({
+    advanced_features: {
+        enable_rtm: true,
+        enable_tools: true,
+    },
+    parameters: {
+        data_channel: 'rtm',
+        enable_metrics: true,
+        enable_error_message: true,
+    },
+});
+const buildStudioProperties = (input: ConvoAiJoinInput): Record<string, unknown> => {
+    const properties = {
+        ...buildChannelProperties(input),
+        ...buildStudioRtmBlock(),
+    };
+    const llm = staticMcpJoinBlock(input);
+    return llm ? { ...properties, llm } : properties;
+};
 const buildProgrammaticLlmBlock = (input: ConvoAiJoinInput): Record<string, unknown> => {
     const mcpEndpoint = `${env.PUBLIC_API_URL.replace(/\/$/, '')}/mcp`;
     const authHeaders = {

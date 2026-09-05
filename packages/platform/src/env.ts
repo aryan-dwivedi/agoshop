@@ -46,6 +46,8 @@ const schema = z
         CONVOAI_SUPPORTED_LANGUAGES: csv('en-US,hi-IN,es-ES'),
         CONVO_LLM_SHARED_SECRET: z.string().min(16),
         CONVO_CALLBACK_TTL_SECONDS: int(7200),
+        MCP_STATIC_API_KEY: z.string().default(''),
+        MCP_SERVER_NAME: z.string().default('shop'),
         AGORA_MANAGED_LLM_MODEL: z.string().default('gpt-4o-mini'),
         AGORA_STUDIO_PIPELINE_ID: z.string().default(''),
         LLM_PROVIDER: z.enum(LLM_PROVIDER_IDS).default('mock'),

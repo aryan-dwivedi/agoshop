@@ -7,6 +7,7 @@ import { sql } from 'drizzle-orm';
 import { aiChannelForConversation } from '@shop/shared';
 
 process.env.NODE_ENV = 'test';
+process.env.MCP_STATIC_API_KEY = 'mcp-static-check-secret-key';
 
 const { createApp } = await import('@shop/api/app.js');
 const { aiServiceRouters } = await import('@shop/ai-service/routes.js');
@@ -103,6 +104,37 @@ const signedGet = await fetch(`${base}/mcp`, {
     },
 });
 ok('GET with auth is not rejected as 405', signedGet.status !== 405, signedGet.status);
+console.log('\n=== MCP static auth ===');
+const staticHeaders = (id: string): Record<string, string> => ({
+    'content-type': 'application/json',
+    accept: 'application/json, text/event-stream',
+    authorization: 'Bearer mcp-static-check-secret-key',
+    'X-Convo-Id': id,
+});
+const staticTool = await postMcp(
+    {
+        jsonrpc: '2.0',
+        id: 5,
+        method: 'tools/call',
+        params: { name: 'get_conversation_context', arguments: {} },
+    },
+    staticHeaders(conversationId),
+);
+ok('static bearer + X-Convo-Id → 200', staticTool.status === 200, staticTool.status);
+const staticMissingConvo = await postMcp(
+    {
+        jsonrpc: '2.0',
+        id: 6,
+        method: 'tools/call',
+        params: { name: 'get_cart', arguments: {} },
+    },
+    {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+        authorization: 'Bearer mcp-static-check-secret-key',
+    },
+);
+ok('static bearer without X-Convo-Id → 401', staticMissingConvo.status === 401);
 console.log('\n=== MCP tools/call ===');
 const toolRes = await postMcp(
     {

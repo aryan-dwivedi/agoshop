@@ -239,6 +239,7 @@ export const AssistantPanel = ({
     const voiceCall = agent.mode === 'voice' && (agent.phase === 'active' || humanActive);
     const micLive = voiceBusy || dictation.listening;
     const thinking =
+        agent.textPending ||
         agent.textAssist.pending ||
         (agent.phase === 'active' && agent.agentState === AgentState.THINKING);
     const listening =
@@ -313,9 +314,8 @@ export const AssistantPanel = ({
     const spokenBase = agent.spokenLanguage.toLowerCase().split('-')[0];
     const notice = agent.capacityNotice ?? agent.handoffNotice ?? agent.error;
     const sendText = async (text: string): Promise<void> => {
-        if (text.trim().length === 0 || agent.textAssist.pending) return;
-        if (voiceBusy) await agent.stop();
-        await agent.textAssist.send(text);
+        if (text.trim().length === 0 || agent.textPending || agent.textAssist.pending) return;
+        await agent.sendText(text);
     };
     const minutes = Math.floor(elapsed / 60)
         .toString()
@@ -534,7 +534,7 @@ export const AssistantPanel = ({
                                             <button
                                                 type="button"
                                                 className="group flex min-h-14 w-full items-center gap-3 rounded-full bg-gradient-to-r from-[#fff4ce] to-[#fff9e9] p-2 pr-4 text-left text-14 font-bold text-[#231f20] transition hover:-translate-y-0.5 hover:shadow-md"
-                                                disabled={agent.textAssist.pending}
+                                                disabled={agent.textPending || agent.textAssist.pending}
                                                 onClick={() => void sendText(example)}
                                             >
                                                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-accent shadow-sm">
@@ -599,7 +599,7 @@ export const AssistantPanel = ({
                             ),
                         )}
 
-                        {agent.textAssist.pending && (
+                        {agent.textPending || agent.textAssist.pending ? (
                             <div className="animate-fade-in flex items-start gap-2.5 py-2">
                                 <AgoMark />
                                 <div>
@@ -622,7 +622,7 @@ export const AssistantPanel = ({
                                     </span>
                                 </div>
                             </div>
-                        )}
+                        ) : null}
 
                         {dictation.interim.length > 0 && (
                             <p className="px-1 text-right text-14 italic text-t3">
@@ -692,7 +692,7 @@ export const AssistantPanel = ({
                             aria-label="Send"
                             title="Send"
                             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#001e60] text-white transition hover:bg-[#003b73] disabled:cursor-not-allowed disabled:bg-[#c7ced8]"
-                            disabled={agent.textAssist.pending || draft.trim().length === 0}
+                            disabled={agent.textPending || agent.textAssist.pending || draft.trim().length === 0}
                         >
                             <SendIcon className="h-5 w-5" />
                         </button>

@@ -51,6 +51,16 @@ export const loadConversation = async (id: string): Promise<ConversationRecord |
         .limit(1);
     return row ?? null;
 };
+export const loadConversationByAgoraAgentId = async (
+    agentId: string,
+): Promise<ConversationRecord | null> => {
+    const [row] = await db
+        .select()
+        .from(aiConversations)
+        .where(eq(aiConversations.agoraAgentId, agentId))
+        .limit(1);
+    return row ?? null;
+};
 const latestUserMessageText = async (conversationId: string): Promise<string | null> => {
     const [row] = await db
         .select({ content: aiMessages.content })

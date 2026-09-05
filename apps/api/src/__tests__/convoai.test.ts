@@ -95,11 +95,33 @@ describe('ConvoAI speech handling', () => {
             agent_rtc_uid: '1001',
             remote_rtc_uids: ['1002'],
             enable_string_uid: false,
+            advanced_features: { enable_rtm: true, enable_tools: true },
+            parameters: { data_channel: 'rtm' },
         });
         expect(body.properties.token).toEqual(expect.any(String));
         expect(body.properties.llm).toBeUndefined();
         expect(body.properties.asr).toBeUndefined();
         expect(body.properties.tts).toBeUndefined();
+    });
+    it('injects per-conversation MCP headers in studio mode when MCP_STATIC_API_KEY is set', () => {
+        vi.stubEnv('AGORA_STUDIO_PIPELINE_ID', '2833d641f480489d8e6585ea08353c56');
+        vi.stubEnv('MCP_STATIC_API_KEY', 'static-test-key');
+        const body = buildConvoAiJoinBody(input) as {
+            properties: {
+                llm?: {
+                    mcp_servers?: Array<{
+                        name?: string;
+                        headers?: Record<string, string>;
+                    }>;
+                };
+            };
+        };
+        expect(body.properties.llm?.mcp_servers).toEqual([
+            {
+                name: 'shop',
+                headers: { 'X-Convo-Id': input.conversationId },
+            },
+        ]);
     });
     it('recovers the agent created before a retried join conflicts', async () => {
         const agentId = 'agent-created-by-the-first-request';
