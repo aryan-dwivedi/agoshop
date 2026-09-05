@@ -4,9 +4,14 @@ import { timingSafeEqual } from 'node:crypto';
 
 import { env } from '@shop/platform/env.js';
 import { unauthorized } from '@shop/platform/lib/errors.js';
+import { keys, redis } from '@shop/platform/lib/redis.js';
 
 import { callbackConversationId, verifyCallback } from '../callbackAuth.js';
-import { loadConversation, loadConversationByAgoraAgentId } from '../conversations.js';
+import {
+    loadConversation,
+    loadConversationByAgoraAgentId,
+    loadSingletonRunningConversation,
+} from '../conversations.js';
 import { isMcpProbeMethod } from './request.js';
 
 export type McpAuthContext = {
@@ -64,11 +69,21 @@ const resolveConversationId = async (headers: IncomingHttpHeaders): Promise<stri
     if (direct) return callbackConversationId(direct);
     const agentId = header(headers, 'x-agora-agent-id') ?? header(headers, 'x-agent-id');
     if (agentId) {
+        const cached = await redis.get(keys.mcpAgentConversation(agentId));
+        if (cached) {
+            const parsed = callbackConversationId(cached);
+            if (parsed) return parsed;
+        }
         const conversation = await loadConversationByAgoraAgentId(agentId);
         if (conversation) return conversation.id;
     }
     const channel = header(headers, 'x-rtc-channel') ?? header(headers, 'x-agora-channel');
     if (channel) return conversationIdFromRtcChannel(channel);
+    return null;
+};
+const resolveStaticSessionConversation = async (): Promise<ConversationRecord | null> => {
+    const singleton = await loadSingletonRunningConversation();
+    if (singleton) return singleton;
     return null;
 };
 const assertActiveConversation = (conversation: ConversationRecord): void => {
@@ -102,6 +117,11 @@ export const authenticateMcpRequest = async (
         }
         if (allowsStaticProbe(request)) {
             return { conversation: probeConversation(), turnId: 0, probe: true };
+        }
+        const sessionConversation = await resolveStaticSessionConversation();
+        if (sessionConversation) {
+            assertActiveConversation(sessionConversation);
+            return { conversation: sessionConversation, turnId: parseTurnId(headers) };
         }
         throw unauthorized('missing_conversation_id');
     }

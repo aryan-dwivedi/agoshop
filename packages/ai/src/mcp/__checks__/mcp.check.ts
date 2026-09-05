@@ -49,13 +49,13 @@ const rtcChannel = aiChannelForConversation(conversationId);
 const callbackExpiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000);
 const expires = Math.floor(callbackExpiresAt.getTime() / 1000);
 await db.execute(sql`
-  insert into ai_conversations
+    insert into ai_conversations
     (id, user_id, surface, transport, language, provider, rtc_channel,
-     viewer_uid, agent_uid, callback_expires_at, status)
+     viewer_uid, agent_uid, agora_agent_id, callback_expires_at, status)
   values
     (cast(${conversationId} as uuid), cast(${userRow.id} as uuid),
      'browse', 'voice', 'en-US', 'mock', ${rtcChannel}, 990001, 990002,
-     ${callbackExpiresAt.toISOString()}, 'running')
+     'fixture-agent-id', ${callbackExpiresAt.toISOString()}, 'running')
 `);
 const app = createApp(aiServiceRouters);
 const server = createServer(app);
@@ -184,7 +184,11 @@ const staticMissingConvo = await postMcp(
         authorization: 'Bearer mcp-static-check-secret-key',
     },
 );
-ok('static bearer without X-Convo-Id → 401', staticMissingConvo.status === 401);
+ok(
+    'static bearer tools/call without X-Convo-Id resolves singleton session → 200',
+    staticMissingConvo.status === 200,
+    staticMissingConvo.status,
+);
 console.log('\n=== MCP tools/call ===');
 const toolRes = await postMcp(
     {

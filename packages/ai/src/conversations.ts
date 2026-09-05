@@ -1,7 +1,7 @@
 import type { CreateConversationDto, Surface } from '@shop/shared';
 import { randomUUID } from 'node:crypto';
 
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, gt, isNotNull } from 'drizzle-orm';
 
 import { interruptConvoAiAgent, joinConvoAiAgent, leaveConvoAiAgent } from '@shop/agora/convoai.js';
 import { mintRtcToken, nextAgoraUid } from '@shop/agora/tokens.js';
@@ -11,6 +11,7 @@ import { env, features } from '@shop/platform/env.js';
 import { track } from '@shop/platform/lib/analytics.js';
 import { AppError, badRequest, conflict, forbidden, notFound } from '@shop/platform/lib/errors.js';
 import { logger } from '@shop/platform/lib/logger.js';
+import { keys, redis } from '@shop/platform/lib/redis.js';
 import { LANGUAGE_AUTO, aiChannelForConversation, resolveSpokenLanguage } from '@shop/shared';
 
 import { acquireSlot, refreshSlot, releaseSlot } from './admission.js';
@@ -60,6 +61,33 @@ export const loadConversationByAgoraAgentId = async (
         .where(eq(aiConversations.agoraAgentId, agentId))
         .limit(1);
     return row ?? null;
+};
+export const loadSingletonRunningConversation = async (): Promise<ConversationRecord | null> => {
+    const rows = await db
+        .select()
+        .from(aiConversations)
+        .where(
+            and(
+                eq(aiConversations.status, 'running'),
+                isNotNull(aiConversations.agoraAgentId),
+                gt(aiConversations.callbackExpiresAt, new Date()),
+            ),
+        )
+        .orderBy(desc(aiConversations.createdAt))
+        .limit(2);
+    if (rows.length === 1) return rows[0] ?? null;
+    return null;
+};
+export const rememberMcpAgentConversation = async (
+    agoraAgentId: string,
+    conversationId: string,
+    expiresAt: Date,
+): Promise<void> => {
+    const ttlSeconds = Math.max(60, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
+    await redis.setex(keys.mcpAgentConversation(agoraAgentId), ttlSeconds, conversationId);
+};
+export const forgetMcpAgentConversation = async (agoraAgentId: string): Promise<void> => {
+    await redis.del(keys.mcpAgentConversation(agoraAgentId));
 };
 const latestUserMessageText = async (conversationId: string): Promise<string | null> => {
     const [row] = await db
@@ -197,6 +225,11 @@ export const startConversation = async (
             .update(aiConversations)
             .set({ agoraAgentId: joinedAgentId, status: 'running', transport: 'voice' })
             .where(eq(aiConversations.id, conversation.id));
+        await rememberMcpAgentConversation(
+            joinedAgentId,
+            conversation.id,
+            conversation.callbackExpiresAt,
+        );
         track({
             type: 'ai_conversation_started',
             userId: conversation.userId,
@@ -254,6 +287,7 @@ export const stopConversation = async (
     }
     let leaveSucceeded = true;
     if (conversation.agoraAgentId) {
+        await forgetMcpAgentConversation(conversation.agoraAgentId);
         try {
             await leaveConvoAiAgent(conversation.agoraAgentId);
         } catch (err) {

@@ -23,6 +23,7 @@ export const keys = {
     promotionsCache: 'promo:v1:active',
     checkoutPolicyCache: 'policy:v1:active',
     convoLlmMode: (conversationId: string) => `convo:${conversationId}:llm_mode`,
+    mcpAgentConversation: (agoraAgentId: string) => `mcp:agent:${agoraAgentId}`,
     obsStreamKey: (sessionId: string) => `session:${sessionId}:obsStreamKey`,
 } as const;
 export const closeRedis = async (): Promise<void> => {
