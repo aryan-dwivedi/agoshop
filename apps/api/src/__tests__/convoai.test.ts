@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 if (!process.env.PUBLIC_API_URL) {
     try {
@@ -20,8 +20,12 @@ const input = {
 };
 afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
 });
 describe('ConvoAI speech handling', () => {
+    beforeEach(() => {
+        vi.stubEnv('AGORA_STUDIO_PIPELINE_ID', '');
+    });
     it('buffers startup speech and wires managed Agora services', () => {
         const body = buildConvoAiJoinBody(input) as {
             properties: {
@@ -77,6 +81,25 @@ describe('ConvoAI speech handling', () => {
                 },
             },
         });
+    });
+    it('uses the Console agent as-is when AGORA_STUDIO_PIPELINE_ID is set', () => {
+        const pipelineId = '2833d641f480489d8e6585ea08353c56';
+        vi.stubEnv('AGORA_STUDIO_PIPELINE_ID', pipelineId);
+        const body = buildConvoAiJoinBody(input) as {
+            pipeline_id?: string;
+            properties: Record<string, unknown>;
+        };
+        expect(body.pipeline_id).toBe(pipelineId);
+        expect(body.properties).toMatchObject({
+            channel: input.channel,
+            agent_rtc_uid: '1001',
+            remote_rtc_uids: ['1002'],
+            enable_string_uid: false,
+        });
+        expect(body.properties.token).toEqual(expect.any(String));
+        expect(body.properties.llm).toBeUndefined();
+        expect(body.properties.asr).toBeUndefined();
+        expect(body.properties.tts).toBeUndefined();
     });
     it('recovers the agent created before a retried join conflicts', async () => {
         const agentId = 'agent-created-by-the-first-request';

@@ -72,6 +72,8 @@ envVarGroups:
             sync: false
           - key: AGORA_CUSTOMER_SECRET
             sync: false
+          - key: AGORA_STUDIO_PIPELINE_ID
+            sync: false
           - key: AGORA_WEBHOOK_SECRET
             sync: false
           - key: LLM_PROVIDER

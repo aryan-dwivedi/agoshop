@@ -9,7 +9,7 @@ import { agoraBasicAuth, mintAgentRtcRtmToken } from './tokens.js';
 
 export { CONVOAI_FAILURE_MESSAGE };
 const BASE = 'https://api.agora.io/api/conversational-ai-agent/v2/projects';
-/** Agora managed TTS defaults — configured in the join body, not via app env vars. */
+/** Agora managed TTS defaults — used when no Studio pipeline is configured. */
 const MANAGED_TTS = {
     vendor: 'minimax',
     url: 'wss://api.minimax.io/ws/v1/t2a_v2',
@@ -44,17 +44,30 @@ export const buildConvoAiTtsBlock = (_language: string): Record<string, unknown>
         },
     },
 });
-export const buildConvoAiJoinBody = (input: ConvoAiJoinInput): Record<string, unknown> => {
+const studioPipelineId = (): string => {
+    if (process.env.AGORA_STUDIO_PIPELINE_ID !== undefined) {
+        return process.env.AGORA_STUDIO_PIPELINE_ID.trim();
+    }
+    return env.AGORA_STUDIO_PIPELINE_ID;
+};
+const buildChannelProperties = (input: ConvoAiJoinInput): Record<string, unknown> => ({
+    channel: input.channel,
+    token: mintAgentRtcRtmToken(input.channel, input.agentUid),
+    agent_rtc_uid: String(input.agentUid),
+    remote_rtc_uids: [String(input.viewerUid)],
+    enable_string_uid: false,
+    idle_timeout: env.CONVOAI_IDLE_TIMEOUT_SECONDS,
+});
+const buildStudioProperties = (input: ConvoAiJoinInput): Record<string, unknown> =>
+    buildChannelProperties(input);
+const buildProgrammaticLlmBlock = (input: ConvoAiJoinInput): Record<string, unknown> => {
     const mcpEndpoint = `${env.PUBLIC_API_URL.replace(/\/$/, '')}/mcp`;
     const authHeaders = {
         'X-Convo-Id': input.conversationId,
         'X-Convo-Expires': String(input.expires),
         'X-Convo-Signature': input.signature,
     };
-    const greetingConfigs = {
-        interruptable: false,
-    };
-    const llm = {
+    return {
         credential_mode: 'managed',
         vendor: 'openai',
         style: 'openai',
@@ -80,62 +93,72 @@ export const buildConvoAiJoinBody = (input: ConvoAiJoinInput): Record<string, un
             },
         ],
         greeting_message: input.greeting,
-        greeting_configs: greetingConfigs,
+        greeting_configs: {
+            interruptable: false,
+        },
         failure_message: CONVOAI_FAILURE_MESSAGE,
         max_history: 24,
     };
+};
+const buildProgrammaticProperties = (input: ConvoAiJoinInput): Record<string, unknown> => ({
+    ...buildChannelProperties(input),
+    advanced_features: {
+        enable_rtm: true,
+        enable_tools: true,
+    },
+    parameters: {
+        data_channel: 'rtm',
+        audio_scenario: 'chorus',
+        enable_metrics: true,
+        enable_error_message: true,
+    },
+    turn_detection: {
+        mode: 'default',
+        config: {
+            speech_threshold: 0.5,
+            start_of_speech: {
+                mode: 'vad',
+                vad_config: {
+                    interrupt_duration_ms: 120,
+                    speaking_interrupt_duration_ms: 320,
+                    prefix_padding_ms: 800,
+                },
+            },
+            end_of_speech: {
+                mode: 'semantic',
+                semantic_config: {
+                    silence_duration_ms: 320,
+                    max_wait_ms: 1200,
+                    pause_state_enabled: true,
+                },
+            },
+        },
+    },
+    interruption: {
+        enable: true,
+        mode: 'start_of_speech',
+    },
+    geofence: { area: 'INDIA' },
+    llm: buildProgrammaticLlmBlock(input),
+});
+export const buildConvoAiJoinBody = (input: ConvoAiJoinInput): Record<string, unknown> => {
+    const pipelineId = studioPipelineId();
+    if (pipelineId) {
+        return {
+            name: `convo-${input.conversationId}`,
+            pipeline_id: pipelineId,
+            properties: buildStudioProperties(input),
+        };
+    }
     return {
         name: `convo-${input.conversationId}`,
         properties: {
-            channel: input.channel,
-            token: mintAgentRtcRtmToken(input.channel, input.agentUid),
-            agent_rtc_uid: String(input.agentUid),
-            remote_rtc_uids: [String(input.viewerUid)],
-            enable_string_uid: false,
-            idle_timeout: env.CONVOAI_IDLE_TIMEOUT_SECONDS,
-            advanced_features: {
-                enable_rtm: true,
-                enable_tools: true,
-            },
-            parameters: {
-                data_channel: 'rtm',
-                audio_scenario: 'chorus',
-                enable_metrics: true,
-                enable_error_message: true,
-            },
-            turn_detection: {
-                mode: 'default',
-                config: {
-                    speech_threshold: 0.5,
-                    start_of_speech: {
-                        mode: 'vad',
-                        vad_config: {
-                            interrupt_duration_ms: 120,
-                            speaking_interrupt_duration_ms: 320,
-                            prefix_padding_ms: 800,
-                        },
-                    },
-                    end_of_speech: {
-                        mode: 'semantic',
-                        semantic_config: {
-                            silence_duration_ms: 320,
-                            max_wait_ms: 1200,
-                            pause_state_enabled: true,
-                        },
-                    },
-                },
-            },
-            interruption: {
-                enable: true,
-                mode: 'start_of_speech',
-            },
-            geofence: { area: 'INDIA' },
+            ...buildProgrammaticProperties(input),
             asr: {
                 vendor: 'ares',
                 language: input.language,
             },
             tts: buildConvoAiTtsBlock(input.language),
-            llm,
         },
     };
 };
@@ -267,7 +290,14 @@ export const joinConvoAiAgent = async (
             agora: json,
         });
     }
-    logger.info({ conversationId: input.conversationId, agentId }, 'convoai agent joined');
+    logger.info(
+        {
+            conversationId: input.conversationId,
+            agentId,
+            studioPipeline: studioPipelineId() || null,
+        },
+        'convoai agent joined',
+    );
     return { agentId };
 };
 export const leaveConvoAiAgent = async (agentId: string): Promise<void> => {

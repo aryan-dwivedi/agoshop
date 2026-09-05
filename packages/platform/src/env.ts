@@ -47,6 +47,7 @@ const schema = z
         CONVO_LLM_SHARED_SECRET: z.string().min(16),
         CONVO_CALLBACK_TTL_SECONDS: int(7200),
         AGORA_MANAGED_LLM_MODEL: z.string().default('gpt-4o-mini'),
+        AGORA_STUDIO_PIPELINE_ID: z.string().default(''),
         LLM_PROVIDER: z.enum(LLM_PROVIDER_IDS).default('mock'),
         LLM_BASE_URL: z.string().default('https://openrouter.ai/api/v1'),
         LLM_API_KEY: z.string().default(''),
