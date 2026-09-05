@@ -81,7 +81,7 @@ const SearchField = ({
                     value={term}
                     autoFocus={autoFocus}
                     onChange={(e) => setTerm(e.target.value)}
-                    placeholder="Search everything at AgoShop"
+                    placeholder="Search everything at agoshop"
                     className="h-10 min-w-0 flex-1 rounded-full bg-transparent px-4 text-14 text-[#001e60] outline-none placeholder:text-[#53657d]"
                 />
                 <button

@@ -1,6 +1,6 @@
 # Architecture
 
-> **Interview HLD:** [`hld/hld-one-page.excalidraw`](hld/hld-one-page.excalidraw) · [`hld/README.md`](hld/README.md)
+> **HLD:** [`hld/hld-one-page.excalidraw`](hld/hld-one-page.excalidraw) · [`hld/README.md`](hld/README.md)
 
 ## 1. What this system is
 

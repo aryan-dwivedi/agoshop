@@ -15,7 +15,7 @@ const MANAGED_TTS = {
     url: 'wss://api.minimax.io/ws/v1/t2a_v2',
     model: 'speech-2.8-turbo',
     voiceId: 'English_captivating_female1',
-    speed: 1.6,
+    speed: 1.0,
     sampleRate: 44100,
 } as const;
 export type ConvoAiJoinInput = {

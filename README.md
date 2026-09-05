@@ -1,4 +1,4 @@
-# Vela Live — AI-powered live commerce
+# agoshop — AI-powered live commerce
 
 A working web prototype for the Agora Solutions Architect exercise: a conventional multi-category storefront that grows **live shopping** and a **voice-first AI shopping assistant** on top of it, with a **20% discount that exists only while the relevant live session is actually live** — enforced as business logic, not presentation text.
 

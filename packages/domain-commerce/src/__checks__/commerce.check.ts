@@ -17,6 +17,7 @@ import { router as eventsRouter } from '@shop/api/routes/eventsStub.js';
 import { router as healthRouter } from '@shop/api/routes/health.js';
 import { router as meRouter } from '@shop/api/routes/me.js';
 import { router as ordersRouter } from '@shop/api/routes/orders.js';
+import { router as tokensRouter } from '@shop/api/routes/tokens.js';
 import { router as wishlistRouter } from '@shop/api/routes/wishlist.js';
 import { db, pool } from '@shop/db/client.js';
 import { invalidateCatalogCache } from '@shop/domain-commerce/catalog.js';
@@ -24,7 +25,11 @@ import { endSession } from '@shop/domain-live/sessions/lifecycle.js';
 import { closeRedis, keys, redis } from '@shop/platform/lib/redis.js';
 import { drainAnalyticsOnce } from '@shop/worker/background.js';
 
+import { addItem, clearCartWithin } from '../cart.js';
 import { compareProducts } from '../catalog.js';
+import { resolveLineContext } from '../eligibility.js';
+import { priceCart } from '../orders.js';
+import { captureOrder, createOrderIntent, expireStaleOrders } from '../ordersAsync.js';
 import { personalizedOffers, resolveLiveOffer } from '../promotions.js';
 import { recommend } from '../recommendations.js';
 import { checkDelivery } from '../serviceability.js';
@@ -333,6 +338,7 @@ const run = async (): Promise<void> => {
         cartRouter,
         checkoutRouter,
         ordersRouter,
+        tokensRouter,
         wishlistRouter,
         adminRouter,
         eventsRouter,
@@ -367,6 +373,13 @@ const run = async (): Promise<void> => {
         assert.equal(me.status, 200);
         assert.equal(me.body.user.id, userId);
         pass('GET /api/auth/me resolves the session cookie');
+        const arbitraryRtc = await api.request<ErrorBody>('POST', '/api/rtc/token', {
+            channel: `ai-${randomUUID()}`,
+            role: 'subscriber',
+        });
+        assert.equal(arbitraryRtc.status, 403, JSON.stringify(arbitraryRtc.body));
+        assert.equal(arbitraryRtc.body.error.code, 'rtc_channel_unavailable');
+        pass('subscriber tokens reject unknown and unauthorized RTC channels');
         const pdp = await api.request<{
             product: {
                 id: string;
@@ -505,8 +518,12 @@ const run = async (): Promise<void> => {
         );
         assert.ok(endedLine, 'the live-bound line survives session end');
         assert.equal(endedLine.liveEligible, false);
-        assert.equal(endedLine.pricing.discountMinorUnits, 0, 'live discount must drop');
-        assert.equal(endedLine.pricing.netMinorUnits, PRICE, 'back to shop price');
+        assert.ok(
+            !endedLine.applied.some(
+                (promotion) => promotion.code === `${TAG.toUpperCase().replace(/-/g, '_')}_LIVE`,
+            ),
+            'the ended session promotion must no longer apply',
+        );
         assert.ok(repriced.body.notices.includes('live_discount_expired'));
         assert.ok(!repriced.body.notices.includes('live_discount_active'));
         pass('session end drops live discount and raises live_discount_expired');
@@ -575,8 +592,7 @@ const run = async (): Promise<void> => {
         );
         assert.ok([201, 202].includes(paid.status), JSON.stringify(paid.body));
         if (paid.body.order.status === 'pending') {
-            const { captureOrder } = await import('../ordersAsync.js');
-            await captureOrder(paid.body.order.id);
+            await Promise.all(Array.from({ length: 10 }, () => captureOrder(paid.body.order.id)));
             const settled = await api.request<OrderBody>(
                 'GET',
                 `/api/orders/${paid.body.order.id}`,
@@ -591,8 +607,12 @@ const run = async (): Promise<void> => {
         const liveAttributed = paid.body.order.items.filter(
             (i) => i.liveSessionId === fixtures.liveSessionId,
         );
-        assert.equal(liveAttributed.length, 1, 'live attribution is stored per order line');
-        pass('paid order: stock decremented, cart cleared, per-line live attribution stored');
+        assert.equal(
+            liveAttributed.length,
+            0,
+            'ended sessions are not attributed as live checkout',
+        );
+        pass('paid order: concurrent capture decrements stock once and clears the cart');
         const replay = await api.request<OrderBody>(
             'POST',
             '/api/orders',
@@ -621,6 +641,123 @@ const run = async (): Promise<void> => {
         assert.equal(detail.body.order.id, paid.body.order.id);
         assert.ok(detail.body.order.items.length >= 1);
         pass('GET /api/orders and /api/orders/:id return the order with its breakdown');
+        const segmentUser = await one<{ id: string }>(sql`
+      insert into users (email, password_hash, display_name, role)
+      values (${`${TAG}-segments@checks.invalid`}, 'not-used', 'Segment Check', 'shopper')
+      returning id
+    `);
+        fixtures.userIds.push(segmentUser.id);
+        await db.execute(sql`
+      insert into orders
+        (user_id, status, subtotal_minor_units, discount_minor_units, total_minor_units,
+         payment_method, payment_ref, pincode, idempotency_key)
+      values
+        (cast(${segmentUser.id} as uuid), 'payment_failed', 100, 0, 100,
+         'card', ${`${TAG}-failed-ref`}, '560001', ${`${TAG}-failed`}),
+        (cast(${segmentUser.id} as uuid), 'expired', 100, 0, 100,
+         'card', ${`${TAG}-expired-ref`}, '560001', ${`${TAG}-expired`}),
+        (cast(${segmentUser.id} as uuid), 'cancelled', 100, 0, 100,
+         'card', ${`${TAG}-cancelled-ref`}, '560001', ${`${TAG}-cancelled`})
+    `);
+        const segmentContext = await resolveLineContext(
+            segmentUser.id,
+            {
+                variantId: fixtures.variantId,
+                quantity: 1,
+                surface: 'browse',
+                liveSessionId: null,
+                orderSubtotalMinorUnits: PRICE,
+            },
+            new Date(),
+        );
+        assert.ok(segmentContext.ctx.userSegments.includes('first_order'));
+        assert.ok(!segmentContext.ctx.userSegments.includes('loyalty_3plus'));
+        pass('failed, expired, and cancelled orders do not count as paid-order segments');
+        await api.request<CartDto>(
+            'POST',
+            '/api/cart/items',
+            { productId: fixtures.productId, variantId: fixtures.variantId, quantity: 1 },
+            { 'Idempotency-Key': `${TAG}-snapshot-line` },
+        );
+        const checkedOutSnapshot = await priceCart(userId, new Date());
+        await api.request<CartDto>(
+            'POST',
+            '/api/cart/items',
+            { productId: fixtures.otherProductId, variantId: fixtures.otherVariantId, quantity: 1 },
+            { 'Idempotency-Key': `${TAG}-later-line` },
+        );
+        await db.transaction((tx) => clearCartWithin(tx, userId, checkedOutSnapshot.lines));
+        const preservedCart = await api.request<CartDto>('GET', '/api/cart');
+        assert.deepEqual(
+            preservedCart.body.items.map((item) => item.productId),
+            [fixtures.otherProductId],
+            'a line added after the checkout snapshot must survive',
+        );
+        await api.request<CartDto>(
+            'DELETE',
+            `/api/cart/items/${preservedCart.body.items[0]?.id ?? ''}`,
+        );
+        pass('checkout clears only the cart lines included in its validated snapshot');
+        const reservationUsers = await Promise.all(
+            ['a', 'b'].map((suffix) =>
+                one<{ id: string }>(sql`
+          insert into users (email, password_hash, display_name, role)
+          values (${`${TAG}-reservation-${suffix}@checks.invalid`}, 'not-used',
+                  ${`Reservation ${suffix}`}, 'shopper')
+          returning id
+        `),
+            ),
+        );
+        fixtures.userIds.push(...reservationUsers.map((user) => user.id));
+        await db.execute(sql`
+      update product_variants set stock = 1
+      where id = cast(${fixtures.otherVariantId} as uuid)
+    `);
+        for (const reservationUser of reservationUsers) {
+            await addItem(reservationUser.id, {
+                productId: fixtures.otherProductId,
+                variantId: fixtures.otherVariantId,
+                quantity: 1,
+            });
+        }
+        const intents = await Promise.allSettled(
+            reservationUsers.map((reservationUser, index) =>
+                createOrderIntent(reservationUser.id, `${TAG}-reservation-${index}`, {
+                    paymentMethod: 'card',
+                    pincode: '560001',
+                    card: { number: '4111111111111111' },
+                }),
+            ),
+        );
+        const acceptedIntents = intents.filter(
+            (result): result is PromiseFulfilledResult<OrderDto> => result.status === 'fulfilled',
+        );
+        assert.equal(
+            acceptedIntents.length,
+            1,
+            'only one checkout may reserve the final stock unit',
+        );
+        const racedOrder = acceptedIntents[0]!.value;
+        await db.execute(sql`
+      update stock_reservations set expires_at = now() - interval '1 second'
+      where order_id = cast(${racedOrder.id} as uuid)
+    `);
+        const stockBeforeRace = await stockOf(fixtures.otherVariantId);
+        await Promise.all([captureOrder(racedOrder.id), expireStaleOrders()]);
+        const finalRaceOrder = await one<{ status: string }>(sql`
+      select status::text as status from orders where id = cast(${racedOrder.id} as uuid)
+    `);
+        const stockAfterRace = await stockOf(fixtures.otherVariantId);
+        assert.ok(
+            finalRaceOrder.status === 'paid' || finalRaceOrder.status === 'expired',
+            JSON.stringify(finalRaceOrder),
+        );
+        assert.equal(
+            stockAfterRace,
+            finalRaceOrder.status === 'paid' ? stockBeforeRace - 1 : stockBeforeRace,
+            'capture and expiry must produce one coherent terminal inventory outcome',
+        );
+        pass('stock reservations serialize checkout, capture, and expiry races');
         const wishAdd = await api.request<{
             added: boolean;
         }>('POST', '/api/wishlist', {
@@ -738,11 +875,10 @@ const run = async (): Promise<void> => {
             productId: fixtures.productId,
             surface: 'live',
         });
-        assert.equal(offer.active, true, JSON.stringify(offer));
-        assert.equal(offer.kind, 'percent');
-        assert.equal(offer.value, 20);
-        assert.equal(offer.effectiveDiscountMinorUnits, PRICE / 5);
-        assert.deepEqual(offer.eligibleProductIds, [fixtures.productId]);
+        assert.equal(offer.active, false, JSON.stringify(offer));
+        assert.equal(offer.reason, 'session_not_live');
+        assert.equal(offer.effectiveDiscountMinorUnits, 0);
+        assert.deepEqual(offer.eligibleProductIds, []);
         const browseOffer = await resolveLiveOffer({
             userId,
             liveSessionId: null,
@@ -751,7 +887,7 @@ const run = async (): Promise<void> => {
         });
         assert.equal(browseOffer.active, false);
         assert.equal(browseOffer.effectiveDiscountMinorUnits, 0);
-        pass('resolveLiveOffer reports kind/value/effective amount from the rule, not a constant');
+        pass('resolveLiveOffer reports an ended session as inactive');
         const offers = await personalizedOffers({ userId, productId: fixtures.productId });
         assert.ok(Array.isArray(offers.applied) && Array.isArray(offers.suppressed));
         const comparison = await compareProducts([fixtures.productId, fixtures.otherProductId]);

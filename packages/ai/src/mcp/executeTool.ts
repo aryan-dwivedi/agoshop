@@ -1,6 +1,5 @@
 import type { ConversationRecord } from '../conversations.js';
 import type { ToolName } from '@shop/shared';
-import { randomUUID } from 'node:crypto';
 
 import { SurfacedProducts } from '../surfacedProducts.js';
 import { executeToolCalls } from '../toolExecutor.js';
@@ -8,6 +7,7 @@ import { executeToolCalls } from '../toolExecutor.js';
 export const executeNamedTool = async (
     conversation: ConversationRecord,
     turnId: number,
+    toolCallId: string,
     name: ToolName,
     args: Record<string, unknown>,
 ): Promise<Record<string, unknown>> => {
@@ -15,7 +15,7 @@ export const executeNamedTool = async (
     const [executed] = await executeToolCalls(
         conversation,
         turnId,
-        [{ id: `mcp_${randomUUID()}`, name, arguments: JSON.stringify(args) }],
+        [{ id: toolCallId, name, arguments: JSON.stringify(args) }],
         surfaced,
         { path: 'direct' },
     );

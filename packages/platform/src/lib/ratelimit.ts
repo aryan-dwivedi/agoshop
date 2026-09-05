@@ -65,7 +65,8 @@ export const rateLimit =
                     res.setHeader('Retry-After', String(Math.max(1, retry)));
                     throw new AppError(429, 'rate_limited', `too many ${name} requests`);
                 }
-            } else if (budget.ipPerMinute) {
+            }
+            if (budget.ipPerMinute) {
                 const ip = req.ip ?? '0.0.0.0';
                 if (!isTrustedIp(ip)) {
                     const retry = await take(`rl:${name}:ip:${ip}`, budget.ipPerMinute);

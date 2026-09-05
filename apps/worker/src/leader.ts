@@ -6,6 +6,12 @@ import { redis } from '@shop/platform/lib/redis.js';
 export const LEADER_KEY = 'worker:leader';
 export const LEADER_TTL_SECONDS = 30;
 export const LEADER_RENEW_INTERVAL_MS = 10000;
+const RENEW_LEASE = `
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+  return redis.call('EXPIRE', KEYS[1], ARGV[2])
+end
+return 0
+`;
 let leaderToken = `worker-${process.pid}-${hostname()}`;
 let isLeader = false;
 export const getIsLeader = (): boolean => isLeader;
@@ -18,9 +24,14 @@ const acquireOrRenew = async (): Promise<boolean> => {
         isLeader = true;
         return true;
     }
-    const holder = await redis.get(LEADER_KEY);
-    if (holder === leaderToken) {
-        await redis.expire(LEADER_KEY, LEADER_TTL_SECONDS);
+    const renewed = (await redis.eval(
+        RENEW_LEASE,
+        1,
+        LEADER_KEY,
+        leaderToken,
+        String(LEADER_TTL_SECONDS),
+    )) as number;
+    if (renewed === 1) {
         isLeader = true;
         return true;
     }

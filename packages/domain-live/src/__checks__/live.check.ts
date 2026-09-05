@@ -379,6 +379,28 @@ const run = async (): Promise<void> => {
                 : degradedMessageIds().includes(`pre-mute-${tag}`),
             { transport: accepted.transport, fetchCount, degraded: degradedMessageIds() },
         );
+        const fetchAfterAccepted = fetchCount;
+        const degradedAfterAccepted = degradedMessageIds().length;
+        const replayed = await postChatMessage({
+            sessionId,
+            actor: { id: probeUser, displayName: 'Check Chatter', role: 'shopper' },
+            clientMessageId: `pre-mute-${tag}`,
+            text: 'hello before the mute',
+        });
+        await settle(50);
+        check(
+            'an idempotent chat replay is returned without fan-out',
+            replayed.replayed &&
+                replayed.fanOutShards === 0 &&
+                fetchCount === fetchAfterAccepted &&
+                degradedMessageIds().length === degradedAfterAccepted,
+            {
+                replayed: replayed.replayed,
+                fanOutShards: replayed.fanOutShards,
+                fetchCount,
+                degraded: degradedMessageIds(),
+            },
+        );
         await applyModeration({
             sessionId,
             actor: { userId: hostUser.id, role: 'seller' },

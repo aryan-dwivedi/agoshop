@@ -28,6 +28,9 @@ export const authenticateMcpRequest = async (
     if (!auth.ok) throw unauthorized('invalid_mcp_signature');
     const conversation = await loadConversation(conversationId);
     if (!conversation) throw unauthorized('conversation_not_found');
+    if (conversation.status !== 'created' && conversation.status !== 'running') {
+        throw unauthorized('conversation_not_active');
+    }
     if (conversation.callbackExpiresAt.getTime() <= Date.now()) {
         throw unauthorized('conversation_expired');
     }

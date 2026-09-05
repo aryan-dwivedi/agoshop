@@ -89,6 +89,21 @@ export const startRecording = async (session: {
     rtcChannel: string;
 }): Promise<void> => {
     if (!isRecordingViaAgora) return;
+    const [existing] = await db
+        .select({
+            resourceId: liveSessions.recordingResourceId,
+            sid: liveSessions.recordingSid,
+            status: liveSessions.recordingStatus,
+        })
+        .from(liveSessions)
+        .where(eq(liveSessions.id, session.id));
+    if (
+        existing?.resourceId &&
+        existing.sid &&
+        ['recording', 'processing', 'ready'].includes(existing.status)
+    ) {
+        return;
+    }
     const uid = String(await nextAgoraUid());
     await redis.set(recorderUidKey(session.id), uid, 'EX', 24 * 60 * 60);
     const acquired = await call('POST', '/acquire', {
@@ -98,8 +113,9 @@ export const startRecording = async (session: {
     });
     const resourceId = acquired.json?.['resourceId'];
     if (!acquired.ok || typeof resourceId !== 'string') {
-        await markFailed(session.id, `acquire_failed_${acquired.status}`);
-        return;
+        const reason = `acquire_failed_${acquired.status}`;
+        await markFailed(session.id, reason);
+        throw new Error(reason);
     }
     const started = await call('POST', `/resourceid/${resourceId}/mode/mix/start`, {
         cname: session.rtcChannel,
@@ -126,8 +142,9 @@ export const startRecording = async (session: {
     });
     const sid = started.json?.['sid'];
     if (!started.ok || typeof sid !== 'string') {
-        await markFailed(session.id, `start_failed_${started.status}`);
-        return;
+        const reason = `start_failed_${started.status}`;
+        await markFailed(session.id, reason);
+        throw new Error(reason);
     }
     await db
         .update(liveSessions)
@@ -180,12 +197,12 @@ export const stopRecording = async (sessionId: string): Promise<void> => {
             clientRequest: {},
         },
     );
-    if (!stopped.ok) {
-        await db
-            .update(liveSessions)
-            .set({ recordingStatus: 'processing' })
-            .where(eq(liveSessions.id, sessionId));
-        return;
+    if (!stopped.ok && stopped.status !== 404) {
+        logger.warn(
+            { sessionId, status: stopped.status, body: stopped.json },
+            'cloud recording stop failed',
+        );
+        throw new Error(`recording_stop_failed_${stopped.status}`);
     }
     const file = fileListUrl(stopped.json);
     if (!file) {

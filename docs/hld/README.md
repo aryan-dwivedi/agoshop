@@ -1,8 +1,8 @@
-# High-level design — interview one-pager
+# High-level design — one-pager
 
 Open the editable source: [`hld-one-page.excalidraw`](hld-one-page.excalidraw)
 
-The page is intentionally simple enough to redraw and explain in an interview. It uses architectural names rather than deployment-product names: the current nginx process is shown as a circular **Load Balancer**; three backend pools (Commerce API, SSE Gateway, AI Service), each with two replicas, are one stacked **Backend services** block; and persistence is split into a **Primary Database**, **Cache + Event Bus**, and **Recording Storage**.
+The page is intentionally simple enough to redraw and explain clearly. It uses architectural names rather than deployment-product names: the current nginx process is shown as a circular **Load Balancer**; three backend pools (Commerce API, SSE Gateway, AI Service), each with two replicas, are one stacked **Backend services** block; and persistence is split into a **Primary Database**, **Cache + Event Bus**, and **Recording Storage**.
 
 ## What the diagram says
 

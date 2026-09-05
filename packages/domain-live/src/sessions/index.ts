@@ -6,9 +6,15 @@ export type {
     UpdateSessionInput,
 } from './types.js';
 export { pinProduct, setSessionPricing } from './catalog.js';
-export { evaluateDeliveryTier } from './deliveryTier.js';
+export { evaluateDeliveryTier, reconcileDeliveryTierPublications } from './deliveryTier.js';
 export { joinSession, heartbeatSession } from './join.js';
-export { endSession, frozenShardCount, startDuePremieres, startSession } from './lifecycle.js';
+export {
+    endSession,
+    frozenShardCount,
+    reconcileSessionEffects,
+    startDuePremieres,
+    startSession,
+} from './lifecycle.js';
 export { flushViewers, touchPresence, viewerCount } from './presence.js';
 export {
     featuredProductId,

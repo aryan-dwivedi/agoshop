@@ -59,7 +59,7 @@ const createShopMcpServer = (conversationId: string, turnId: number): McpServer 
                 description: TOOL_DESCRIPTIONS[name],
                 inputSchema: schema.shape,
             },
-            (async (args: Record<string, unknown>) => {
+            (async (args: Record<string, unknown>, extra: { requestId: string | number }) => {
                 const conversation = await loadConversation(conversationId);
                 if (!conversation) {
                     return {
@@ -89,7 +89,13 @@ const createShopMcpServer = (conversationId: string, turnId: number): McpServer 
                         isError: true,
                     };
                 }
-                const result = await executeNamedTool(conversation, turnId, name, validated.data);
+                const result = await executeNamedTool(
+                    conversation,
+                    turnId,
+                    `mcp_${String(extra.requestId)}`,
+                    name,
+                    validated.data,
+                );
                 const isError = 'error' in result;
                 return { ...formatToolResult(result), isError };
             }) as never,

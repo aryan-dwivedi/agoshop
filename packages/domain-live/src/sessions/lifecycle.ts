@@ -1,4 +1,6 @@
-import { and, eq, isNotNull, lte } from 'drizzle-orm';
+import type { Tx } from '@shop/db/client.js';
+
+import { and, eq, isNotNull, lte, sql } from 'drizzle-orm';
 
 import { revokeObsIngest } from '@shop/agora/mediagateway.js';
 import { createConverter, deleteConverter } from '@shop/agora/mediapush.js';
@@ -33,6 +35,105 @@ const publishStatus = async (row: typeof liveSessions.$inferSelect): Promise<voi
         deliveryTier: row.deliveryTier,
     });
 };
+const withLifecycleLock = async (
+    kind: 'start' | 'end',
+    sessionId: string,
+    work: (tx: Tx) => Promise<void>,
+): Promise<void> => {
+    await db.transaction(async (tx) => {
+        await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtextextended(${`${kind}:${sessionId}`}, 0))`,
+        );
+        await work(tx);
+    });
+};
+const logSettledFailures = (
+    message: string,
+    sessionId: string,
+    results: PromiseSettledResult<void>[],
+): void => {
+    for (const result of results) {
+        if (result.status === 'rejected') {
+            logger.error({ err: result.reason, sessionId }, message);
+        }
+    }
+};
+const repairSessionStart = async (
+    sessionId: string,
+    attemptSideServices: boolean,
+): Promise<void> => {
+    let sideSession: { id: string; slug: string; rtcChannel: string } | null = null;
+    await withLifecycleLock('start', sessionId, async (tx) => {
+        const [row] = await tx.select().from(liveSessions).where(eq(liveSessions.id, sessionId));
+        if (!row) throw notFound('session_not_found');
+        if (row.status !== 'live') throw conflict('session_not_startable');
+        sideSession = { id: row.id, slug: row.slug, rtcChannel: row.rtcChannel };
+        if (row.startEffectsCompletedAt) return;
+        await redis
+            .pipeline()
+            .set(keys.sessionStatus(sessionId), 'live')
+            .set(keys.sessionTier(sessionId), row.deliveryTier)
+            .del(keys.sessionViewers(sessionId))
+            .exec();
+        await publishStatus(row);
+        await tx
+            .update(liveSessions)
+            .set({ startEffectsCompletedAt: new Date() })
+            .where(eq(liveSessions.id, sessionId));
+        track({ type: 'session_started', sessionId });
+    });
+    if (!attemptSideServices || sideSession === null) return;
+    const current = sideSession as { id: string; slug: string; rtcChannel: string };
+    const results = await Promise.allSettled([
+        startRecording({ id: current.id, rtcChannel: current.rtcChannel }),
+        startRtt({ id: current.id, rtcChannel: current.rtcChannel }),
+        createConverter({
+            id: current.id,
+            slug: current.slug,
+            rtcChannel: current.rtcChannel,
+        }),
+    ]);
+    logSettledFailures('session side service start failed', sessionId, results);
+};
+const repairSessionEnd = async (sessionId: string, attemptSideServices: boolean): Promise<void> => {
+    await withLifecycleLock('end', sessionId, async (tx) => {
+        const [row] = await tx.select().from(liveSessions).where(eq(liveSessions.id, sessionId));
+        if (!row) throw notFound('session_not_found');
+        if (row.status !== 'ended') throw conflict('session_not_live');
+        if (row.endEffectsCompletedAt) return;
+        await redis
+            .pipeline()
+            .set(keys.sessionStatus(sessionId), 'ended')
+            .del(keys.sessionViewers(sessionId))
+            .exec();
+        await publishStatus(row);
+        const holders = await db
+            .selectDistinct({ userId: carts.userId })
+            .from(cartItems)
+            .innerJoin(carts, eq(carts.id, cartItems.cartId))
+            .where(eq(cartItems.liveSessionId, sessionId));
+        await Promise.all(
+            holders.map(async (holder) => {
+                const cart = await getCart(holder.userId);
+                await publishToUser(holder.userId, EVENTS.cartUpdated, cart);
+            }),
+        );
+        await redis.xadd(keys.summaryStream, '*', 'sessionId', sessionId);
+        await tx
+            .update(liveSessions)
+            .set({ endEffectsCompletedAt: new Date() })
+            .where(eq(liveSessions.id, sessionId));
+        track({ type: 'session_ended', sessionId });
+    });
+    if (!attemptSideServices) return;
+    const results = await Promise.allSettled([
+        stopRecording(sessionId),
+        stopRtt(sessionId),
+        deleteConverter(sessionId),
+        revokeObsIngest(sessionId),
+    ]);
+    logSettledFailures('session side service cleanup failed', sessionId, results);
+};
 export const startSession = async (
     sessionId: string,
     options: {
@@ -57,96 +158,70 @@ export const startSession = async (
             startedAt: new Date(),
             chatShardCount: shardCount,
             deliveryTier: 'rtc',
+            deliveryTierPublishedAt: null,
             ...(options.consentAcknowledged ? { recordingConsentAt: new Date() } : {}),
         })
         .where(and(eq(liveSessions.id, sessionId), eq(liveSessions.status, 'scheduled')))
-        .returning();
-    const winner = won[0];
-    if (!winner) {
+        .returning({ id: liveSessions.id });
+    const transitioned = won.length > 0;
+    if (!transitioned) {
         const dto = await getSessionById(sessionId);
         if (!dto) throw notFound('session_not_found');
         if (dto.status !== 'live') throw conflict('session_not_startable');
-        return { session: dto, transitioned: false };
     }
-    await redis
-        .pipeline()
-        .set(keys.sessionStatus(sessionId), 'live')
-        .set(keys.sessionTier(sessionId), 'rtc')
-        .del(keys.sessionViewers(sessionId))
-        .exec();
-    await publishStatus(winner);
-    track({ type: 'session_started', sessionId });
-    if (options.consentAcknowledged) {
+    await repairSessionStart(sessionId, transitioned);
+    if (transitioned && options.consentAcknowledged) {
         track({
             type: 'recording_consent',
             sessionId,
             userId: options.actorUserId ?? null,
         });
     }
-    const results = await Promise.allSettled([
-        startRecording({ id: winner.id, rtcChannel: winner.rtcChannel }),
-        startRtt({ id: winner.id, rtcChannel: winner.rtcChannel }),
-        createConverter({
-            id: winner.id,
-            slug: winner.slug,
-            rtcChannel: winner.rtcChannel,
-        }),
-    ]);
-    for (const result of results) {
-        if (result.status === 'rejected') {
-            logger.error({ err: result.reason, sessionId }, 'session side service start failed');
-        }
-    }
     const dto = await getSessionById(sessionId);
     if (!dto) throw notFound('session_not_found');
-    return { session: dto, transitioned: true };
+    return { session: dto, transitioned };
 };
 export const endSession = async (sessionId: string) => {
     const won = await db
         .update(liveSessions)
-        .set({ status: 'ended', endedAt: new Date() })
+        .set({ status: 'ended', endedAt: new Date(), endEffectsCompletedAt: null })
         .where(and(eq(liveSessions.id, sessionId), eq(liveSessions.status, 'live')))
-        .returning();
-    const winner = won[0];
-    if (!winner) {
+        .returning({ id: liveSessions.id });
+    const transitioned = won.length > 0;
+    if (!transitioned) {
         const dto = await getSessionById(sessionId);
         if (!dto) throw notFound('session_not_found');
         if (dto.status !== 'ended') throw conflict('session_not_live');
-        return { session: dto, transitioned: false };
     }
-    await redis
-        .pipeline()
-        .set(keys.sessionStatus(sessionId), 'ended')
-        .del(keys.sessionViewers(sessionId))
-        .exec();
-    await publishStatus(winner);
-    const holders = await db
-        .selectDistinct({ userId: carts.userId })
-        .from(cartItems)
-        .innerJoin(carts, eq(carts.id, cartItems.cartId))
-        .where(eq(cartItems.liveSessionId, sessionId));
-    await Promise.all(
-        holders.map(async (h) => {
-            const cart = await getCart(h.userId);
-            await publishToUser(h.userId, EVENTS.cartUpdated, cart);
-        }),
-    );
-    await redis.xadd(keys.summaryStream, '*', 'sessionId', sessionId);
-    track({ type: 'session_ended', sessionId });
-    const results = await Promise.allSettled([
-        stopRecording(sessionId),
-        stopRtt(sessionId),
-        deleteConverter(sessionId),
-        revokeObsIngest(sessionId),
-    ]);
-    for (const result of results) {
-        if (result.status === 'rejected') {
-            logger.error({ err: result.reason, sessionId }, 'session side service cleanup failed');
-        }
-    }
+    await repairSessionEnd(sessionId, transitioned);
     const dto = await getSessionById(sessionId);
     if (!dto) throw notFound('session_not_found');
-    return { session: dto, transitioned: true };
+    return { session: dto, transitioned };
+};
+export const reconcileSessionEffects = async (): Promise<number> => {
+    const rows = await db
+        .select({ id: liveSessions.id, status: liveSessions.status })
+        .from(liveSessions)
+        .where(isNotNull(liveSessions.startedAt))
+        .limit(100);
+    let repaired = 0;
+    for (const row of rows) {
+        try {
+            if (row.status === 'live') {
+                await repairSessionStart(row.id, true);
+                repaired += 1;
+            } else if (row.status === 'ended') {
+                await repairSessionEnd(row.id, true);
+                repaired += 1;
+            }
+        } catch (err) {
+            logger.warn(
+                { err, sessionId: row.id, status: row.status },
+                'session lifecycle repair deferred',
+            );
+        }
+    }
+    return repaired;
 };
 export const startDuePremieres = async (): Promise<number> => {
     const due = await db

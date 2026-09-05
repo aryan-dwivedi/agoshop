@@ -18,7 +18,7 @@ npm-debug.log*
 # Local stack / runtime data
 .stack/
 var/
-velapub/
+agoshoppub/
 *.rdb
 dump.rdb
 

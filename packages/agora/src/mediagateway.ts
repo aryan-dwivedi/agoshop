@@ -18,7 +18,10 @@ const streamKeyBase = () =>
 const revokeStoredStreamKey = async (sessionId: string): Promise<void> => {
     const streamKey = await redis.get(keys.obsStreamKey(sessionId));
     if (!streamKey) return;
-    await call('DELETE', `/${encodeURIComponent(streamKey)}`);
+    const revoked = await call('DELETE', `/${encodeURIComponent(streamKey)}`);
+    if (!revoked.ok && revoked.status !== 404) {
+        throw new Error(`media_gateway_revoke_failed_${revoked.status}`);
+    }
     await redis.del(keys.obsStreamKey(sessionId));
 };
 const call = async (

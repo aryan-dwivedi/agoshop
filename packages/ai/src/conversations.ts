@@ -179,11 +179,13 @@ export const startConversation = async (
         throw conflict('conversation_expired', 'start a fresh conversation');
     }
     await acquireSlot(conversation.id);
+    let joinedAgentId: string | null = null;
     try {
-        const { agentId } = await joinConvoAiAgent(await buildConvoAiJoinParams(conversation));
+        const joined = await joinConvoAiAgent(await buildConvoAiJoinParams(conversation));
+        joinedAgentId = joined.agentId;
         await db
             .update(aiConversations)
-            .set({ agoraAgentId: agentId, status: 'running', transport: 'voice' })
+            .set({ agoraAgentId: joinedAgentId, status: 'running', transport: 'voice' })
             .where(eq(aiConversations.id, conversation.id));
         track({
             type: 'ai_conversation_started',
@@ -191,24 +193,39 @@ export const startConversation = async (
             sessionId: conversation.liveSessionId,
             payload: {
                 conversationId: conversation.id,
-                agoraAgentId: agentId,
+                agoraAgentId: joinedAgentId,
                 transport: 'voice',
             },
         });
         logger.info(
             {
                 conversationId: conversation.id,
-                agoraAgentId: agentId,
+                agoraAgentId: joinedAgentId,
                 channel: conversation.rtcChannel,
             },
             'convoai agent joined',
         );
-        return { agentId };
+        return { agentId: joinedAgentId };
     } catch (err) {
+        if (joinedAgentId) {
+            try {
+                await leaveConvoAiAgent(joinedAgentId);
+                joinedAgentId = null;
+            } catch (leaveErr) {
+                logger.error(
+                    { err: leaveErr, conversationId: conversation.id, agoraAgentId: joinedAgentId },
+                    'convoai agent cleanup failed; persisted for the lease sweeper',
+                );
+            }
+        }
         await releaseSlot(conversation.id);
         await db
             .update(aiConversations)
-            .set({ status: 'failed', endedAt: new Date() })
+            .set({
+                status: 'failed',
+                endedAt: new Date(),
+                agoraAgentId: joinedAgentId,
+            })
             .where(eq(aiConversations.id, conversation.id));
         throw err;
     }
@@ -225,13 +242,23 @@ export const stopConversation = async (
         await releaseSlot(conversationId);
         return;
     }
+    let leaveSucceeded = true;
     if (conversation.agoraAgentId) {
-        await leaveConvoAiAgent(conversation.agoraAgentId).catch((err: unknown) =>
+        try {
+            await leaveConvoAiAgent(conversation.agoraAgentId);
+        } catch (err) {
+            leaveSucceeded = false;
             logger.warn(
                 { err, conversationId, agoraAgentId: conversation.agoraAgentId },
-                'convoai leave failed; releasing the slot anyway',
-            ),
-        );
+                'convoai leave failed; retaining the agent id for cleanup retry',
+            );
+        }
+    }
+    if (leaveSucceeded && conversation.agoraAgentId) {
+        await db
+            .update(aiConversations)
+            .set({ agoraAgentId: null })
+            .where(eq(aiConversations.id, conversationId));
     }
     await releaseSlot(conversationId);
     if (conversation.status === 'running' || conversation.status === 'created') {

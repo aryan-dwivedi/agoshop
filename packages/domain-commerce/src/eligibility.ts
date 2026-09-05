@@ -87,7 +87,8 @@ const loadUserFacts = async (
 ): Promise<SegmentRow> => {
     const { rows } = await exec.execute<SegmentRow>(sql`
     select
-      (select count(*)::int from orders o where o.user_id = cast(${userId} as uuid)) as paid_orders,
+      (select count(*)::int from orders o
+       where o.user_id = cast(${userId} as uuid) and o.status = 'paid') as paid_orders,
       (select exists(select 1 from wishlist_items w
                       where w.user_id = cast(${userId} as uuid)
                         and w.product_id = cast(${productId} as uuid))) as wishlisted,

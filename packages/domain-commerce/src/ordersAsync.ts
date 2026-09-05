@@ -4,7 +4,7 @@ import type { OrderDto } from '@shop/shared';
 
 import { sql } from 'drizzle-orm';
 
-import { db } from '@shop/db/client.js';
+import { db, pool } from '@shop/db/client.js';
 import { env } from '@shop/platform/env.js';
 import { track } from '@shop/platform/lib/analytics.js';
 import { AppError, badRequest, conflict } from '@shop/platform/lib/errors.js';
@@ -89,13 +89,17 @@ const rollbackCommittedStock = async (orderId: string, userId: string): Promise<
       select status::text as status from orders
       where id = cast(${orderId} as uuid) for update
     `);
-        if (locked[0]?.status !== 'pending') return;
+        if (locked[0]?.status !== 'capturing') return;
         await tx.execute(sql`
       update product_variants pv
-      set stock = pv.stock + oi.quantity
-      from order_items oi
-      where oi.order_id = cast(${orderId} as uuid)
-        and pv.id = oi.variant_id
+      set stock = pv.stock + reservations.quantity
+      from (
+        select variant_id, sum(quantity)::int as quantity
+        from stock_reservations
+        where order_id = cast(${orderId} as uuid) and status = 'confirmed'
+        group by variant_id
+      ) reservations
+      where pv.id = reservations.variant_id
     `);
         await tx.execute(sql`
       update stock_reservations set status = 'released'
@@ -103,7 +107,7 @@ const rollbackCommittedStock = async (orderId: string, userId: string): Promise<
     `);
         await tx.execute(sql`
       update orders set status = 'payment_failed'
-      where id = cast(${orderId} as uuid) and status = 'pending'
+      where id = cast(${orderId} as uuid) and status = 'capturing'
     `);
         await releasePromotionHolds(orderId, tx);
     });
@@ -160,6 +164,14 @@ export const createOrderIntent = async (
                     },
                 });
             }
+            const variantIds = [...new Set(revalidated.lines.map((line) => line.variantId))].sort();
+            for (const variantId of variantIds) {
+                await tx.execute(sql`
+          select id from product_variants
+          where id = cast(${variantId} as uuid)
+          for update
+        `);
+            }
             for (const line of revalidated.lines) {
                 const available = await availableStock(line.variantId, tx);
                 if (available < line.quantity) {
@@ -201,7 +213,7 @@ export const createOrderIntent = async (
         `);
             }
             await insertPromotionHolds(tx, userId, insertedId, applied);
-            await clearCartWithin(tx, userId);
+            await clearCartWithin(tx, userId, revalidated.lines);
             return { insertedId, applied };
         });
         committedOrderId = result.insertedId;
@@ -225,46 +237,57 @@ export const createOrderIntent = async (
         throw err;
     }
 };
-export const captureOrder = async (orderId: string): Promise<void> => {
-    const order = await db.transaction(async (tx) => {
-        const { rows } = await tx.execute<{
-            id: string;
-            user_id: string;
-            status: string;
-            payment_ref: string;
-        }>(sql`
+const captureOrderLocked = async (orderId: string): Promise<void> => {
+    type CaptureOrderRow = {
+        id: string;
+        user_id: string;
+        status: string;
+        payment_ref: string;
+    };
+    const { rows: claimed } = await db.execute<CaptureOrderRow>(sql`
+    update orders
+    set status = 'capturing'
+    where id = cast(${orderId} as uuid) and status = 'pending'
+    returning id, user_id, status::text as status, payment_ref
+  `);
+    let order = claimed[0] ?? null;
+    if (!order) {
+        const { rows } = await db.execute<CaptureOrderRow>(sql`
       select id, user_id, status::text as status, payment_ref
       from orders
-      where id = cast(${orderId} as uuid) and status = 'pending'
-      for update skip locked
+      where id = cast(${orderId} as uuid) and status = 'capturing'
     `);
-        return rows[0] ?? null;
-    });
+        order = rows[0] ?? null;
+    }
     if (!order) return;
-    let stockCommitted = false;
     try {
-        await db.transaction(async (tx) => {
+        const canCapture = await db.transaction(async (tx) => {
             const { rows: locked } = await tx.execute<{
                 status: string;
             }>(sql`
         select status::text as status from orders
         where id = cast(${orderId} as uuid) for update
       `);
-            if (locked[0]?.status !== 'pending') return;
-            const { rows: lines } = await tx.execute<{
+            if (locked[0]?.status !== 'capturing') return false;
+            const { rows: activeLines } = await tx.execute<{
                 variant_id: string;
                 quantity: number;
             }>(sql`
-        select variant_id, quantity from order_items where order_id = cast(${orderId} as uuid)
+        select variant_id, sum(quantity)::int as quantity
+        from stock_reservations
+        where order_id = cast(${orderId} as uuid)
+          and status = 'active'
+        group by variant_id
+        order by variant_id
       `);
-            for (const line of lines) {
-                const { rows: dec } = await tx.execute(sql`
+            for (const line of activeLines) {
+                const { rows: decremented } = await tx.execute(sql`
           update product_variants
           set stock = stock - ${line.quantity}
           where id = cast(${line.variant_id} as uuid) and stock >= ${line.quantity}
           returning stock
         `);
-                if (dec.length === 0) {
+                if (decremented.length === 0) {
                     throw conflict('out_of_stock', 'stock unavailable at capture', {
                         variantId: line.variant_id,
                     });
@@ -274,12 +297,13 @@ export const captureOrder = async (orderId: string): Promise<void> => {
         update stock_reservations set status = 'confirmed'
         where order_id = cast(${orderId} as uuid) and status = 'active'
       `);
+            return true;
         });
-        stockCommitted = true;
+        if (!canCapture) return;
     } catch (err) {
         await db.execute(sql`
       update orders set status = 'payment_failed'
-      where id = cast(${orderId} as uuid) and status = 'pending'
+      where id = cast(${orderId} as uuid) and status = 'capturing'
     `);
         await db.execute(sql`
       update stock_reservations set status = 'released'
@@ -294,7 +318,7 @@ export const captureOrder = async (orderId: string): Promise<void> => {
     }
     const captured = await capture(order.payment_ref);
     if (!captured.ok) {
-        if (stockCommitted) await rollbackCommittedStock(orderId, order.user_id);
+        await rollbackCommittedStock(orderId, order.user_id);
         await voidPreauthorization(order.payment_ref);
         return;
     }
@@ -302,7 +326,7 @@ export const captureOrder = async (orderId: string): Promise<void> => {
         id: string;
     }>(sql`
     update orders set status = 'paid'
-    where id = cast(${orderId} as uuid) and status = 'pending'
+    where id = cast(${orderId} as uuid) and status = 'capturing'
     returning id
   `);
     if (paidRows.length === 0) return;
@@ -319,6 +343,28 @@ export const captureOrder = async (orderId: string): Promise<void> => {
         payload: { orderId, totalMinorUnits: paid.totalMinorUnits },
     });
 };
+export const captureOrder = async (orderId: string): Promise<void> => {
+    const client = await pool.connect();
+    let locked = false;
+    try {
+        await client.query('select pg_advisory_lock(hashtextextended($1, 0))', [
+            `order-capture:${orderId}`,
+        ]);
+        locked = true;
+        await captureOrderLocked(orderId);
+    } finally {
+        if (locked) {
+            await client
+                .query('select pg_advisory_unlock(hashtextextended($1, 0))', [
+                    `order-capture:${orderId}`,
+                ])
+                .catch((err: unknown) =>
+                    logger.warn({ err, orderId }, 'order capture advisory unlock failed'),
+                );
+        }
+        client.release();
+    }
+};
 export const expireStaleOrders = async (): Promise<number> => {
     const { rows } = await db.execute<{
         order_id: string;
@@ -328,24 +374,52 @@ export const expireStaleOrders = async (): Promise<number> => {
     select distinct o.id as order_id, o.payment_ref, o.user_id
     from orders o
     join stock_reservations sr on sr.order_id = o.id
-    where o.status = 'pending'
+    where o.status in ('pending', 'expiring')
       and sr.status = 'active'
       and sr.expires_at < now()
   `);
     let expired = 0;
-    for (const row of rows) {
-        await voidPreauthorization(row.payment_ref);
-        await db.execute(sql`
-      update orders set status = 'expired'
-      where id = cast(${row.order_id} as uuid) and status = 'pending'
+    for (const candidate of rows) {
+        const { rows: claimed } = await db.execute<{
+            payment_ref: string;
+            user_id: string;
+        }>(sql`
+      update orders set status = 'expiring'
+      where id = cast(${candidate.order_id} as uuid) and status = 'pending'
+      returning payment_ref, user_id
     `);
-        await db.execute(sql`
-      update stock_reservations set status = 'expired'
-      where order_id = cast(${row.order_id} as uuid) and status = 'active'
+        const order =
+            claimed[0] ??
+            (candidate.payment_ref
+                ? { payment_ref: candidate.payment_ref, user_id: candidate.user_id }
+                : null);
+        if (!order) continue;
+        const { rows: current } = await db.execute<{ status: string }>(sql`
+      select status::text as status from orders
+      where id = cast(${candidate.order_id} as uuid)
     `);
-        await releasePromotionHolds(row.order_id);
-        const dto = await getOrder(row.user_id, row.order_id);
-        if (dto) await publishToUser(row.user_id, EVENTS.orderUpdated, dto);
+        if (current[0]?.status !== 'expiring') continue;
+        await voidPreauthorization(order.payment_ref);
+        const transitioned = await db.transaction(async (tx) => {
+            const { rows: locked } = await tx.execute<{ status: string }>(sql`
+        select status::text as status from orders
+        where id = cast(${candidate.order_id} as uuid) for update
+      `);
+            if (locked[0]?.status !== 'expiring') return false;
+            await tx.execute(sql`
+        update stock_reservations set status = 'expired'
+        where order_id = cast(${candidate.order_id} as uuid) and status = 'active'
+      `);
+            await releasePromotionHolds(candidate.order_id, tx);
+            await tx.execute(sql`
+        update orders set status = 'expired'
+        where id = cast(${candidate.order_id} as uuid) and status = 'expiring'
+      `);
+            return true;
+        });
+        if (!transitioned) continue;
+        const dto = await getOrder(order.user_id, candidate.order_id);
+        if (dto) await publishToUser(order.user_id, EVENTS.orderUpdated, dto);
         expired += 1;
     }
     return expired;

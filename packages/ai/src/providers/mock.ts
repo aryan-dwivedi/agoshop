@@ -34,7 +34,17 @@ type Script =
           kind: 'tool';
           tool: 'add_to_cart' | 'get_product_details';
           productId: string;
+      }
+    | {
+          kind: 'search';
+          query: string;
+      }
+    | {
+          kind: 'greeting';
       };
+const GREETING = /^[\s!.,]*(?:hi|hey|hello|hiya|namaste|ji|yo|sup|good\s+(?:morning|afternoon|evening))[\s!.,]*$/iu;
+const SHOPPING_PREFIX =
+    /\b(?:i\s+)?(?:need|want|looking\s+for|find(?:\s+me)?|search(?:\s+for)?|show\s+me|get(?:\s+me)?|buy|any)\s+(.+)/iu;
 const lastUserText = (messages: ChatMessage[]): string => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
         const message = messages[i]!;
@@ -42,10 +52,54 @@ const lastUserText = (messages: ChatMessage[]): string => {
     }
     return '';
 };
+const extractSearchQuery = (text: string): string | null => {
+    const trimmed = text.trim().replace(/[?.!]+$/u, '').trim();
+    if (trimmed.length === 0 || GREETING.test(trimmed)) return null;
+    const prefixed = SHOPPING_PREFIX.exec(trimmed);
+    if (prefixed?.[1]) return prefixed[1].trim().slice(0, 200);
+    if (trimmed.length >= 2) return trimmed.slice(0, 200);
+    return null;
+};
+const lastToolResult = (messages: ChatMessage[]): ChatMessage | undefined =>
+    [...messages].reverse().find((message) => message.role === 'tool');
+const summarizeSearchResults = (messages: ChatMessage[]): string[] => {
+    const tool = lastToolResult(messages);
+    if (!tool?.content) return ['I could not find anything matching that. What else can I help with?'];
+    try {
+        const data = JSON.parse(tool.content) as {
+            total?: number;
+            results?: Array<{ title?: string }>;
+        };
+        const results = data.results ?? [];
+        if (results.length === 0) {
+            return ['I did not find anything matching that in the catalog. What else can I help with?'];
+        }
+        const names = results
+            .map((item) => item.title?.trim())
+            .filter((title): title is string => Boolean(title))
+            .slice(0, 3);
+        if (names.length === 0) {
+            return ['I found a few options — tap a product card to see details.'];
+        }
+        if (names.length === 1) {
+            return [`I found ${names[0]}. Want details or should I add it to your cart?`];
+        }
+        const tail = (data.total ?? results.length) > names.length ? ' and more' : '';
+        return [`I found ${names.join(', ')}${tail}. Which one interests you?`];
+    } catch {
+        return ['I found a few options — tap a product card to see details.'];
+    }
+};
 const chooseScript = (messages: ChatMessage[]): Script => {
     if (messages.some((m) => m.role === 'tool')) return { kind: 'text' };
-    const match = DIRECTIVE.exec(lastUserText(messages));
-    if (!match) return { kind: 'text' };
+    const text = lastUserText(messages);
+    const match = DIRECTIVE.exec(text);
+    if (!match) {
+        if (GREETING.test(text.trim())) return { kind: 'greeting' };
+        const query = extractSearchQuery(text);
+        if (query) return { kind: 'search', query };
+        return { kind: 'greeting' };
+    }
     const [, kind, tool, productId] = match;
     if (kind === 'slow') return { kind: 'slow' };
     if (kind === 'streaming') return { kind: 'streaming' };
@@ -84,7 +138,27 @@ const CLOSING = [
     'with the live discount applied. ',
     'Anything else?',
 ];
-const OPENING = ['Sure. ', 'Looking at the catalog ', 'for you ', 'right now.'];
+const GREETING_REPLY = [
+    'Hi! ',
+    'Tell me what you are shopping for ',
+    'and I will help you find it.',
+];
+const emitToolCall = function* (
+    name: string,
+    args: string,
+    signal: AbortSignal,
+): Generator<LlmChunk> {
+    const id = `call_mock_${(callSeq += 1)}`;
+    const split = Math.max(1, Math.floor(args.length / 3));
+    if (signal.aborted) throw abortError();
+    yield {
+        toolCalls: [{ index: 0, id, name, argumentsDelta: '' }],
+    };
+    yield { toolCalls: [{ index: 0, argumentsDelta: args.slice(0, split) }] };
+    yield { toolCalls: [{ index: 0, argumentsDelta: args.slice(split, split * 2) }] };
+    yield { toolCalls: [{ index: 0, argumentsDelta: args.slice(split * 2) }] };
+    yield { finishReason: 'tool_calls' };
+};
 async function* run(req: LlmRequest): AsyncGenerator<LlmChunk> {
     mockStats.streams += 1;
     const script = chooseScript(req.messages);
@@ -160,13 +234,30 @@ async function* run(req: LlmRequest): AsyncGenerator<LlmChunk> {
             mockStats.completed += 1;
             return;
         }
+        if (script.kind === 'greeting') {
+            for (const delta of GREETING_REPLY) {
+                if (req.signal.aborted) throw abortError();
+                yield { contentDelta: delta };
+            }
+            yield { finishReason: 'stop' };
+            mockStats.completed += 1;
+            return;
+        }
+        if (script.kind === 'search') {
+            const args = JSON.stringify({ query: script.query, limit: 5 });
+            yield* emitToolCall('search_products', args, req.signal);
+            mockStats.completed += 1;
+            return;
+        }
         if (script.kind === 'text') {
             const answer =
                 closing && closingTool === 'check_delivery'
                     ? ['Yes — ', 'delivery is available to 560001.']
-                    : closing
-                      ? CLOSING
-                      : OPENING;
+                    : closing && closingTool === 'search_products'
+                      ? summarizeSearchResults(req.messages)
+                      : closing
+                        ? CLOSING
+                        : GREETING_REPLY;
             for (const delta of answer) {
                 if (req.signal.aborted) throw abortError();
                 yield { contentDelta: delta };
@@ -175,23 +266,13 @@ async function* run(req: LlmRequest): AsyncGenerator<LlmChunk> {
             mockStats.completed += 1;
             return;
         }
-        const id = `call_mock_${(callSeq += 1)}`;
         const args =
             script.tool === 'add_to_cart'
                 ? `{"product_id":"${script.productId}","quantity":1}`
                 : `{"product_id":"${script.productId}"}`;
-        const split = Math.floor(args.length / 3);
         yield { contentDelta: 'Let me ' };
         yield { contentDelta: 'take care of that.' };
-        yield {
-            toolCalls: [{ index: 0, id, name: script.tool, argumentsDelta: '' }],
-        };
-        yield { toolCalls: [{ index: 0, argumentsDelta: args.slice(0, split) }] };
-        yield {
-            toolCalls: [{ index: 0, argumentsDelta: args.slice(split, split * 2) }],
-        };
-        yield { toolCalls: [{ index: 0, argumentsDelta: args.slice(split * 2) }] };
-        yield { finishReason: 'tool_calls' };
+        yield* emitToolCall(script.tool, args, req.signal);
         mockStats.completed += 1;
     } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') mockStats.aborted += 1;

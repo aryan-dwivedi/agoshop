@@ -202,7 +202,8 @@ export type CheckoutOptionsDto = {
     pincodeServiceable: boolean | null;
     etaDays: number | null;
 };
-export type OrderStatus = 'pending' | 'paid' | 'payment_failed' | 'expired' | 'cancelled';
+export type OrderStatus =
+    'pending' | 'capturing' | 'expiring' | 'paid' | 'payment_failed' | 'expired' | 'cancelled';
 export type FulfilmentStatus =
     'processing' | 'packed' | 'shipped' | 'out_for_delivery' | 'delivered' | 'failed';
 export type OrderDto = {

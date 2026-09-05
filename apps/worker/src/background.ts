@@ -1,7 +1,7 @@
 import { unlink } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 
-import { and, eq, inArray, isNotNull, lt } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, lt, or } from 'drizzle-orm';
 
 import { listPollableRecordingSessionIds, pollRecording } from '@shop/agora/recording.js';
 import { startRtt } from '@shop/agora/rtt.js';
@@ -25,6 +25,8 @@ import { flushReactions } from '@shop/domain-live/reactions.js';
 import {
     flushViewers,
     listLiveSessionIds,
+    reconcileDeliveryTierPublications,
+    reconcileSessionEffects,
     startDuePremieres,
     viewerCount,
 } from '@shop/domain-live/sessions.js';
@@ -336,9 +338,12 @@ export const sweepLeasesOnce = async (): Promise<number> => {
         .select({ id: aiConversations.id })
         .from(aiConversations)
         .where(
-            and(
-                inArray(aiConversations.status, ['created', 'running']),
-                lt(aiConversations.callbackExpiresAt, new Date()),
+            or(
+                and(
+                    inArray(aiConversations.status, ['created', 'running']),
+                    lt(aiConversations.callbackExpiresAt, new Date()),
+                ),
+                and(eq(aiConversations.status, 'failed'), isNotNull(aiConversations.agoraAgentId)),
             ),
         )
         .limit(200);
@@ -511,6 +516,12 @@ export const startBackground = async (): Promise<void> => {
     leaderLoop('lease-sweep', SWEEP_INTERVAL_MS, sweepLeasesOnce);
     leaderLoop('recording-poll', RECORDING_POLL_INTERVAL_MS, pollRecordingsOnce);
     leaderLoop('premiere-start', PREMIERE_INTERVAL_MS, startDuePremieresOnce);
+    leaderLoop('session-lifecycle-repair', PREMIERE_INTERVAL_MS, reconcileSessionEffects);
+    leaderLoop(
+        'delivery-tier-publication-repair',
+        PREMIERE_INTERVAL_MS,
+        reconcileDeliveryTierPublications,
+    );
     leaderLoop('retention', RETENTION_INTERVAL_MS, runRetentionPurge);
 };
 export const stopBackground = async (signal: string): Promise<void> => {

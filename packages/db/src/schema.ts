@@ -33,6 +33,8 @@ export const supportTicketStatusEnum = pgEnum('support_ticket_status', [
 ]);
 export const orderStatusEnum = pgEnum('order_status', [
     'pending',
+    'capturing',
+    'expiring',
     'paid',
     'payment_failed',
     'expired',
@@ -357,6 +359,8 @@ export const liveSessions = pgTable('live_sessions', {
     scheduledFor: timestamp('scheduled_for', { withTimezone: true }),
     startedAt: timestamp('started_at', { withTimezone: true }),
     endedAt: timestamp('ended_at', { withTimezone: true }),
+    startEffectsCompletedAt: timestamp('start_effects_completed_at', { withTimezone: true }),
+    endEffectsCompletedAt: timestamp('end_effects_completed_at', { withTimezone: true }),
     rtcChannel: text('rtc_channel').notNull(),
     coverImageUrl: text('cover_image_url'),
     language: text('language').notNull().default('en-US'),
@@ -366,6 +370,7 @@ export const liveSessions = pgTable('live_sessions', {
     discountPercent: integer('discount_percent'),
     chatShardCount: integer('chat_shard_count').notNull().default(1),
     deliveryTier: deliveryTierEnum('delivery_tier').notNull().default('rtc'),
+    deliveryTierPublishedAt: timestamp('delivery_tier_published_at', { withTimezone: true }),
     recordingConsentAt: timestamp('recording_consent_at', { withTimezone: true }),
     recordingProvider: text('recording_provider'),
     recordingStatus: recordingStatusEnum('recording_status').notNull().default('none'),
@@ -585,10 +590,14 @@ export const aiToolCalls = pgTable(
         argsHash: text('args_hash').notNull(),
         toolCallId: text('tool_call_id').notNull(),
         args: jsonb('args').$type<Record<string, unknown>>().notNull(),
-        result: jsonb('result').$type<Record<string, unknown>>().notNull(),
+        result: jsonb('result').$type<Record<string, unknown>>(),
+        state: text('state').notNull().default('pending'),
+        claimToken: text('claim_token'),
+        claimExpiresAt: timestamp('claim_expires_at', { withTimezone: true }),
         createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+        updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     },
-    (t) => [primaryKey({ columns: [t.conversationId, t.turnId, t.name, t.argsHash] })],
+    (t) => [primaryKey({ columns: [t.conversationId, t.toolCallId] })],
 );
 export const analyticsEvents = pgTable(
     'analytics_events',

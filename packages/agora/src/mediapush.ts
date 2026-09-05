@@ -85,6 +85,14 @@ export const createConverter = async (session: {
     rtcChannel: string;
 }): Promise<void> => {
     if (!env.MEDIA_PUSH_ENABLED) return;
+    const [existing] = await db
+        .select({
+            converterId: liveSessions.mediaPushConverterId,
+            status: liveSessions.mediaPushStatus,
+        })
+        .from(liveSessions)
+        .where(eq(liveSessions.id, session.id));
+    if (existing?.converterId && existing.status === 'running') return;
     if (!env.MEDIA_PUSH_RTMP_URL || !env.MEDIA_PUSH_HLS_URL) {
         await db
             .update(liveSessions)
@@ -138,7 +146,7 @@ export const createConverter = async (session: {
             { sessionId: session.id, status: created.status, body: created.json },
             'media push converter creation failed',
         );
-        return;
+        throw new Error(`media_push_create_failed_${created.status}`);
     }
     await db
         .update(liveSessions)
@@ -180,7 +188,10 @@ export const deleteConverter = async (sessionId: string): Promise<void> => {
         .from(liveSessions)
         .where(eq(liveSessions.id, sessionId));
     if (!row?.converterId || row.status === 'off') return;
-    await call('DELETE', `/${encodeURIComponent(row.converterId)}`);
+    const deleted = await call('DELETE', `/${encodeURIComponent(row.converterId)}`);
+    if (!deleted.ok && deleted.status !== 404) {
+        throw new Error(`media_push_delete_failed_${deleted.status}`);
+    }
     await db
         .update(liveSessions)
         .set({ mediaPushStatus: 'off', mediaPushConverterId: null })

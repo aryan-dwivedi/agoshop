@@ -182,14 +182,17 @@ export const CheckoutFlow = ({
             );
             let order = res.order;
             const deadline = Date.now() + 30000;
-            while (order.status === 'pending' && Date.now() < deadline) {
+            while (
+                ['pending', 'capturing', 'expiring'].includes(order.status) &&
+                Date.now() < deadline
+            ) {
                 await new Promise((r) => setTimeout(r, 300));
                 const poll = await api.get<{
                     order: OrderDto;
                 }>(`/api/orders/${order.id}`);
                 order = poll.order;
             }
-            if (order.status === 'pending') {
+            if (['pending', 'capturing', 'expiring'].includes(order.status)) {
                 throw new Error('Order is still processing. Check your orders page in a moment.');
             }
             if (order.status === 'payment_failed' || order.status === 'expired') {

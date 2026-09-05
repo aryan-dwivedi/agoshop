@@ -3,14 +3,9 @@ import { Router } from 'express';
 import { handleMcpRequest } from '@shop/ai/mcp/server.js';
 
 export const mcpRouter = Router();
-mcpRouter.post('/mcp', (req, res, next) => {
+const forwardMcp = (req: Parameters<typeof handleMcpRequest>[0], res: Parameters<typeof handleMcpRequest>[1], next: (err?: unknown) => void): void => {
     handleMcpRequest(req, res).catch(next);
-});
-mcpRouter.get('/mcp', (_req, res) => {
-    res.status(405).json({
-        jsonrpc: '2.0',
-        error: { code: -32000, message: 'Method not allowed' },
-        id: null,
-    });
-});
+};
+mcpRouter.post('/mcp', forwardMcp);
+mcpRouter.get('/mcp', forwardMcp);
 export const aiServiceRouters = [mcpRouter];

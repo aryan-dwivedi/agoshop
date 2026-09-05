@@ -3,8 +3,8 @@
 #
 # Run from the repo root:  docker compose -f infra/docker-compose.yml --env-file .env up --build
 #
-# PUBLIC_API_URL is fixed to http://localhost:8080 below (nginx front door). Do not rely on
-# npm-dev PUBLIC_API_URL from .env — that value is for `npm run dev` / Vite, not this stack.
+# PUBLIC_API_URL must be the public HTTPS front door reachable by Agora (for example,
+# an ngrok URL whose tunnel targets nginx on host port 8080).
 #
 # Two invariants this file exists to enforce:
 #   1. ONE named volume `recordings` is mounted into api1, api2, worker AND nginx at
@@ -18,7 +18,7 @@ name: live-commerce
 x-api-env: &api-env
     NODE_ENV: production
     PORT: 8787
-    PUBLIC_API_URL: http://localhost:8080
+    PUBLIC_API_URL: ${PUBLIC_API_URL:?set PUBLIC_API_URL to the public HTTPS/ngrok URL}
     # Customer, seller, and support Vite dev servers. The API splits on commas.
     WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:5173,http://localhost:5174,http://localhost:5175}
     DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/live_commerce

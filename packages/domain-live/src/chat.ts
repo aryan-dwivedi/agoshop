@@ -191,6 +191,9 @@ export const postChatMessage = async (a: {
         ...(sharedProduct === undefined ? {} : { product: sharedProduct }),
         ts: createdAt.getTime(),
     };
+    if (replayed) {
+        return { message: envelope, transport: 'rtm-rest', replayed: true, fanOutShards: 0 };
+    }
     const channels = isHost
         ? chatChannelsFor(session.slug, session.chatShardCount)
         : [chatShardChannel(session.slug, shardIndex)];

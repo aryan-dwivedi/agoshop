@@ -7,7 +7,7 @@ import { sql } from 'drizzle-orm';
 import { db } from '@shop/db/client.js';
 import { env } from '@shop/platform/env.js';
 import { track } from '@shop/platform/lib/analytics.js';
-import { badRequest, notFound } from '@shop/platform/lib/errors.js';
+import { AppError, badRequest, notFound } from '@shop/platform/lib/errors.js';
 import { evaluatePromotions } from '@shop/shared';
 
 import { defaultVariantId, resolveLineContext } from './eligibility.js';
@@ -256,11 +256,22 @@ export const removeItem = async (userId: string, itemId: string): Promise<CartDt
 const touchCart = async (cartId: string, exec: Executor = db): Promise<void> => {
     await exec.execute(sql`update carts set updated_at = now() where id = cast(${cartId} as uuid)`);
 };
-export const clearCartWithin = async (tx: Tx, userId: string): Promise<void> => {
-    await tx.execute(sql`
-    delete from cart_items
-    where cart_id in (select id from carts where user_id = cast(${userId} as uuid))
-  `);
+export const clearCartWithin = async (
+    tx: Tx,
+    userId: string,
+    lines: { cartItemId: string; quantity: number }[],
+): Promise<void> => {
+    for (const line of lines) {
+        const deleted = await tx.execute(sql`
+      delete from cart_items
+      where id = cast(${line.cartItemId} as uuid)
+        and quantity = ${line.quantity}
+        and cart_id in (select id from carts where user_id = cast(${userId} as uuid))
+    `);
+        if (deleted.rowCount !== 1) {
+            throw new AppError(409, 'cart_changed', 'cart changed while checking out');
+        }
+    }
     await tx.execute(
         sql`update carts set updated_at = now() where user_id = cast(${userId} as uuid)`,
     );

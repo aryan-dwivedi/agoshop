@@ -24,31 +24,36 @@ const ok = (label: string, condition: boolean, detail?: unknown): void => {
     failures += 1;
     console.log(`  FAIL  ${label}${detail === undefined ? '' : ` — ${JSON.stringify(detail)}`}`);
 };
+await db.execute(sql`delete from users where email like 'mcp-check-%@checks.invalid'`);
 const [userRow] = (
-    await db.execute<{
-        id: string;
-    }>(sql`select id from users where email = 'shopper@demo.test' limit 1`)
-).rows;
-if (!userRow) throw new Error('fixture: shopper@demo.test missing — run npm run db:seed');
-const [liveRow] = (
-    await db.execute<{
-        id: string;
-    }>(sql`
-    select id from live_sessions where status in ('live', 'scheduled') limit 1
+    await db.execute<{ id: string }>(sql`
+    insert into users (email, password_hash, display_name, role)
+    values (${`mcp-check-${randomUUID()}@checks.invalid`}, 'not-used', 'MCP Check', 'shopper')
+    returning id
   `)
 ).rows;
-if (!liveRow) throw new Error('fixture: no live session — run npm run db:seed');
+if (!userRow) throw new Error('fixture: could not create shopper');
+const [productRow] = (
+    await db.execute<{ product_id: string; variant_id: string }>(sql`
+    select p.id as product_id, pv.id as variant_id
+    from products p
+    join product_variants pv on pv.product_id = p.id
+    order by pv.is_default desc, pv.id
+    limit 1
+  `)
+).rows;
+if (!productRow) throw new Error('fixture: no active product variant — run npm run db:seed');
 const conversationId = randomUUID();
 const rtcChannel = aiChannelForConversation(conversationId);
 const callbackExpiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000);
 const expires = Math.floor(callbackExpiresAt.getTime() / 1000);
 await db.execute(sql`
   insert into ai_conversations
-    (id, user_id, live_session_id, surface, transport, language, provider, rtc_channel,
+    (id, user_id, surface, transport, language, provider, rtc_channel,
      viewer_uid, agent_uid, callback_expires_at, status)
   values
-    (cast(${conversationId} as uuid), cast(${userRow.id} as uuid), cast(${liveRow.id} as uuid),
-     'live', 'voice', 'en-US', 'mock', ${rtcChannel}, 990001, 990002,
+    (cast(${conversationId} as uuid), cast(${userRow.id} as uuid),
+     'browse', 'voice', 'en-US', 'mock', ${rtcChannel}, 990001, 990002,
      ${callbackExpiresAt.toISOString()}, 'running')
 `);
 const app = createApp(aiServiceRouters);
@@ -83,6 +88,21 @@ const missing = await fetch(`${base}/mcp`, {
     }),
 });
 ok('missing headers → 401', missing.status === 401);
+const missingGet = await fetch(`${base}/mcp`, {
+    method: 'GET',
+    headers: { accept: 'text/event-stream' },
+});
+ok('GET without auth → 401', missingGet.status === 401);
+const signedGet = await fetch(`${base}/mcp`, {
+    method: 'GET',
+    headers: {
+        accept: 'text/event-stream',
+        'X-Convo-Id': conversationId,
+        'X-Convo-Expires': String(expires),
+        'X-Convo-Signature': signCallback(conversationId, expires),
+    },
+});
+ok('GET with auth is not rejected as 405', signedGet.status !== 405, signedGet.status);
 console.log('\n=== MCP tools/call ===');
 const toolRes = await postMcp(
     {
@@ -118,6 +138,65 @@ ok(
             invalidBody.includes('isError')),
     invalidBody.slice(0, 200),
 );
+console.log('\n=== MCP mutation idempotency ===');
+const mutation = {
+    jsonrpc: '2.0',
+    id: 'mutation-1',
+    method: 'tools/call',
+    params: {
+        name: 'add_to_cart',
+        arguments: {
+            product_id: productRow.product_id,
+            variant_id: productRow.variant_id,
+            quantity: 1,
+        },
+    },
+};
+const firstMutation = await postMcp(mutation, signedHeaders(conversationId, expires));
+await firstMutation.text();
+const replayMutation = await postMcp(mutation, signedHeaders(conversationId, expires));
+await replayMutation.text();
+const secondMutation = await postMcp(
+    { ...mutation, id: 'mutation-2' },
+    signedHeaders(conversationId, expires),
+);
+await secondMutation.text();
+const [cartQuantity] = (
+    await db.execute<{ quantity: number }>(sql`
+    select coalesce(sum(ci.quantity), 0)::int as quantity
+    from carts c
+    join cart_items ci on ci.cart_id = c.id
+    where c.user_id = cast(${userRow.id} as uuid)
+      and ci.variant_id = cast(${productRow.variant_id} as uuid)
+  `)
+).rows;
+ok(
+    'same JSON-RPC id replays while a new id executes identical arguments',
+    firstMutation.status === 200 &&
+        replayMutation.status === 200 &&
+        secondMutation.status === 200 &&
+        cartQuantity?.quantity === 2,
+    cartQuantity,
+);
+const [callCount] = (
+    await db.execute<{ count: number }>(sql`
+    select count(*)::int as count
+    from ai_tool_calls
+    where conversation_id = cast(${conversationId} as uuid)
+      and state = 'completed'
+  `)
+).rows;
+ok('completed mutations are recorded once per tool-call id', callCount?.count === 2, callCount);
+await db.execute(sql`
+  update ai_conversations set status = 'stopped'
+  where id = cast(${conversationId} as uuid)
+`);
+const stopped = await postMcp(
+    { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'get_cart', arguments: {} } },
+    signedHeaders(conversationId, expires),
+);
+ok('stopped conversation → 401', stopped.status === 401, stopped.status);
+await db.execute(sql`delete from users where id = cast(${userRow.id} as uuid)`);
 await db.execute(sql`delete from ai_conversations where id = cast(${conversationId} as uuid)`);
 server.close();
 await pool.end();

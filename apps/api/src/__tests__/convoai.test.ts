@@ -51,7 +51,7 @@ describe('ConvoAI speech handling', () => {
         expect(body.properties.tts?.credential_mode).toBe('managed');
         expect(body.properties.tts?.params).toMatchObject({
             model: 'speech-2.8-turbo',
-            voice_setting: { speed: 1.6 },
+            voice_setting: { speed: 1.0 },
         });
         expect(body.properties.llm).toMatchObject({ params: { max_tokens: 160 } });
     });
@@ -73,7 +73,7 @@ describe('ConvoAI speech handling', () => {
                 model: 'speech-2.8-turbo',
                 voice_setting: {
                     voice_id: 'English_captivating_female1',
-                    speed: 1.6,
+                    speed: 1.0,
                 },
             },
         });

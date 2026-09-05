@@ -59,6 +59,11 @@ const translateConfig = (languages: string[]): Json | undefined => {
 };
 export const startRtt = async (session: { id: string; rtcChannel: string }): Promise<void> => {
     if (env.TRANSCRIPTION_PROVIDER !== 'agora') return;
+    const [existing] = await db
+        .select({ taskId: liveSessions.rttTaskId, status: liveSessions.rttStatus })
+        .from(liveSessions)
+        .where(eq(liveSessions.id, session.id));
+    if (existing?.taskId && existing.status === 'running') return;
     const languages = env.TRANSCRIPTION_LANGUAGES.slice(0, MAX_LANGUAGES);
     if (languages.length === 0) {
         await db
@@ -96,7 +101,7 @@ export const startRtt = async (session: { id: string; rtcChannel: string }): Pro
             { sessionId: session.id, status: joined.status, body: joined.json },
             'rtt join failed',
         );
-        return;
+        throw new Error(`rtt_join_failed_${joined.status}`);
     }
     await db
         .update(liveSessions)
@@ -110,7 +115,10 @@ export const stopRtt = async (sessionId: string): Promise<void> => {
         .from(liveSessions)
         .where(eq(liveSessions.id, sessionId));
     if (!row?.taskId || row.status === 'off') return;
-    await call('POST', `/agents/${encodeURIComponent(row.taskId)}/leave`, {});
+    const stopped = await call('POST', `/agents/${encodeURIComponent(row.taskId)}/leave`, {});
+    if (!stopped.ok && stopped.status !== 404) {
+        throw new Error(`rtt_leave_failed_${stopped.status}`);
+    }
     await db
         .update(liveSessions)
         .set({ rttStatus: 'off', rttTaskId: null })

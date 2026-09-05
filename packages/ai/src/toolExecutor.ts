@@ -2,9 +2,10 @@ import type { ConversationRecord } from './conversations.js';
 import type { SurfacedProducts } from './surfacedProducts.js';
 import type { ToolInvocation } from './tools/index.js';
 import type { ToolName } from '@shop/shared';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { setTimeout as sleep } from 'node:timers/promises';
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, lte } from 'drizzle-orm';
 
 import { db } from '@shop/db/client.js';
 import { aiMessages, aiToolCalls } from '@shop/db/schema.js';
@@ -63,6 +64,8 @@ const persistToolMessage = async (
         turnId,
     });
 };
+const MUTATION_CLAIM_TTL_MS = 5 * 60 * 1000;
+const MUTATION_WAIT_MS = 30 * 1000;
 const executeOne = async (
     conversation: ConversationRecord,
     turnId: number,
@@ -115,20 +118,94 @@ const executeOne = async (
     const mutating = MUTATING_TOOLS[name];
     const argsHash = hashArgs(args);
     const stopTimer = toolLatencySeconds.startTimer({ tool: name });
+    let claimToken: string | null = null;
+    let replayedResult: Record<string, unknown> | null = null;
     if (mutating) {
-        const [existing] = await db
-            .select({ result: aiToolCalls.result })
-            .from(aiToolCalls)
-            .where(
-                and(
-                    eq(aiToolCalls.conversationId, conversation.id),
-                    eq(aiToolCalls.turnId, turnId),
-                    eq(aiToolCalls.name, name),
-                    eq(aiToolCalls.argsHash, argsHash),
-                ),
-            )
-            .limit(1);
-        if (existing) {
+        claimToken = randomUUID();
+        const claimExpiresAt = new Date(Date.now() + MUTATION_CLAIM_TTL_MS);
+        const claimed = await db
+            .insert(aiToolCalls)
+            .values({
+                conversationId: conversation.id,
+                turnId,
+                name,
+                argsHash,
+                toolCallId: call.id,
+                args,
+                result: null,
+                state: 'pending',
+                claimToken,
+                claimExpiresAt,
+            })
+            .onConflictDoNothing({
+                target: [aiToolCalls.conversationId, aiToolCalls.toolCallId],
+            })
+            .returning({ claimToken: aiToolCalls.claimToken });
+        let ownsClaim = claimed[0]?.claimToken === claimToken;
+        const waitDeadline = Date.now() + MUTATION_WAIT_MS;
+        while (!ownsClaim) {
+            const [existing] = await db
+                .select({
+                    result: aiToolCalls.result,
+                    state: aiToolCalls.state,
+                    claimExpiresAt: aiToolCalls.claimExpiresAt,
+                })
+                .from(aiToolCalls)
+                .where(
+                    and(
+                        eq(aiToolCalls.conversationId, conversation.id),
+                        eq(aiToolCalls.toolCallId, call.id),
+                    ),
+                )
+                .limit(1);
+            if (existing?.state === 'completed' && existing.result) {
+                replayedResult = existing.result;
+                break;
+            }
+            if (
+                existing?.state === 'pending' &&
+                existing.claimExpiresAt !== null &&
+                existing.claimExpiresAt.getTime() <= Date.now()
+            ) {
+                const reclaimed = await db
+                    .update(aiToolCalls)
+                    .set({
+                        turnId,
+                        name,
+                        argsHash,
+                        args,
+                        claimToken,
+                        claimExpiresAt,
+                        updatedAt: new Date(),
+                    })
+                    .where(
+                        and(
+                            eq(aiToolCalls.conversationId, conversation.id),
+                            eq(aiToolCalls.toolCallId, call.id),
+                            eq(aiToolCalls.state, 'pending'),
+                            lte(aiToolCalls.claimExpiresAt, new Date()),
+                        ),
+                    )
+                    .returning({ claimToken: aiToolCalls.claimToken });
+                ownsClaim = reclaimed[0]?.claimToken === claimToken;
+                if (ownsClaim) break;
+            }
+            if (Date.now() >= waitDeadline) {
+                stopTimer();
+                aiToolCallsTotal.inc({ tool: name, outcome: 'error' });
+                return {
+                    id: call.id,
+                    name,
+                    outcome: 'error',
+                    result: toolError(
+                        'tool_call_in_progress',
+                        'this tool call is still being processed; retry it shortly',
+                    ),
+                };
+            }
+            await sleep(50);
+        }
+        if (replayedResult) {
             stopTimer();
             aiToolCallsTotal.inc({ tool: name, outcome: 'replayed' });
             track({
@@ -144,14 +221,14 @@ const executeOne = async (
                 },
             });
             logger.info(
-                { conversationId: conversation.id, turnId, tool: name, argsHash },
+                { conversationId: conversation.id, turnId, tool: name, toolCallId: call.id },
                 'ai tool call replayed from aiToolCalls; domain untouched',
             );
             return {
                 id: call.id,
                 name,
                 outcome: 'replayed',
-                result: existing.result,
+                result: replayedResult,
             };
         }
     }
@@ -167,19 +244,23 @@ const executeOne = async (
         result = toolError('tool_failed', message);
     }
     const durationMs = Math.round(stopTimer() * 1000);
-    if (mutating && outcome === 'ok') {
+    if (mutating && claimToken) {
         await db
-            .insert(aiToolCalls)
-            .values({
-                conversationId: conversation.id,
-                turnId,
-                name,
-                argsHash,
-                toolCallId: call.id,
-                args,
+            .update(aiToolCalls)
+            .set({
                 result,
+                state: 'completed',
+                claimToken: null,
+                claimExpiresAt: null,
+                updatedAt: new Date(),
             })
-            .onConflictDoNothing();
+            .where(
+                and(
+                    eq(aiToolCalls.conversationId, conversation.id),
+                    eq(aiToolCalls.toolCallId, call.id),
+                    eq(aiToolCalls.claimToken, claimToken),
+                ),
+            );
     }
     aiToolCallsTotal.inc({ tool: name, outcome });
     track({
@@ -194,6 +275,7 @@ const executeOne = async (
             conversationId: conversation.id,
             turnId,
             durationMs,
+            path: opts.path ?? 'auto',
         },
     });
     await persistToolMessage(conversation, turnId, name, args, result).catch((err: unknown) =>

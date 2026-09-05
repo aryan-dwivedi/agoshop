@@ -45,7 +45,8 @@ type Priced = {
 };
 type OrderRow = {
     id: string;
-    status: 'pending' | 'paid' | 'payment_failed' | 'expired' | 'cancelled';
+    status:
+        'pending' | 'capturing' | 'expiring' | 'paid' | 'payment_failed' | 'expired' | 'cancelled';
     created_at: string;
     subtotal_minor_units: number;
     discount_minor_units: number;
@@ -302,7 +303,7 @@ export const createOrder = async (
           `);
                 }
             }
-            await clearCartWithin(tx, userId);
+            await clearCartWithin(tx, userId, revalidated.lines);
             return { insertedId, applied };
         });
         orderId = result.insertedId;
