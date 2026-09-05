@@ -8,7 +8,7 @@ import type {
 } from '@shop/shared';
 import type { UseQueryResult } from '@tanstack/react-query';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { EVENTS } from '@shop/shared';
@@ -54,6 +54,15 @@ export type HlsOrigin = {
 type StatusChangedData = {
     sessionId: string;
     status: SessionStatus;
+};
+type RttStatusChangedData = {
+    sessionId: string;
+    rttStatus: LiveSessionDto['rttStatus'];
+    captionsEnabled: boolean;
+};
+type RecordingReadyData = {
+    sessionId: string;
+    recordingUrl: string;
 };
 type TierChangedData = {
     sessionId: string;
@@ -120,6 +129,7 @@ export type LiveSessionState = {
     serverSkewMs: number;
     viewerCount: number;
     captions: CaptionLine[];
+    captionsAvailable: boolean;
     reactions: ReactionState;
     poll: PollDto | null;
     applyPoll: (poll: PollDto | null) => void;
@@ -134,6 +144,7 @@ export const useLiveSession = (
     },
 ): LiveSessionState => {
     const { role } = opts;
+    const queryClient = useQueryClient();
     const skewRef = useRef(0);
     const [serverSkewMs, setServerSkewMs] = useState(0);
     const query = useQuery<LiveSessionDto, Error>({
@@ -147,6 +158,10 @@ export const useLiveSession = (
         },
         enabled: Boolean(slug),
         staleTime: 10000,
+        refetchInterval: (query) =>
+            query.state.data?.status === 'live' || query.state.data?.status === 'ended'
+                ? 15000
+                : false,
     });
     const session = query.data ?? null;
     const sessionId = session?.id ?? null;
@@ -157,6 +172,7 @@ export const useLiveSession = (
     const [hls, setHls] = useState<HlsOrigin | null>(null);
     const [viewerCount, setViewerCount] = useState(0);
     const [captions, setCaptions] = useState<CaptionLine[]>([]);
+    const [captionsEnabled, setCaptionsEnabled] = useState(false);
     const [reactions, setReactions] = useState<ReactionState>({
         counts: {},
         deltas: {},
@@ -178,6 +194,9 @@ export const useLiveSession = (
         if (!session) return;
         if (!liveViewerCountRef.current) setViewerCount(session.viewerCount);
         setServerSkewMs(skewRef.current);
+        const rttReady =
+            session.rttStatus === 'connecting' || session.rttStatus === 'running';
+        setCaptionsEnabled(rttReady);
         const featured = session.products.find((p) => p.isFeatured || p.pinnedAt !== null);
         setPinnedProductId(featured?.productId ?? null);
         if (session.deliveryTier === 'cdn' && session.hlsUrl) {
@@ -197,6 +216,7 @@ export const useLiveSession = (
                 const result = await api.post<JoinSessionDto>(`/api/sessions/${sessionId}/join`);
                 setJoin(result);
                 setJoinError(null);
+                if (result.captionsEnabled) setCaptionsEnabled(true);
                 if (result.deliveryTier === 'cdn' && result.hlsUrl) {
                     latchCdn({
                         url: result.hlsUrl,
@@ -243,7 +263,35 @@ export const useLiveSession = (
         (event: ServerEvent) => {
             switch (event.event) {
                 case EVENTS.sessionStatusChanged: {
-                    if ((event.data as StatusChangedData).status === 'ended') setJoin(null);
+                    const data = event.data as StatusChangedData;
+                    if (data.sessionId !== sessionId) break;
+                    if (data.status === 'ended') setJoin(null);
+                    queryClient.setQueryData<LiveSessionDto>(['session', slug], (current) =>
+                        current ? { ...current, status: data.status } : current,
+                    );
+                    break;
+                }
+                case EVENTS.sessionRttStatusChanged: {
+                    const data = event.data as RttStatusChangedData;
+                    if (data.sessionId !== sessionId) break;
+                    setCaptionsEnabled(data.captionsEnabled);
+                    queryClient.setQueryData<LiveSessionDto>(['session', slug], (current) =>
+                        current ? { ...current, rttStatus: data.rttStatus } : current,
+                    );
+                    break;
+                }
+                case EVENTS.recordingReady: {
+                    const data = event.data as RecordingReadyData;
+                    if (data.sessionId !== sessionId) break;
+                    queryClient.setQueryData<LiveSessionDto>(['session', slug], (current) =>
+                        current
+                            ? {
+                                  ...current,
+                                  recordingStatus: 'ready',
+                                  recordingUrl: data.recordingUrl,
+                              }
+                            : current,
+                    );
                     break;
                 }
                 case EVENTS.sessionDeliveryTierChanged: {
@@ -277,6 +325,7 @@ export const useLiveSession = (
                 }
                 case EVENTS.sessionCaption: {
                     const data = event.data as CaptionData;
+                    setCaptionsEnabled(true);
                     const line: CaptionLine = {
                         id: data.captionId,
                         text: data.text,
@@ -337,7 +386,7 @@ export const useLiveSession = (
                     break;
             }
         },
-        [latchCdn],
+        [latchCdn, queryClient, sessionId, slug],
     );
     useServerEvents({
         enabled: Boolean(sessionId),
@@ -354,6 +403,7 @@ export const useLiveSession = (
                 : null,
         [session?.status, session?.startedAt, serverSkewMs],
     );
+    const captionsAvailable = captionsEnabled || captions.length > 0;
     return {
         query,
         session,
@@ -366,6 +416,7 @@ export const useLiveSession = (
         serverSkewMs,
         viewerCount,
         captions,
+        captionsAvailable,
         reactions,
         poll,
         applyPoll: setPoll,

@@ -4,13 +4,23 @@ import { db } from '@shop/db/client.js';
 import { liveSessions } from '@shop/db/schema.js';
 import { env } from '@shop/platform/env.js';
 import { logger } from '@shop/platform/lib/logger.js';
+import { publishToSession } from '@shop/platform/lib/sse.js';
+import { EVENTS } from '@shop/shared';
 
 import { agoraRestFetch } from './restFetch.js';
 import { AGORA_REST_BASE, agoraBasicAuth, mintRtcToken, nextAgoraUid } from './tokens.js';
 
 const BASE = `${AGORA_REST_BASE}/api/speech-to-text/v1/projects`;
 const MAX_LANGUAGES = 4;
+type RttStatus = 'off' | 'connecting' | 'running' | 'failed';
 type Json = Record<string, unknown>;
+const publishRttStatus = async (sessionId: string, rttStatus: RttStatus): Promise<void> => {
+    await publishToSession(sessionId, EVENTS.sessionRttStatusChanged, {
+        sessionId,
+        rttStatus,
+        captionsEnabled: rttStatus === 'connecting' || rttStatus === 'running',
+    });
+};
 const call = async (
     method: 'POST' | 'GET',
     suffix: string,
@@ -70,6 +80,7 @@ export const startRtt = async (session: { id: string; rtcChannel: string }): Pro
             .update(liveSessions)
             .set({ rttStatus: 'failed' })
             .where(eq(liveSessions.id, session.id));
+        await publishRttStatus(session.id, 'failed');
         logger.warn({ sessionId: session.id }, 'rtt start skipped — TRANSCRIPTION_LANGUAGES empty');
         return;
     }
@@ -77,6 +88,7 @@ export const startRtt = async (session: { id: string; rtcChannel: string }): Pro
         .update(liveSessions)
         .set({ rttStatus: 'connecting' })
         .where(eq(liveSessions.id, session.id));
+    await publishRttStatus(session.id, 'connecting');
     const pubBotUid = await nextAgoraUid();
     const translate = translateConfig(languages);
     const joined = await call('POST', '/join', {
@@ -97,6 +109,7 @@ export const startRtt = async (session: { id: string; rtcChannel: string }): Pro
             .update(liveSessions)
             .set({ rttStatus: 'failed' })
             .where(eq(liveSessions.id, session.id));
+        await publishRttStatus(session.id, 'failed');
         logger.warn(
             { sessionId: session.id, status: joined.status, body: joined.json },
             'rtt join failed',
@@ -107,6 +120,7 @@ export const startRtt = async (session: { id: string; rtcChannel: string }): Pro
         .update(liveSessions)
         .set({ rttTaskId: taskId, rttStatus: 'running' })
         .where(eq(liveSessions.id, session.id));
+    await publishRttStatus(session.id, 'running');
     logger.info({ sessionId: session.id, taskId }, 'rtt task running');
 };
 export const stopRtt = async (sessionId: string): Promise<void> => {
@@ -123,6 +137,7 @@ export const stopRtt = async (sessionId: string): Promise<void> => {
         .update(liveSessions)
         .set({ rttStatus: 'off', rttTaskId: null })
         .where(eq(liveSessions.id, sessionId));
+    await publishRttStatus(sessionId, 'off');
 };
 export const queryRtt = async (
     sessionId: string,

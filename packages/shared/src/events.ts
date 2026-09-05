@@ -6,6 +6,7 @@ export const EVENTS = {
     sessionViewersChanged: 'session.viewers_changed',
     sessionReactions: 'session.reactions',
     sessionCaption: 'session.caption',
+    sessionRttStatusChanged: 'session.rtt_status_changed',
     pollOpened: 'poll.opened',
     pollResults: 'poll.results',
     pollClosed: 'poll.closed',

@@ -125,7 +125,7 @@ const Live = (): JSX.Element => {
         );
     }
     const consentGate = Boolean(live.join?.recordingConsentRequired) && !consented;
-    const captionsAvailable = live.join?.captionsEnabled ?? false;
+    const captionsAvailable = live.captionsAvailable;
     const readOnly = !isLive || offline;
     const latestRoomMessage = chat.messages.at(-1);
     const latestRoomText = latestRoomMessage?.text?.trim() ?? '';

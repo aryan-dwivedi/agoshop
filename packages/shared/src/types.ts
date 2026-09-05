@@ -123,6 +123,7 @@ export type LiveSessionDto = {
     hlsOriginKind: 'media-push' | 'simulated-origin' | null;
     recordingStatus: string;
     recordingUrl: string | null;
+    rttStatus: 'off' | 'connecting' | 'running' | 'failed';
     transcriptSummary: string | null;
     viewerCount: number;
     peakViewers: number;

@@ -156,6 +156,7 @@ const toDto = (
         hlsOriginKind: origin.hlsOriginKind,
         recordingStatus: row.recordingStatus,
         recordingUrl: row.recordingUrl,
+        rttStatus: row.rttStatus,
         transcriptSummary: row.transcriptSummary,
         viewerCount: viewers,
         peakViewers: row.peakViewers,

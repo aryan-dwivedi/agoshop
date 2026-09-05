@@ -150,10 +150,23 @@ export const LiveTheatre = ({
                                         See what&apos;s live
                                     </Link>
                                 </div>
+                            ) : session.recordingStatus === 'recording' ||
+                              session.recordingStatus === 'processing' ? (
+                                <>
+                                    <p className="max-w-sm text-14 leading-relaxed text-white/70">
+                                        The replay is being prepared — it will appear here shortly.
+                                    </p>
+                                    <Link
+                                        to="/live"
+                                        className="on-video rounded-full px-4 py-2 text-14 font-medium"
+                                    >
+                                        See what&apos;s live
+                                    </Link>
+                                </>
                             ) : (
                                 <>
                                     <p className="max-w-sm text-14 leading-relaxed text-white/70">
-                                        The replay will be here in a few minutes.
+                                        This show was not recorded.
                                     </p>
                                     <Link
                                         to="/live"

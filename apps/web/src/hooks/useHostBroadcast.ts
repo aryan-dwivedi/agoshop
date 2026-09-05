@@ -172,7 +172,9 @@ export const useHostBroadcast = (opts: {
         pendingLinesRef.current.clear();
         try {
             await api.post(`/api/sessions/${id}/transcript`, { lines });
-        } catch {}
+        } catch (err) {
+            console.warn('caption forward failed', err);
+        }
     }, []);
     const ingestCaption = useCallback(
         (segment: AgoraRttCaptionSegment) => {

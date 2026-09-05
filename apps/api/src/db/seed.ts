@@ -1,18 +1,8 @@
-import { createHash } from 'node:crypto';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
-
 import bcrypt from 'bcryptjs';
 import { sql } from 'drizzle-orm';
 
 import { env } from '@shop/platform/env.js';
 import { closeRedis, keys, redis } from '@shop/platform/lib/redis.js';
-import {
-    MAX_CHAT_SHARDS,
-    SAMPLE_VOD_FALLBACK_URL,
-    liveSourceForSlug,
-    sessionCoverForSlug,
-} from '@shop/shared';
 
 import { loadMarketplaceCatalog } from './marketplace-catalog.js';
 import * as t from './schema.js';
@@ -28,16 +18,6 @@ const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 const now = Date.now();
 const at = (offsetMs: number): Date => new Date(now + offsetMs);
-const shardCountFor = (expectedPeakViewers: number): number =>
-    Math.min(
-        Math.max(Math.ceil(expectedPeakViewers / env.RTM_CHAT_SHARD_TARGET), 1),
-        MAX_CHAT_SHARDS,
-    );
-const shardIndexFor = (userId: string, chatShardCount: number): number =>
-    Number(
-        BigInt(`0x${createHash('sha256').update(userId).digest('hex')}`) %
-            BigInt(Math.max(1, chatShardCount)),
-    );
 type SeedVariant = {
     sku: string;
     label: string;
@@ -2875,157 +2855,6 @@ const PROMOTIONS = [
         conditions: { sellerSlugs: ['pulse-audio'], minLineMinorUnits: 200000 },
     },
 ];
-const TRANSCRIPT_FIXTURE: {
-    speaker: string;
-    language: string;
-    text: string;
-    translatedText?: Record<string, string>;
-}[] = [
-    {
-        speaker: 'host',
-        language: 'en-US',
-        text: 'Welcome back to Pulse Audio. Tonight we are settling the under five thousand rupee question once and for all.',
-    },
-    {
-        speaker: 'host',
-        language: 'en-US',
-        text: 'Five pairs on the desk, and I have been living with each of them for about two weeks.',
-    },
-    {
-        speaker: 'host',
-        language: 'hi-IN',
-        text: 'Sabse pehle Noise Airwave Max 5 — iski hybrid ANC pachaas decibel tak jaati hai.',
-        translatedText: {
-            'en-US':
-                'First up is the Noise Airwave Max 5 — its hybrid ANC goes up to fifty decibels.',
-        },
-    },
-    {
-        speaker: 'assistant',
-        language: 'en-US',
-        text: 'The Noise Airwave Max 5 is listed at Rs 4,999 against an MRP of Rs 5,999, and the live-session offer is active right now.',
-    },
-    {
-        speaker: 'host',
-        language: 'en-US',
-        text: 'Eighty hours of playtime on the Noise, and it charges over Type-C, which at this price is not a given.',
-    },
-    {
-        speaker: 'host',
-        language: 'en-US',
-        text: 'Now the boAt Rockerz 512 ANC. Forty decibels of hybrid cancellation, forty millimetre drivers, and low latency mode for games.',
-    },
-    {
-        speaker: 'host',
-        language: 'hi-IN',
-        text: 'Rockerz 512 ka forty millisecond latency mode gaming ke liye kaafi accha hai.',
-        translatedText: {
-            'en-US':
-                "The Rockerz 512's forty millisecond latency mode is genuinely good for gaming.",
-        },
-    },
-    {
-        speaker: 'assistant',
-        language: 'en-US',
-        text: 'The boAt Rockerz 512 ANC is Rs 2,799, down from an MRP of Rs 7,990.',
-    },
-    {
-        speaker: 'host',
-        language: 'en-US',
-        text: 'The Sony WH-CH520 is the odd one out — no ANC at all, but fifty hours of battery and the cleanest mids of the five.',
-    },
-    {
-        speaker: 'host',
-        language: 'en-US',
-        text: 'If you take calls all day and never use cancellation, the Sony is the pair I would tell you to buy.',
-    },
-    {
-        speaker: 'host',
-        language: 'hi-IN',
-        text: 'Sony mein ANC nahi hai, lekin awaaz sabse saaf hai aur battery pachaas ghante chalti hai.',
-        translatedText: {
-            'en-US':
-                'The Sony has no ANC, but the cleanest sound of the group and fifty hours of battery.',
-        },
-    },
-    {
-        speaker: 'assistant',
-        language: 'en-US',
-        text: 'The Sony WH-CH520 is Rs 4,490, and delivery to 560001 is two days with cash on delivery available.',
-    },
-    {
-        speaker: 'host',
-        language: 'en-US',
-        text: 'Someone in chat asked about the Philips TAH6550. Sixty hours, three mics, and it folds flat, which none of the others do.',
-    },
-    {
-        speaker: 'host',
-        language: 'en-US',
-        text: 'I am pinning the Philips now, so it should jump to the top of your product rail.',
-    },
-    {
-        speaker: 'assistant',
-        language: 'en-US',
-        text: 'The Philips TAH6550 is Rs 2,499 against an MRP of Rs 6,999.',
-    },
-    {
-        speaker: 'host',
-        language: 'en-US',
-        text: 'And the boAt Rockerz Plus 550 — hundred hours, fifty millimetre drivers, and the cheapest of the lot at under two thousand.',
-    },
-    {
-        speaker: 'host',
-        language: 'en-US',
-        text: 'Let us run the poll. Which pair should we restock first?',
-    },
-    {
-        speaker: 'assistant',
-        language: 'en-US',
-        text: 'Three viewers have voted so far. The Noise Airwave Max 5 is leading with two votes.',
-    },
-    {
-        speaker: 'host',
-        language: 'hi-IN',
-        text: 'Aaj ka live offer session khatam hone tak hi valid hai, toh cart abhi check kar lijiye.',
-        translatedText: {
-            'en-US':
-                "Today's live offer is only valid until the session ends, so check your cart now.",
-        },
-    },
-    {
-        speaker: 'host',
-        language: 'en-US',
-        text: 'That is the shortlist. One clear winner, and the replay will be up in a few minutes with the full transcript.',
-    },
-    {
-        speaker: 'assistant',
-        language: 'en-US',
-        text: 'The live-session offer has now ended. Cart lines from this session are repriced at the standard rate.',
-    },
-];
-const CHAT_FIXTURE: {
-    user: 'shopper' | 'loyal' | 'admin';
-    text: string;
-}[] = [
-    { user: 'shopper', text: 'Does the Noise Airwave actually hit 50dB of ANC?' },
-    {
-        user: 'loyal',
-        text: 'Bought the Rockerz 512 in the last drop, the latency mode is legit.',
-    },
-    { user: 'shopper', text: 'Can you show the folding hinge on the Philips?' },
-    {
-        user: 'admin',
-        text: 'Reminder: the live offer only applies while this session is running.',
-    },
-    { user: 'loyal', text: 'Is the Sony worth it with no ANC at 4,490?' },
-    { user: 'shopper', text: 'Adding the Noise to my cart now.' },
-    { user: 'loyal', text: 'What is the delivery time to 400001?' },
-    { user: 'shopper', text: 'Mic test on the Rockerz Plus 550 please.' },
-    { user: 'admin', text: 'Poll is open — pick the pair you want restocked.' },
-    { user: 'loyal', text: 'Voted for the Noise.' },
-    { user: 'shopper', text: 'Any chance of a white colourway on the boAt?' },
-    { user: 'loyal', text: 'Thanks for the shortlist, this settled it for me.' },
-];
 const clearRedisKeys = async (): Promise<number> => {
     const prefixes = [
         'sess:',
@@ -3293,385 +3122,88 @@ const seed = async (): Promise<void> => {
             viewedAt: at(-6 * HOUR),
         },
     ]);
-    const sessionSeeds = [
-        {
-            slug: 'gym-live',
-            sellerSlug: 'flexfit',
-            title: 'The Perfect Summer Gym Outfits',
-            description:
-                'Building three summer training fits end to end — tee, shorts, tights, trainers, and the bag that carries it.',
-            status: 'ended' as const,
-            scheduledFor: at(-40 * MINUTE),
-            startedAt: at(-35 * MINUTE) as Date | null,
-            endedAt: at(-5 * MINUTE) as Date | null,
-            coverImageUrl: sessionCoverForSlug('gym-live') as string | null,
-            expectedPeakViewers: 7,
-            chatShardCount: shardCountFor(7),
-            peakViewers: 4,
-            recordingStatus: 'ready' as const,
-            recordingUrl: liveSourceForSlug('gym-live') as string | null,
-            transcriptSummary: null as string | null,
-            products: [
-                'puma-graphics-training-tee',
-                'puma-teamrise-training-shorts',
-                'puma-essentials-high-waist-tights',
-                'adidas-vacfast-running-shoes',
-                'symactive-6mm-yoga-mat',
-                'puma-convertible-gym-bag-v4',
-            ],
-            featured: 'puma-graphics-training-tee' as string | null,
-            discountPercent: null as number | null,
-        },
-        {
-            slug: 'phones-live',
-            sellerSlug: 'cellverse',
-            title: 'Best Phones Under Rs 45,000: Camera & Performance Picks',
-            description:
-                'Ranking the under-Rs 45,000 shortlist on camera and sustained performance, with the two we would actually buy.',
-            status: 'ended' as const,
-            scheduledFor: at(-30 * MINUTE),
-            startedAt: at(-26 * MINUTE) as Date | null,
-            endedAt: at(-4 * MINUTE) as Date | null,
-            coverImageUrl: sessionCoverForSlug('phones-live') as string | null,
-            expectedPeakViewers: 12,
-            chatShardCount: shardCountFor(12),
-            peakViewers: 8,
-            recordingStatus: 'ready' as const,
-            recordingUrl: liveSourceForSlug('phones-live') as string | null,
-            transcriptSummary: null as string | null,
-            products: [
-                'samsung-galaxy-a56-5g',
-                'samsung-galaxy-s24-fe',
-                'oppo-f33-pro-5g',
-                'samsung-galaxy-a35-5g',
-                'redmi-15-5g',
-                'realme-p4r-5g',
-            ],
-            featured: 'samsung-galaxy-a56-5g' as string | null,
-            discountPercent: null as number | null,
-        },
-        {
-            slug: 'glow-live',
-            sellerSlug: 'glow-atelier',
-            title: 'Skincare Sunday: Building the Routine',
-            description:
-                'Serum, then sunscreen, then colour — layering order, and what actually goes on top of what.',
-            status: 'ended' as const,
-            scheduledFor: at(-22 * MINUTE),
-            startedAt: at(-19 * MINUTE) as Date | null,
-            endedAt: at(-3 * MINUTE) as Date | null,
-            coverImageUrl: null as string | null,
-            expectedPeakViewers: 5,
-            chatShardCount: shardCountFor(5),
-            peakViewers: 2,
-            recordingStatus: 'ready' as const,
-            recordingUrl: liveSourceForSlug('glow-live') as string | null,
-            transcriptSummary: null as string | null,
-            products: [
-                'minimalist-16-vitamin-c-serum',
-                'derma-co-15-vitamin-c-serum',
-                'minimalist-sunscreen-spf50',
-                'dot-and-key-vitamin-c-sunscreen',
-                'plum-15-vitamin-c-serum',
-                'blue-heaven-matte-love-minis',
-            ],
-            featured: 'minimalist-16-vitamin-c-serum' as string | null,
-            discountPercent: null as number | null,
-        },
-        {
-            slug: 'headphones-live',
-            sellerSlug: 'pulse-audio',
-            title: 'Prime Day: Best Headphones Under Rs 5,000',
-            description:
-                'Five pairs under Rs 5,000, two weeks with each, and one clear winner on ANC, battery and call quality.',
-            status: 'ended' as const,
-            scheduledFor: at(-18 * MINUTE),
-            startedAt: at(-14 * MINUTE) as Date | null,
-            endedAt: at(-2 * MINUTE) as Date | null,
-            coverImageUrl: sessionCoverForSlug('headphones-live') as string | null,
-            expectedPeakViewers: 9,
-            chatShardCount: shardCountFor(9),
-            peakViewers: 6,
-            recordingStatus: 'ready' as const,
-            recordingUrl: liveSourceForSlug('headphones-live') as string | null,
-            transcriptSummary: null as string | null,
-            products: [
-                'noise-airwave-max-5',
-                'boat-rockerz-512-anc',
-                'sony-wh-ch520',
-                'boat-rockerz-plus-550',
-                'philips-tah6550',
-                'realme-buds-t310',
-            ],
-            featured: 'noise-airwave-max-5' as string | null,
-            discountPercent: 20 as number | null,
-        },
-        {
-            slug: 'decor-live',
-            sellerSlug: 'casa-nido',
-            title: 'Aesthetic Home Decor Haul: Budget Furnishing Finds',
-            description:
-                'Unboxing the whole haul — lamps, planters, framed art and the vase set that keeps selling out.',
-            status: 'ended' as const,
-            scheduledFor: at(-11 * MINUTE),
-            startedAt: at(-8 * MINUTE) as Date | null,
-            endedAt: at(-1 * MINUTE) as Date | null,
-            coverImageUrl: sessionCoverForSlug('decor-live') as string | null,
-            expectedPeakViewers: 6,
-            chatShardCount: shardCountFor(6),
-            peakViewers: 3,
-            recordingStatus: 'ready' as const,
-            recordingUrl: liveSourceForSlug('decor-live') as string | null,
-            transcriptSummary: null as string | null,
-            products: [
-                'exclusivelane-dainty-flowers-lamp',
-                'homesake-luxe-cone-gold-lamp',
-                'purezento-ceramic-bud-vases',
-                'textured-ceramic-plant-pots',
-                'hothouse-framed-flower-wall-art',
-                'livinluxe-tree-of-life-canvas',
-            ],
-            featured: 'exclusivelane-dainty-flowers-lamp' as string | null,
-            discountPercent: null as number | null,
-        },
-        {
-            slug: 'scheduled',
-            sellerSlug: 'cellverse',
-            title: 'Big Billion Days Preview: The Under-Rs 25,000 Bracket',
-            description:
-                'A first look at the under-Rs 25,000 line-up before the sale opens: batteries, refresh rates and cameras.',
-            status: 'scheduled' as const,
-            scheduledFor: at(2 * HOUR),
-            startedAt: null as Date | null,
-            endedAt: null as Date | null,
-            coverImageUrl: 'https://m.media-amazon.com/images/I/61f5ZCuSD6L._SL900_.jpg' as
-                string | null,
-            expectedPeakViewers: 200,
-            chatShardCount: 1,
-            peakViewers: 0,
-            recordingStatus: 'none' as const,
-            recordingUrl: null as string | null,
-            transcriptSummary: null as string | null,
-            products: [
-                'oneplus-n6-5g',
-                'samsung-galaxy-m36-5g',
-                'motorola-g67-power-5g',
-                'redmi-note-15-se-5g',
-            ],
-            featured: null as string | null,
-            discountPercent: null as number | null,
-        },
-        {
-            slug: 'ready-to-go-live',
-            sellerSlug: 'pulse-audio',
-            title: 'Gaming Audio Drop: Wired Picks Under Rs 3,000',
-            description:
-                'Wired headsets and low-latency earbuds under Rs 3,000, with mic tests on every one of them.',
-            status: 'scheduled' as const,
-            scheduledFor: at(-5 * MINUTE),
-            startedAt: null as Date | null,
-            endedAt: null as Date | null,
-            coverImageUrl: 'https://m.media-amazon.com/images/I/51vT4GzBObL._SL900_.jpg' as
-                string | null,
-            expectedPeakViewers: 6,
-            chatShardCount: 1,
-            peakViewers: 0,
-            recordingStatus: 'none' as const,
-            recordingUrl: null as string | null,
-            transcriptSummary: null as string | null,
-            products: [
-                featuredReadyProduct,
-                'boult-z40',
-                'jbl-quantum-100m2',
-                'hyperx-cloud-stinger-2-core',
-                'realme-buds-t310',
-            ],
-            featured: featuredReadyProduct as string | null,
-            discountPercent: null as number | null,
-        },
-        {
-            slug: 'ended',
-            sellerSlug: 'pulse-audio',
-            title: 'The Under-Rs 5,000 Audio Shortlist',
-            description:
-                "Last week's shortlist: five pairs on the desk, a restock poll, and the pair we told everyone to buy.",
-            status: 'ended' as const,
-            scheduledFor: at(-1 * DAY - 50 * MINUTE),
-            startedAt: at(-1 * DAY - 45 * MINUTE) as Date | null,
-            endedAt: at(-1 * DAY) as Date | null,
-            coverImageUrl: '/media/recordings/covers/ended.jpg' as string | null,
-            expectedPeakViewers: 8,
-            chatShardCount: shardCountFor(8),
-            peakViewers: 5,
-            recordingStatus: 'ready' as const,
-            recordingUrl: SAMPLE_VOD_FALLBACK_URL as string | null,
-            transcriptSummary:
-                'The Under-Rs 5,000 Audio Shortlist compared five pairs. The Noise Airwave Max 5 (Rs 4,999, MRP Rs 5,999) led on hybrid ANC up to 50 dB and 80 hours of playtime and was the featured pick. The boAt Rockerz 512 ANC (Rs 2,799) was called out for its 40 ms low-latency mode, and the Philips TAH6550 (Rs 2,499) for folding flat with 60 hours of battery; the Philips was pinned mid-show. The Sony WH-CH520 (Rs 4,490) has no ANC but the cleanest mids and 50 hours of battery, and was recommended for call-heavy use. A restock poll ran and the Noise won with two of three votes. The 20% live-session offer was repeatedly flagged as valid only until the session ended.' as
-                    string | null,
-            products: [
-                'noise-airwave-max-5',
-                'boat-rockerz-512-anc',
-                'sony-wh-ch520',
-                'philips-tah6550',
-                'boat-rockerz-plus-550',
-            ],
-            featured: 'noise-airwave-max-5' as string | null,
-            discountPercent: null as number | null,
-        },
-    ];
-    const sessionRows = await db
-        .insert(t.liveSessions)
-        .values(
-            sessionSeeds.map((s) => {
-                const seller = SELLERS.find((x) => x.slug === s.sellerSlug)!;
-                return {
-                    slug: s.slug,
-                    sellerId: sellerId(s.sellerSlug),
-                    title: s.title,
-                    description: s.description,
-                    hostName: seller.ownerName,
-                    hostUserId: userId(seller.ownerEmail),
-                    status: s.status,
-                    scheduledFor: s.scheduledFor,
-                    startedAt: s.startedAt,
-                    endedAt: s.endedAt,
-                    rtcChannel: `live-${s.slug}`,
-                    coverImageUrl: s.coverImageUrl,
-                    language: 'en-US',
-                    expectedPeakViewers: s.expectedPeakViewers,
-                    chatShardCount: s.chatShardCount,
-                    discountPercent: s.discountPercent,
-                    deliveryTier: 'rtc' as const,
-                    recordingConsentAt: s.startedAt,
-                    recordingProvider: s.status === 'ended' ? 'browser' : null,
-                    recordingStatus: s.recordingStatus,
-                    recordingUrl: s.recordingUrl,
-                    hlsUrl: null,
-                    hlsOriginKind: null,
-                    transcriptSummary: s.transcriptSummary,
-                    peakViewers: s.peakViewers,
-                };
-            }),
-        )
-        .returning({ id: t.liveSessions.id, slug: t.liveSessions.slug });
+    const sessionSeeds: {
+        slug: string;
+        sellerSlug: string;
+        title: string;
+        description: string;
+        status: 'scheduled' | 'live' | 'ended';
+        scheduledFor: Date;
+        startedAt: Date | null;
+        endedAt: Date | null;
+        coverImageUrl: string | null;
+        expectedPeakViewers: number;
+        chatShardCount: number;
+        peakViewers: number;
+        recordingStatus: 'none' | 'ready';
+        recordingUrl: string | null;
+        transcriptSummary: string | null;
+        products: string[];
+        featured: string | null;
+        discountPercent: number | null;
+    }[] = [];
+    const sessionRows =
+        sessionSeeds.length === 0
+            ? []
+            : await db
+                  .insert(t.liveSessions)
+                  .values(
+                      sessionSeeds.map((s) => {
+                          const seller = SELLERS.find((x) => x.slug === s.sellerSlug)!;
+                          return {
+                              slug: s.slug,
+                              sellerId: sellerId(s.sellerSlug),
+                              title: s.title,
+                              description: s.description,
+                              hostName: seller.ownerName,
+                              hostUserId: userId(seller.ownerEmail),
+                              status: s.status,
+                              scheduledFor: s.scheduledFor,
+                              startedAt: s.startedAt,
+                              endedAt: s.endedAt,
+                              rtcChannel: `live-${s.slug}`,
+                              coverImageUrl: s.coverImageUrl,
+                              language: 'en-US',
+                              expectedPeakViewers: s.expectedPeakViewers,
+                              chatShardCount: s.chatShardCount,
+                              discountPercent: s.discountPercent,
+                              deliveryTier: 'rtc' as const,
+                              recordingConsentAt: s.startedAt,
+                              recordingProvider: s.status === 'ended' ? 'browser' : null,
+                              recordingStatus: s.recordingStatus,
+                              recordingUrl: s.recordingUrl,
+                              hlsUrl: null,
+                              hlsOriginKind: null,
+                              transcriptSummary: s.transcriptSummary,
+                              peakViewers: s.peakViewers,
+                          };
+                      }),
+                  )
+                  .returning({ id: t.liveSessions.id, slug: t.liveSessions.slug });
     const sessionId = (slug: string): string => {
         const row = sessionRows.find((s) => s.slug === slug);
         if (!row) throw new Error(`seed: session ${slug} missing`);
         return row.id;
     };
-    await db.insert(t.liveSessionProducts).values(
-        sessionSeeds.flatMap((s) =>
-            s.products.map((slug, index) => ({
-                sessionId: sessionId(s.slug),
-                productId: productId(slug),
-                sortOrder: index,
-                isFeatured: s.featured === slug,
-                pinnedAt:
-                    s.featured === slug && s.startedAt
-                        ? new Date(s.startedAt.getTime() + 4 * MINUTE)
-                        : null,
-            })),
-        ),
-    );
-    const seedFor = (slug: string): (typeof sessionSeeds)[number] => {
-        const row = sessionSeeds.find((s) => s.slug === slug);
-        if (!row) throw new Error(`seed: session seed ${slug} missing`);
-        return row;
-    };
-    const endedId = sessionId('ended');
-    const endedStart = seedFor('ended').startedAt!.getTime();
-    const endedShards = seedFor('ended').chatShardCount;
-    await db.insert(t.sessionTranscripts).values(
-        TRANSCRIPT_FIXTURE.map((line, index) => ({
-            sessionId: endedId,
-            speaker: line.speaker,
-            language: line.language,
-            text: line.text,
-            translatedText: line.translatedText ?? {},
-            startMs: index * 135000,
-            createdAt: new Date(endedStart + index * 135000),
-        })),
-    );
-    const chatUserId = {
-        shopper: shopperId,
-        loyal: loyalId,
-        admin: adminId,
-    } as const;
-    await db.insert(t.chatMessages).values(
-        CHAT_FIXTURE.map((m, index) => ({
-            sessionId: endedId,
-            userId: chatUserId[m.user],
-            shardIndex: shardIndexFor(chatUserId[m.user], endedShards),
-            clientMessageId: `seed-chat-${index}`,
-            text: m.text,
-            status: 'visible' as const,
-            flagged: false,
-            createdAt: new Date(endedStart + (index + 1) * 3 * MINUTE),
-        })),
-    );
-    const [poll] = await db
-        .insert(t.polls)
-        .values({
-            sessionId: endedId,
-            question: 'Which pair should we restock first?',
-            status: 'closed',
-            createdAt: new Date(endedStart + 30 * MINUTE),
-            closedAt: new Date(endedStart + 38 * MINUTE),
-        })
-        .returning({ id: t.polls.id });
-    const pollId = poll!.id;
-    const pollOptionRows = await db
-        .insert(t.pollOptions)
-        .values([
-            { pollId, label: 'Noise Airwave Max 5', sortOrder: 0 },
-            { pollId, label: 'boAt Rockerz 512 ANC', sortOrder: 1 },
-            { pollId, label: 'Sony WH-CH520', sortOrder: 2 },
-        ])
-        .returning({ id: t.pollOptions.id, label: t.pollOptions.label });
-    const optionId = (label: string): string => {
-        const row = pollOptionRows.find((o) => o.label === label);
-        if (!row) throw new Error(`seed: poll option ${label} missing`);
-        return row.id;
-    };
-    await db.insert(t.pollVotes).values([
-        {
-            pollId,
-            optionId: optionId('Noise Airwave Max 5'),
-            userId: shopperId,
-            createdAt: new Date(endedStart + 31 * MINUTE),
-        },
-        {
-            pollId,
-            optionId: optionId('Noise Airwave Max 5'),
-            userId: loyalId,
-            createdAt: new Date(endedStart + 32 * MINUTE),
-        },
-        {
-            pollId,
-            optionId: optionId('Sony WH-CH520'),
-            userId: adminId,
-            createdAt: new Date(endedStart + 33 * MINUTE),
-        },
-    ]);
-    const endedHostId = userId(
-        SELLERS.find((s) => s.slug === seedFor('ended').sellerSlug)!.ownerEmail,
-    );
-    await db.insert(t.chatModeration).values([
-        {
-            sessionId: endedId,
-            targetUserId: shopperId,
-            action: 'mute',
-            actorUserId: endedHostId,
-            createdAt: new Date(endedStart + 26 * MINUTE),
-        },
-        {
-            sessionId: endedId,
-            targetUserId: shopperId,
-            action: 'unmute',
-            actorUserId: endedHostId,
-            createdAt: new Date(endedStart + 29 * MINUTE),
-        },
-    ]);
+    if (sessionSeeds.length > 0) {
+        await db.insert(t.liveSessionProducts).values(
+            sessionSeeds.flatMap((s) =>
+                s.products.map((slug, index) => ({
+                    sessionId: sessionId(s.slug),
+                    productId: productId(slug),
+                    sortOrder: index,
+                    isFeatured: s.featured === slug,
+                    pinnedAt:
+                        s.featured === slug && s.startedAt
+                            ? new Date(s.startedAt.getTime() + 4 * MINUTE)
+                            : null,
+                })),
+            ),
+        );
+        for (const s of sessionSeeds) {
+            await redis.set(keys.sessionStatus(sessionId(s.slug)), s.status);
+        }
+    }
     const orderRows = await db
         .insert(t.orders)
         .values([
@@ -3726,7 +3258,7 @@ const seed = async (): Promise<void> => {
                 paymentRef: 'mock_pre_auth_seed_3',
                 pincode: '400001',
                 idempotencyKey: 'seed-loyal-order-3',
-                createdAt: new Date(endedStart + 24 * MINUTE),
+                createdAt: at(-3 * DAY),
                 fulfilmentStatus: 'shipped',
                 trackingNumber: 'AWB9928101234',
                 carrier: 'Ekart',
@@ -3778,7 +3310,7 @@ const seed = async (): Promise<void> => {
             unitPriceMinorUnits: 499900,
             lineDiscountMinorUnits: 99980,
             appliedPromotionCodes: ['LIVE20'],
-            liveSessionId: endedId,
+            liveSessionId: null,
         },
         {
             orderId: orderId('seed-loyal-order-3'),
@@ -3797,111 +3329,9 @@ const seed = async (): Promise<void> => {
             userId: loyalId,
             orderId: orderId('seed-loyal-order-3'),
             minorUnits: 99980,
-            createdAt: new Date(endedStart + 24 * MINUTE),
+            createdAt: at(-3 * DAY),
         },
     ]);
-    const analyticsRows: {
-        occurredAt: Date;
-        userId: string | null;
-        sessionId: string | null;
-        productId: string | null;
-        type: string;
-        payload: Record<string, unknown>;
-    }[] = [];
-    for (const [index, uid] of [shopperId, loyalId, adminId, endedHostId].entries()) {
-        analyticsRows.push({
-            occurredAt: new Date(endedStart + index * 90000),
-            userId: uid,
-            sessionId: endedId,
-            productId: null,
-            type: 'session_join',
-            payload: { surface: 'live' },
-        });
-    }
-    const viewerCurve = [
-        1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 4, 4, 3, 4, 5, 5, 5, 4, 4, 3, 3, 4, 5, 5, 5, 5, 4, 4, 3, 3, 4,
-        4, 5, 4, 4, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1,
-    ];
-    viewerCurve.forEach((viewers, minute) => {
-        analyticsRows.push({
-            occurredAt: new Date(endedStart + minute * MINUTE),
-            userId: null,
-            sessionId: endedId,
-            productId: null,
-            type: 'viewer_sample',
-            payload: { viewers },
-        });
-    });
-    const pinPlan: [string, number][] = [
-        ['noise-airwave-max-5', 4],
-        ['boat-rockerz-512-anc', 20],
-        ['philips-tah6550', 34],
-    ];
-    for (const [slug, minute] of pinPlan) {
-        analyticsRows.push({
-            occurredAt: new Date(endedStart + minute * MINUTE),
-            userId: endedHostId,
-            sessionId: endedId,
-            productId: productId(slug),
-            type: 'product_pinned',
-            payload: { slug },
-        });
-    }
-    const addToCartPlan: [string, string, number][] = [
-        ['noise-airwave-max-5', loyalId, 9],
-        ['noise-airwave-max-5', shopperId, 14],
-        ['noise-airwave-max-5', adminId, 18],
-        ['boat-rockerz-512-anc', loyalId, 23],
-        ['boat-rockerz-512-anc', shopperId, 28],
-        ['philips-tah6550', shopperId, 37],
-    ];
-    for (const [slug, uid, minute] of addToCartPlan) {
-        analyticsRows.push({
-            occurredAt: new Date(endedStart + minute * MINUTE),
-            userId: uid,
-            sessionId: endedId,
-            productId: productId(slug),
-            type: 'add_to_cart',
-            payload: { source: 'live', quantity: 1 },
-        });
-    }
-    analyticsRows.push({
-        occurredAt: new Date(endedStart + 24 * MINUTE),
-        userId: loyalId,
-        sessionId: endedId,
-        productId: null,
-        type: 'order_created',
-        payload: {
-            orderId: orderId('seed-loyal-order-3'),
-            totalMinorUnits: 679820,
-        },
-    });
-    await db.insert(t.analyticsEvents).values(analyticsRows);
-    for (const s of sessionSeeds) {
-        await redis.set(keys.sessionStatus(sessionId(s.slug)), s.status);
-    }
-    await redis.hset(keys.sessionReactions(endedId), {
-        '❤️': 128,
-        '🔥': 64,
-        '👏': 32,
-        '😮': 11,
-    });
-    const mp4Present = existsSync(join(env.RECORDING_LOCAL_DIR, 'sample-session.mp4'));
-    if (!mp4Present) {
-        console.warn(
-            `seed: ${join(env.RECORDING_LOCAL_DIR, 'sample-session.mp4')} is absent — recorded playback still points at ` +
-                `${SAMPLE_VOD_FALLBACK_URL}, and the CDN-tier step reports the missing HLS fixture rather than a broken player.`,
-        );
-    }
-    const missingCovers = sessionSeeds
-        .filter((s) => s.coverImageUrl?.startsWith('/media/recordings/covers/'))
-        .filter((s) => !existsSync(join(env.RECORDING_LOCAL_DIR, 'covers', `${s.slug}.jpg`)));
-    if (missingCovers.length > 0) {
-        console.warn(
-            `seed: cover art missing for ${missingCovers.map((s) => s.slug).join(', ')} — those replay tiles fall back to ` +
-                'a decoded playback frame, which is the same path glow-live takes on purpose.',
-        );
-    }
     const counts = await pool.query<{
         table: string;
         rows: number;
@@ -3937,19 +3367,15 @@ const seed = async (): Promise<void> => {
     const replaySeeds = sessionSeeds.filter(
         (s) => s.status === 'ended' && s.recordingStatus === 'ready' && s.recordingUrl !== null,
     );
-    const shardSummary = replaySeeds.map((s) => `${s.slug}=${s.chatShardCount}`).join(', ');
-    const coverless = replaySeeds.filter((s) => s.coverImageUrl === null).map((s) => s.slug);
     console.log(
         [
             '',
             `  shopper logins  shopper@demo.test / loyal@demo.test / admin@demo.test`,
             `  seller logins   ${SELLERS.map((s) => `${s.ownerEmail} (${s.displayName})`).join(', ')}`,
             `  password        ${PASSWORD}`,
-            '  sessions        scheduled (+2h) | ready-to-go-live (start this one)',
+            '  sessions        none — schedule a new show from the seller console',
             '  live now        0',
-            `  replays         ${replaySeeds.map((s) => s.slug).join(' | ')} (${replaySeeds.length} playable)`,
-            `  covers          ${replaySeeds.length - coverless.length}/${replaySeeds.length} replays have cover art; ${coverless.join(', ') || 'none'} falls back to the playback frame`,
-            `  chat shards     ${shardSummary} (RTM_CHAT_SHARD_TARGET=${env.RTM_CHAT_SHARD_TARGET})`,
+            `  replays         ${replaySeeds.length === 0 ? 'none' : replaySeeds.map((s) => s.slug).join(' | ')}`,
             '',
         ].join('\n'),
     );

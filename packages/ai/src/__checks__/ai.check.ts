@@ -39,23 +39,71 @@ const [userRow] = (
 ).rows;
 if (!userRow) throw new Error('fixture: shopper@demo.test missing — run npm run db:seed');
 const userId = userRow.id;
-const [liveRow] = (
+const fixtureLiveSessionId = randomUUID();
+const fixtureScheduledSessionId = randomUUID();
+const [sellerRow] = (
     await db.execute<{
-        session_id: string;
-        product_id: string;
+        id: string;
+        owner_user_id: string;
+        host_name: string;
     }>(sql`
-    select ls.id as session_id, lsp.product_id
-    from live_sessions ls
-    join live_session_products lsp on lsp.session_id = ls.id
-    where ls.status in ('live', 'scheduled')
-    order by (ls.status = 'live') desc, lsp.sort_order
+    select s.id, s.owner_user_id, u.display_name as host_name
+    from sellers s
+    join users u on u.id = s.owner_user_id
+    where s.slug = 'pulse-audio'
     limit 1
   `)
 ).rows;
-if (!liveRow)
-    throw new Error('fixture: no active session with an attached product — run npm run db:seed');
-const sessionId = liveRow.session_id;
-const productId = liveRow.product_id;
+if (!sellerRow) throw new Error('fixture: pulse-audio seller missing — run npm run db:seed');
+const [contextSellerRow] = (
+    await db.execute<{
+        id: string;
+        owner_user_id: string;
+        host_name: string;
+    }>(sql`
+    select s.id, s.owner_user_id, u.display_name as host_name
+    from sellers s
+    join users u on u.id = s.owner_user_id
+    where s.slug = 'cellverse'
+    limit 1
+  `)
+).rows;
+if (!contextSellerRow) throw new Error('fixture: cellverse seller missing — run npm run db:seed');
+const [productRow] = (
+    await db.execute<{
+        id: string;
+    }>(sql`select id from products where slug = 'noise-airwave-max-5' limit 1`)
+).rows;
+if (!productRow) throw new Error('fixture: noise-airwave-max-5 missing — run npm run db:seed');
+const [contextProductRow] = (
+    await db.execute<{
+        id: string;
+    }>(sql`select id from products where slug = 'oneplus-n6-5g' limit 1`)
+).rows;
+if (!contextProductRow) throw new Error('fixture: oneplus-n6-5g missing — run npm run db:seed');
+const sessionId = fixtureLiveSessionId;
+const productId = productRow.id;
+const scheduledFor = new Date(Date.now() + 2 * 60 * 60 * 1000);
+await db.execute(sql`
+  insert into live_sessions
+    (id, slug, seller_id, title, host_name, host_user_id, status, scheduled_for, rtc_channel,
+     language, expected_peak_viewers, chat_shard_count, delivery_tier)
+  values
+    (cast(${fixtureLiveSessionId} as uuid), ${`ai-check-live-${fixtureLiveSessionId.slice(0, 8)}`},
+     cast(${sellerRow.id} as uuid), 'AI check live fixture', ${sellerRow.host_name},
+     cast(${sellerRow.owner_user_id} as uuid), 'scheduled', ${scheduledFor.toISOString()},
+     ${`live-ai-check-${fixtureLiveSessionId.slice(0, 8)}`}, 'en-US', 8, 1, 'rtc'),
+    (cast(${fixtureScheduledSessionId} as uuid), ${`ai-check-scheduled-${fixtureScheduledSessionId.slice(0, 8)}`},
+     cast(${contextSellerRow.id} as uuid), 'AI check scheduled fixture', ${contextSellerRow.host_name},
+     cast(${contextSellerRow.owner_user_id} as uuid), 'scheduled', ${scheduledFor.toISOString()},
+     ${`live-ai-check-${fixtureScheduledSessionId.slice(0, 8)}`}, 'en-US', 8, 1, 'rtc')
+`);
+await db.execute(sql`
+  insert into live_session_products (session_id, product_id, sort_order, is_featured)
+  values
+    (cast(${fixtureLiveSessionId} as uuid), cast(${productId} as uuid), 0, true),
+    (cast(${fixtureScheduledSessionId} as uuid), cast(${contextProductRow.id} as uuid), 0, false)
+`);
 const [variantRow] = (
     await db.execute<{
         id: string;
@@ -124,6 +172,10 @@ const conversation: ConversationRecord = {
 };
 const cleanup = async (): Promise<void> => {
     await db.execute(sql`delete from ai_conversations where id = cast(${conversationId} as uuid)`);
+    await db.execute(sql`
+      delete from live_sessions
+      where id in (cast(${fixtureLiveSessionId} as uuid), cast(${fixtureScheduledSessionId} as uuid))
+    `);
     await dropFixtureCartLine();
     await closeRedis();
     await pool.end();
@@ -238,17 +290,9 @@ try {
     }
     console.log('\n9b. live context identifies the host and line-up without claiming video vision');
     {
-        const [scheduled] = (
-            await db.execute<{
-                id: string;
-            }>(sql`
-        select id from live_sessions where slug = 'scheduled' limit 1
-      `)
-        ).rows;
-        if (!scheduled) throw new Error('fixture: scheduled session missing');
         const withoutRoomFeed: ConversationRecord = {
             ...conversation,
-            liveSessionId: scheduled.id,
+            liveSessionId: fixtureScheduledSessionId,
             contextProductId: null,
             surface: 'live',
         };
