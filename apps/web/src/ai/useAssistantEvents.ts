@@ -18,6 +18,35 @@ type AiProductsShown = {
     turnId: number;
     products: AiProductCard[];
 };
+const mergeVoiceProducts = (
+    lines: readonly AssistantLine[],
+    voiceProducts: Readonly<Record<number, AiProductCard[]>>,
+): AssistantLine[] => {
+    const byTurn = new Map(Object.entries(voiceProducts).map(([turnId, products]) => [Number(turnId), products]));
+    let lastAssistantIdx = -1;
+    for (let i = lines.length - 1; i >= 0; i -= 1) {
+        if (lines[i]?.role === 'assistant') {
+            lastAssistantIdx = i;
+            break;
+        }
+    }
+    return lines.map((line, idx) => {
+        if (line.role !== 'assistant' || line.turnId === null) return line;
+        const exact = byTurn.get(line.turnId);
+        if (exact) {
+            byTurn.delete(line.turnId);
+            return { ...line, products: exact };
+        }
+        if (idx === lastAssistantIdx) {
+            const orphan = [...byTurn.values()].flat();
+            if (orphan.length > 0) {
+                byTurn.clear();
+                return { ...line, products: orphan };
+            }
+        }
+        return line;
+    });
+};
 export type UseAssistantEventsResult = {
     lines: AssistantLine[];
 };
@@ -55,14 +84,6 @@ export const useAssistantEvents = (opts: {
         [conversationId, openSheet, queryClient],
     );
     useServerEvents({ enabled: conversationId !== null, onEvent });
-    const merged = useMemo(
-        () =>
-            lines.map((line) =>
-                line.role === 'assistant' && line.turnId !== null && voiceProducts[line.turnId]
-                    ? { ...line, products: voiceProducts[line.turnId] as AiProductCard[] }
-                    : line,
-            ),
-        [lines, voiceProducts],
-    );
+    const merged = useMemo(() => mergeVoiceProducts(lines, voiceProducts), [lines, voiceProducts]);
     return { lines: merged };
 };

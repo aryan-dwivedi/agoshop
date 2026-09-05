@@ -1,8 +1,16 @@
 import type { ConversationRecord } from './conversations.js';
-import type { CartDto, ProductDto } from '@shop/shared';
+import type { AiProductCard, CartDto, ProductDto, ToolName } from '@shop/shared';
 
 import { publishToUser } from '@shop/platform/lib/sse.js';
 import { EVENTS, minorUnitsToDecimalString } from '@shop/shared';
+
+/** Catalog tools whose MCP results should surface tappable product cards in the client. */
+export const CATALOG_SURFACE_TOOLS: ReadonlySet<ToolName> = new Set([
+    'search_products',
+    'get_product_details',
+    'compare_products',
+    'recommend_products',
+]);
 
 export const toolError = (code: string, message: string): Record<string, unknown> => ({
     error: { code, message },
@@ -70,3 +78,15 @@ export const publishToolExecuted = (
         conversationId: conversation.id,
         ...event,
     });
+export const publishProductsShown = (
+    conversation: ConversationRecord,
+    turnId: number,
+    products: readonly AiProductCard[],
+): Promise<void> =>
+    products.length === 0
+        ? Promise.resolve()
+        : publishToUser(conversation.userId, EVENTS.aiProductsShown, {
+              conversationId: conversation.id,
+              turnId,
+              products,
+          });

@@ -5,7 +5,13 @@ import { fileURLToPath } from 'node:url';
 import { sql } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 
-import { db, pool } from './client.js';
+// Schema changes and index builds legitimately outlast the request-path statement
+// timeout, and cancelling one mid-build is worse than letting it run: extra.sql guards
+// its optional DDL, so a cancelled CREATE INDEX is swallowed as a warning and silently
+// retried-and-cancelled on every boot. The pool reads this once at construction, so it
+// has to be set before ./client.js is loaded — hence the dynamic import.
+process.env.PG_STATEMENT_TIMEOUT_MS = process.env.PG_MIGRATION_STATEMENT_TIMEOUT_MS ?? '0';
+const { db, pool } = await import('./client.js');
 
 const here = dirname(fileURLToPath(import.meta.url));
 const migrationsFolder = process.env.MIGRATIONS_DIR ?? join(here, '../../drizzle');

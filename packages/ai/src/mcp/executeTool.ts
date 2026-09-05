@@ -1,6 +1,7 @@
 import type { ConversationRecord } from '../conversations.js';
 import type { ToolName } from '@shop/shared';
 
+import { CATALOG_SURFACE_TOOLS, publishProductsShown } from '../speakable.js';
 import { SurfacedProducts } from '../surfacedProducts.js';
 import { executeToolCalls } from '../toolExecutor.js';
 
@@ -19,5 +20,10 @@ export const executeNamedTool = async (
         surfaced,
         { path: 'direct' },
     );
-    return executed?.result ?? { error: { code: 'tool_failed', message: 'no result' } };
+    const result = executed?.result ?? { error: { code: 'tool_failed', message: 'no result' } };
+    if (executed?.outcome === 'ok' && CATALOG_SURFACE_TOOLS.has(name)) {
+        const products = surfaced.cards('');
+        await publishProductsShown(conversation, turnId, products).catch(() => undefined);
+    }
+    return result;
 };

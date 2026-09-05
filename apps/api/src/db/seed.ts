@@ -14,9 +14,13 @@ import {
     sessionCoverForSlug,
 } from '@shop/shared';
 
-import { db, pool } from './client.js';
 import { loadMarketplaceCatalog } from './marketplace-catalog.js';
 import * as t from './schema.js';
+
+// Bulk catalog loads run far longer than the request-path statement timeout. Set before
+// ./client.js is loaded, since the pool reads it once at construction.
+process.env.PG_STATEMENT_TIMEOUT_MS = process.env.PG_SEED_STATEMENT_TIMEOUT_MS ?? '0';
+const { db, pool } = await import('./client.js');
 
 const PASSWORD = 'demo1234';
 const MINUTE = 60000;
