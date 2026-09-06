@@ -38,8 +38,7 @@ const Host = (): JSX.Element => {
     const session = live.session;
     const isOwner = session !== null && user !== null && session.hostUserId === user.id;
     const isCohost = session !== null && user !== null && session.coHostUserId === user.id;
-    const canAccessRoom =
-        user !== null && (user.role === 'seller' || isCohost || user.role === 'admin');
+    const canAccessRoom = user !== null && (isOwner || isCohost || user.role === 'admin');
     const onSessionUpdated = useCallback(
         (updated: LiveSessionDto) => {
             queryClient.setQueryData(

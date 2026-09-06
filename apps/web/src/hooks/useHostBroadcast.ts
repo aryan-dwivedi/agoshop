@@ -161,6 +161,9 @@ export const useHostBroadcast = (opts: {
     const remotePublishersRef = useRef<RemotePublisher[]>([]);
     remotePublishersRef.current = remotePublishers;
     const obsGatewayUidRef = useRef<string | null>(null);
+    const endingRef = useRef(false);
+    const onEndedRef = useRef(onEnded);
+    onEndedRef.current = onEnded;
     const sourceRef = useRef<BroadcastSource>(source);
     sourceRef.current = source;
     const recorder = useHostRecorder({ sessionId });
@@ -271,6 +274,23 @@ export const useHostBroadcast = (opts: {
         remotePublishersRef.current = [];
         setRemotePublishers([]);
     }, []);
+    const disconnect = useCallback(async (): Promise<void> => {
+        const active = clientRef.current;
+        clientRef.current = null;
+        setClient(null);
+        setConnectionState('DISCONNECTED');
+        setVideoPublished(false);
+        if (active) {
+            active.removeAllListeners();
+            await active.unpublish().catch(() => undefined);
+            await active.leave().catch(() => undefined);
+        }
+        releaseTracks();
+        releaseRemotes();
+        setObsIngest(null);
+        setObsFeedConnected(false);
+        obsGatewayUidRef.current = null;
+    }, [releaseTracks, releaseRemotes]);
     const readAspect = useCallback((width: number, height: number): void => {
         if (width > 0 && height > 0) setFrameAspect(width / height);
     }, []);
@@ -662,37 +682,34 @@ export const useHostBroadcast = (opts: {
     }, []);
     const endSession = useCallback(async (): Promise<void> => {
         if (!sessionId) return;
+        endingRef.current = true;
         setState('ending');
         try {
             if (flushTimerRef.current !== null) {
                 window.clearTimeout(flushTimerRef.current);
                 flushTimerRef.current = null;
             }
-            await flushCaptions();
-            await recorderRef.current.stopAndUpload();
-            await api.post(`/api/sessions/${sessionId}/end`);
-            const active = clientRef.current;
-            clientRef.current = null;
-            setClient(null);
-            setConnectionState('DISCONNECTED');
-            setVideoPublished(false);
-            if (active) {
-                active.removeAllListeners();
-                await active.unpublish().catch(() => undefined);
-                await active.leave().catch(() => undefined);
-            }
-            releaseTracks();
-            releaseRemotes();
-            setObsIngest(null);
-            setObsFeedConnected(false);
-            obsGatewayUidRef.current = null;
+            const endRequest = api.post(`/api/sessions/${sessionId}/end`);
+            const captionsFlush = flushCaptions();
+            const recordingUpload = recorderRef.current.stopAndUpload();
+            await disconnect();
+            await endRequest;
+            await Promise.all([captionsFlush, recordingUpload]);
             setState('ended');
-            onEnded?.();
+            onEndedRef.current?.();
         } catch (err) {
+            endingRef.current = false;
             setState('error');
             setError(err instanceof Error ? err.message : 'end_session_failed');
         }
-    }, [sessionId, flushCaptions, releaseTracks, releaseRemotes, onEnded]);
+    }, [sessionId, flushCaptions, disconnect]);
+    useEffect(() => {
+        if (sessionStatus !== 'ended') return;
+        void disconnect().finally(() => {
+            setState('ended');
+            if (!endingRef.current) onEndedRef.current?.();
+        });
+    }, [sessionStatus, disconnect]);
     const toggleMic = useCallback(async (): Promise<void> => {
         const mic = micRef.current;
         if (!mic) return;

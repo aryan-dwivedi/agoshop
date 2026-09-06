@@ -11,13 +11,7 @@ import { useSession } from '../../state/session';
 
 type PermissionState = 'idle' | 'checking' | 'ready' | 'blocked';
 type CoHostInviteState =
-    | 'checking'
-    | 'none'
-    | 'redeeming'
-    | 'accepted'
-    | 'invalid'
-    | 'wrong-account'
-    | 'failed';
+    'checking' | 'none' | 'redeeming' | 'accepted' | 'invalid' | 'wrong-account' | 'failed';
 const SOURCES: {
     id: BroadcastSource;
     label: string;
@@ -48,6 +42,7 @@ const Preflight = (): JSX.Element => {
     const [source, setSource] = useState<BroadcastSource>('camera');
     const [state, setState] = useState<PermissionState>('idle');
     const [cohostInviteState, setCohostInviteState] = useState<CoHostInviteState>('checking');
+    const [hostAccess, setHostAccess] = useState(false);
     const [message, setMessage] = useState(
         'Check your camera and microphone before opening the room.',
     );
@@ -62,9 +57,11 @@ const Preflight = (): JSX.Element => {
                 const { session } = await api.get<{
                     session: {
                         id: string;
+                        hostUserId: string | null;
                         coHostUserId: string | null;
                     };
                 }>(`/api/sessions/${slug}`);
+                setHostAccess(session.hostUserId === user.id || user.role === 'admin');
                 if (session.coHostUserId === user.id) {
                     setCohostInviteState('accepted');
                     return;
@@ -144,20 +141,24 @@ const Preflight = (): JSX.Element => {
     const ready = state === 'ready' || source === 'obs';
     const cohostInvite = cohostInviteState === 'accepted';
     const canEnter = (ready || cohostInvite) && online;
-    if (
-        inviteToken !== null &&
-        (cohostInviteState === 'checking' || cohostInviteState === 'redeeming')
-    ) {
+    if (cohostInviteState === 'checking' || cohostInviteState === 'redeeming') {
+        const acceptingInvite = inviteToken !== null;
         return (
             <RoleGate
                 roles={['shopper', 'seller', 'support', 'admin']}
-                title="Accepting co-host link"
-                subtitle="Connecting this browser to the broadcast room."
+                title={acceptingInvite ? 'Accepting co-host link' : 'Checking broadcast access'}
+                subtitle={
+                    acceptingInvite
+                        ? 'Connecting this browser to the broadcast room.'
+                        : 'Confirming that this account is assigned to the show.'
+                }
                 theme="light"
             >
                 <div
                     className="card mx-auto h-32 max-w-lg animate-pulse"
-                    aria-label="Accepting co-host invite"
+                    aria-label={
+                        acceptingInvite ? 'Accepting co-host invite' : 'Checking broadcast access'
+                    }
                 />
             </RoleGate>
         );
@@ -256,9 +257,25 @@ const Preflight = (): JSX.Element => {
             </RoleGate>
         );
     }
+    if (!hostAccess) {
+        return (
+            <RoleGate
+                roles={['shopper', 'seller', 'support', 'admin']}
+                title="Broadcast access required"
+                subtitle="This account is not assigned to host or co-host this show."
+                theme="light"
+            >
+                <div className="card mx-auto max-w-lg p-6 text-center">
+                    <p className="text-14 text-t2">
+                        Use the assigned host account, or open a co-host invite from the host.
+                    </p>
+                </div>
+            </RoleGate>
+        );
+    }
     return (
         <RoleGate
-            roles={['seller']}
+            roles={['shopper', 'seller', 'support', 'admin']}
             title="Get ready to go live"
             subtitle="Choose a publish source and run a quick check."
             theme="light"
