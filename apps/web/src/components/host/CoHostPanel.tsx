@@ -1,9 +1,10 @@
 import type { LiveSessionDto } from '@shop/shared';
 
-import { UserPlus, X } from 'lucide-react';
+import { Copy, Link2, RefreshCw, X } from 'lucide-react';
 import { useState } from 'react';
 
-import { useInviteCohost, useRemoveCohost } from '../../lib/sellerApi';
+import { sellerUrl } from '../../lib/origins';
+import { useCreateCohostInvite, useRemoveCohost } from '../../lib/sellerApi';
 
 export const CoHostPanel = ({
     session,
@@ -12,10 +13,31 @@ export const CoHostPanel = ({
     session: LiveSessionDto;
     onSessionUpdated: (session: LiveSessionDto) => void;
 }): JSX.Element => {
-    const [email, setEmail] = useState('');
-    const invite = useInviteCohost();
+    const [inviteLink, setInviteLink] = useState<string | null>(null);
+    const [copied, setCopied] = useState(false);
+    const [copyError, setCopyError] = useState<string | null>(null);
+    const createInvite = useCreateCohostInvite();
     const remove = useRemoveCohost();
-    const busy = invite.isPending || remove.isPending;
+    const busy = createInvite.isPending || remove.isPending;
+    const createLink = (): void => {
+        void createInvite.mutateAsync(session.id).then(({ token }) => {
+            setInviteLink(
+                sellerUrl(`/live/${session.slug}/preflight?cohost=${encodeURIComponent(token)}`),
+            );
+            setCopied(false);
+            setCopyError(null);
+        });
+    };
+    const copyLink = async (): Promise<void> => {
+        if (inviteLink === null) return;
+        try {
+            await navigator.clipboard.writeText(inviteLink);
+            setCopied(true);
+            setCopyError(null);
+        } catch {
+            setCopyError('Clipboard access failed. Select the link and copy it manually.');
+        }
+    };
     return (
         <section
             className="border-t border-line p-3"
@@ -23,8 +45,8 @@ export const CoHostPanel = ({
         >
             <h2 className="eyebrow">Co-host</h2>
             <p className="mt-1 text-13 text-t3">
-                A second camera on stage. They can publish video and audio but cannot end the show
-                or moderate chat.
+                Create a private link for the second camera. Anyone with the link can join; no
+                seller account is required.
             </p>
 
             {session.coHostName !== null ? (
@@ -37,9 +59,10 @@ export const CoHostPanel = ({
                         className="btn-quiet btn-xs"
                         disabled={busy}
                         onClick={() =>
-                            void remove
-                                .mutateAsync(session.id)
-                                .then((updated) => onSessionUpdated(updated))
+                            void remove.mutateAsync(session.id).then((updated) => {
+                                onSessionUpdated(updated);
+                                setInviteLink(null);
+                            })
                         }
                     >
                         <X
@@ -49,49 +72,63 @@ export const CoHostPanel = ({
                         Remove
                     </button>
                 </div>
-            ) : (
-                <form
-                    className="mt-3 flex gap-2"
-                    onSubmit={(event) => {
-                        event.preventDefault();
-                        const trimmed = email.trim();
-                        if (trimmed.length === 0) return;
-                        void invite
-                            .mutateAsync({ sessionId: session.id, email: trimmed })
-                            .then((updated) => {
-                                onSessionUpdated(updated);
-                                setEmail('');
-                            });
-                    }}
+            ) : inviteLink === null ? (
+                <button
+                    type="button"
+                    className="btn-standard btn-sm mt-3"
+                    disabled={busy}
+                    onClick={createLink}
                 >
-                    <input
-                        type="email"
-                        className="input flex-1 text-14"
-                        placeholder="co-host@example.com"
-                        value={email}
-                        onChange={(event) => setEmail(event.target.value)}
-                        disabled={busy}
-                        aria-label="Co-host email"
+                    <Link2
+                        className="h-4 w-4"
+                        strokeWidth={1.8}
                     />
-                    <button
-                        type="submit"
-                        className="btn-standard btn-sm shrink-0"
-                        disabled={busy}
-                    >
-                        <UserPlus
-                            className="h-4 w-4"
-                            strokeWidth={1.8}
-                        />
-                        Invite
-                    </button>
-                </form>
+                    {createInvite.isPending ? 'Creating…' : 'Create join link'}
+                </button>
+            ) : (
+                <div className="mt-3 space-y-2">
+                    <input
+                        className="input w-full text-13"
+                        aria-label="Co-host join link"
+                        readOnly
+                        value={inviteLink}
+                        onFocus={(event) => event.currentTarget.select()}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            className="btn-standard btn-sm"
+                            onClick={() => void copyLink()}
+                        >
+                            <Copy
+                                className="h-4 w-4"
+                                strokeWidth={1.8}
+                            />
+                            {copied ? 'Copied' : 'Copy link'}
+                        </button>
+                        <button
+                            type="button"
+                            className="btn-quiet btn-sm"
+                            disabled={busy}
+                            onClick={createLink}
+                        >
+                            <RefreshCw
+                                className="h-4 w-4"
+                                strokeWidth={1.8}
+                            />
+                            New link
+                        </button>
+                    </div>
+                    <p className="text-12 text-t3">The link expires in 24 hours and works once.</p>
+                </div>
             )}
 
-            {(invite.error ?? remove.error) !== null && (
+            {(createInvite.error ?? remove.error) !== null && (
                 <p className="mt-2 text-13 text-danger">
-                    {invite.error?.message ?? remove.error?.message}
+                    {createInvite.error?.message ?? remove.error?.message}
                 </p>
             )}
+            {copyError !== null && <p className="mt-2 text-13 text-danger">{copyError}</p>}
         </section>
     );
 };

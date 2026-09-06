@@ -34,42 +34,30 @@ type ReplayPlayerProps = {
 const CAPTION_HOLD_MS = 6000;
 // Live shopping replays should never exceed a few hours; reject bogus probe values.
 const MAX_REASONABLE_DURATION_S = 8 * 60 * 60;
-const clampDuration = (seconds: number): number => {
+const DURATION_PROBE_TIME_S = Number.MAX_SAFE_INTEGER;
+const boundedTime = (seconds: number): number => {
     if (!Number.isFinite(seconds) || seconds <= 0) return 0;
     return Math.min(seconds, MAX_REASONABLE_DURATION_S);
 };
-const resolveDuration = (video: HTMLVideoElement, playbackTime = 0): number => {
-    const media = clampDuration(video.duration);
-    const bufferedEnd =
-        video.buffered.length > 0
-            ? clampDuration(video.buffered.end(video.buffered.length - 1))
-            : 0;
-    const seekableEnd =
-        video.seekable.length > 0
-            ? clampDuration(video.seekable.end(video.seekable.length - 1))
-            : 0;
-    const played = clampDuration(playbackTime);
-    return Math.max(media, bufferedEnd, seekableEnd, played);
+const validDuration = (seconds: number): number => {
+    if (!Number.isFinite(seconds) || seconds <= 0 || seconds > MAX_REASONABLE_DURATION_S) return 0;
+    return seconds;
 };
-const seekForDurationProbe = (video: HTMLVideoElement): boolean => {
-    if (video.seekable.length > 0) {
-        const end = clampDuration(video.seekable.end(video.seekable.length - 1));
-        if (end > 0) {
-            video.currentTime = end;
-            return true;
-        }
+const readDuration = (video: HTMLVideoElement): number => validDuration(video.duration);
+const readProbedDuration = (video: HTMLVideoElement): number =>
+    readDuration(video) || validDuration(video.currentTime);
+const startDurationProbe = (video: HTMLVideoElement): boolean => {
+    try {
+        // MediaRecorder WebM files can expose `Infinity` until a seek forces the
+        // browser to parse the final cluster. A distant seek is clamped to the real end.
+        video.currentTime = DURATION_PROBE_TIME_S;
+        return true;
+    } catch {
+        return false;
     }
-    if (video.buffered.length > 0) {
-        const end = clampDuration(video.buffered.end(video.buffered.length - 1));
-        if (end > 0) {
-            video.currentTime = end;
-            return true;
-        }
-    }
-    return false;
 };
 const formatTime = (seconds: number): string => {
-    const safe = clampDuration(seconds);
+    const safe = boundedTime(seconds);
     if (safe <= 0) return '0:00';
     const whole = Math.floor(safe);
     const hours = Math.floor(whole / 3600);
@@ -127,8 +115,8 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
             setDuration(resolvedDuration);
             const restoreTime = durationProbeRef.current;
             if (restoreTime === null) return;
-            durationProbeRef.current = null;
             video.currentTime = restoreTime;
+            durationProbeRef.current = null;
             setCurrentTime(restoreTime);
             setProbingDuration(false);
         },
@@ -136,20 +124,25 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
     );
     const syncDuration = useCallback(
         (video: HTMLVideoElement, probeUnknown = false): void => {
-            const resolved = resolveDuration(video, video.currentTime);
+            const resolved = readDuration(video);
             if (resolved > 0) {
                 finishDurationProbe(video, resolved);
                 return;
             }
-            if (!probeUnknown || durationProbeRef.current !== null) return;
+            if (durationProbeRef.current !== null) {
+                const probed = readProbedDuration(video);
+                if (probed > 0) finishDurationProbe(video, probed);
+                return;
+            }
+            if (!probeUnknown) return;
             durationProbeRef.current = video.currentTime;
             setProbingDuration(true);
-            if (!seekForDurationProbe(video)) {
+            if (!startDurationProbe(video)) {
                 finishDurationProbe(video, 0);
                 return;
             }
             durationFallbackRef.current = window.setTimeout(() => {
-                finishDurationProbe(video, resolveDuration(video, 0));
+                finishDurationProbe(video, readProbedDuration(video));
             }, 4000);
         },
         [finishDurationProbe],
@@ -192,10 +185,10 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
             const video = videoRef.current;
             if (!video) return;
             if (durationProbeRef.current !== null) return;
-            const limit = resolveDuration(video, duration);
+            const limit = duration || readDuration(video);
             video.currentTime = Math.max(0, Math.min(seconds, limit > 0 ? limit : seconds));
             setCurrentTime(video.currentTime);
-            if (limit > 0) setDuration((current) => Math.max(current, limit));
+            if (limit > 0) setDuration(limit);
         },
         [duration],
     );
@@ -203,6 +196,7 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
     const togglePlayback = useCallback((): void => {
         const video = videoRef.current;
         if (!video) return;
+        if (durationProbeRef.current !== null) return;
         if (video.paused) {
             if (video.ended) seekTo(0);
             void video.play().catch(() => setMediaError('Playback could not start.'));
@@ -291,23 +285,31 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
                 onClick={togglePlayback}
                 onDoubleClick={toggleFullscreen}
                 onDurationChange={(event) => syncDuration(event.currentTarget)}
+                onSeeked={(event) => {
+                    if (durationProbeRef.current !== null) syncDuration(event.currentTarget);
+                }}
                 onTimeUpdate={(event) => {
-                    if (durationProbeRef.current !== null) return;
                     const video = event.currentTarget;
-                    const time = video.currentTime;
-                    setCurrentTime(time);
-                    // Browser-recorded WebM often under-reports duration metadata.
-                    setDuration((current) => resolveDuration(video, Math.max(current, time)));
+                    if (durationProbeRef.current !== null) {
+                        syncDuration(video);
+                        return;
+                    }
+                    setCurrentTime(video.currentTime);
+                    const resolved = readDuration(video);
+                    if (resolved > 0) setDuration(resolved);
                 }}
                 onProgress={(event) => {
                     const video = event.currentTarget;
-                    const resolved = resolveDuration(video, video.currentTime);
+                    const resolved =
+                        durationProbeRef.current === null
+                            ? readDuration(video)
+                            : readProbedDuration(video);
                     if (resolved <= 0) return;
                     if (durationProbeRef.current !== null) {
                         finishDurationProbe(video, resolved);
                         return;
                     }
-                    setDuration((current) => Math.max(current, resolved));
+                    setDuration(resolved);
                 }}
                 onPlay={() => {
                     setPlaying(true);
@@ -326,7 +328,7 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
                     if (!video) return;
                     const time = video.currentTime;
                     setCurrentTime(time);
-                    setDuration((current) => Math.max(current, time));
+                    setDuration(readDuration(video) || boundedTime(time));
                 }}
                 onWaiting={() => setWaiting(true)}
                 onCanPlay={(event) => {
@@ -496,7 +498,7 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
 
                     <span className="tnum ml-0.5 text-12 font-medium text-white/90 md:text-13">
                         {formatTime(currentTime)} <span className="text-white/55">/</span>{' '}
-                        {formatTime(Math.max(duration, currentTime))}
+                        {formatTime(duration)}
                     </span>
 
                     <div className="ml-auto flex items-center gap-1">

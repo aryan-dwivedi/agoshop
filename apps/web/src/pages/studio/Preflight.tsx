@@ -2,7 +2,7 @@ import type { BroadcastSource } from '../../hooks/useHostBroadcast';
 
 import { Camera, CheckCircle2, Mic, Radio, Wifi, XCircle } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 
 import { RoleGate } from '../../components/seller/RoleGate';
 import { writePreflightHandoff } from '../../hooks/useHostBroadcast';
@@ -10,6 +10,7 @@ import { api } from '../../lib/api';
 import { useSession } from '../../state/session';
 
 type PermissionState = 'idle' | 'checking' | 'ready' | 'blocked';
+type CoHostInviteState = 'checking' | 'none' | 'redeeming' | 'accepted' | 'invalid';
 const SOURCES: {
     id: BroadcastSource;
     label: string;
@@ -32,27 +33,48 @@ const Preflight = (): JSX.Element => {
         slug: string;
     }>();
     const { user } = useSession();
+    const [params] = useSearchParams();
+    const inviteToken = params.get('cohost');
     const videoRef = useRef<HTMLVideoElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
+    const inviteAttemptRef = useRef<string | null>(null);
     const [source, setSource] = useState<BroadcastSource>('camera');
     const [state, setState] = useState<PermissionState>('idle');
-    const [cohostInvite, setCohostInvite] = useState(false);
+    const [cohostInviteState, setCohostInviteState] = useState<CoHostInviteState>('checking');
     const [message, setMessage] = useState(
         'Check your camera and microphone before opening the room.',
     );
     useEffect(() => {
         if (!slug || user === null) return;
-        void api
-            .get<{
-                session: {
-                    coHostUserId: string | null;
-                };
-            }>(`/api/sessions/${slug}`)
-            .then((res) => {
-                if (res.session.coHostUserId === user.id) setCohostInvite(true);
-            })
-            .catch(() => undefined);
-    }, [slug, user]);
+        const attemptKey = `${user.id}:${slug}:${inviteToken ?? ''}`;
+        if (inviteAttemptRef.current === attemptKey) return;
+        inviteAttemptRef.current = attemptKey;
+        setCohostInviteState(inviteToken === null ? 'checking' : 'redeeming');
+        void (async () => {
+            try {
+                const { session } = await api.get<{
+                    session: {
+                        id: string;
+                        coHostUserId: string | null;
+                    };
+                }>(`/api/sessions/${slug}`);
+                if (session.coHostUserId === user.id) {
+                    setCohostInviteState('accepted');
+                    return;
+                }
+                if (inviteToken === null) {
+                    setCohostInviteState('none');
+                    return;
+                }
+                await api.post(`/api/sessions/${session.id}/cohost-invite/redeem`, {
+                    token: inviteToken,
+                });
+                setCohostInviteState('accepted');
+            } catch {
+                setCohostInviteState(inviteToken === null ? 'none' : 'invalid');
+            }
+        })();
+    }, [slug, user, inviteToken]);
     const stopPreview = (): void => {
         streamRef.current?.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
@@ -105,7 +127,42 @@ const Preflight = (): JSX.Element => {
     };
     const online = navigator.onLine;
     const ready = state === 'ready' || source === 'obs';
+    const cohostInvite = cohostInviteState === 'accepted';
     const canEnter = (ready || cohostInvite) && online;
+    if (
+        inviteToken !== null &&
+        (cohostInviteState === 'checking' || cohostInviteState === 'redeeming')
+    ) {
+        return (
+            <RoleGate
+                roles={['shopper', 'seller', 'support', 'admin']}
+                title="Accepting co-host link"
+                subtitle="Connecting this browser to the broadcast room."
+                theme="light"
+            >
+                <div
+                    className="card mx-auto h-32 max-w-lg animate-pulse"
+                    aria-label="Accepting co-host invite"
+                />
+            </RoleGate>
+        );
+    }
+    if (inviteToken !== null && cohostInviteState === 'invalid') {
+        return (
+            <RoleGate
+                roles={['shopper', 'seller', 'support', 'admin']}
+                title="Co-host link unavailable"
+                subtitle="This invite has expired or was already used."
+                theme="light"
+            >
+                <div className="card mx-auto max-w-lg p-6 text-center">
+                    <p className="text-14 text-t2">
+                        Ask the host to create and copy a new co-host join link.
+                    </p>
+                </div>
+            </RoleGate>
+        );
+    }
     if (cohostInvite && slug) {
         return (
             <RoleGate

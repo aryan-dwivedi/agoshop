@@ -355,6 +355,8 @@ export const liveSessions = pgTable('live_sessions', {
     coHostUserId: uuid('co_host_user_id').references(() => users.id, {
         onDelete: 'set null',
     }),
+    coHostInviteTokenHash: text('co_host_invite_token_hash'),
+    coHostInviteExpiresAt: timestamp('co_host_invite_expires_at', { withTimezone: true }),
     status: sessionStatusEnum('status').notNull().default('scheduled'),
     scheduledFor: timestamp('scheduled_for', { withTimezone: true }),
     startedAt: timestamp('started_at', { withTimezone: true }),

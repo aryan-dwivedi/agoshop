@@ -211,30 +211,15 @@ export const useUpdateVariantPricing = (
         },
     });
 };
-export const useInviteCohost = (): UseMutationResult<
-    LiveSessionDto,
-    Error,
-    {
-        sessionId: string;
-        email: string;
-    }
-> => {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: async ({ sessionId, email }) => {
-            const res = await api.put<{
-                session: LiveSessionDto;
-            }>(`/api/sessions/${sessionId}/cohost`, {
-                email,
-            });
-            return res.session;
-        },
-        onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ['session'] });
-            await queryClient.invalidateQueries({ queryKey: ['seller', 'sessions'] });
-        },
-    });
+export type CoHostInvite = {
+    token: string;
+    expiresAt: string;
 };
+export const useCreateCohostInvite = (): UseMutationResult<CoHostInvite, Error, string> =>
+    useMutation({
+        mutationFn: (sessionId) =>
+            api.post<CoHostInvite>(`/api/sessions/${sessionId}/cohost-invite`),
+    });
 export const useRemoveCohost = (): UseMutationResult<LiveSessionDto, Error, string> => {
     const queryClient = useQueryClient();
     return useMutation({

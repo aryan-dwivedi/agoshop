@@ -179,12 +179,12 @@ cookie.
 
 **Free-tier limits to expect:**
 
-| Limit                          | Effect                                                                        |
-| ------------------------------ | ----------------------------------------------------------------------------- |
+| Limit                          | Effect                                                                                                     |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------- |
 | Spin-down after ~15 min idle   | First request after idle can take ~1 minute; free Postgres also hibernates and may need up to ~60s to wake |
-| Postgres expires after 30 days | Upgrade the database before expiry to keep data                               |
-| 512 MB RAM, no persistent disk | Voice uses Agora managed TTS (no Kokoro in-process); recordings are ephemeral |
-| No private services / workers  | Everything runs in-process in the one web container                           |
+| Postgres expires after 30 days | Upgrade the database before expiry to keep data                                                            |
+| 512 MB RAM, no persistent disk | Voice uses Agora managed TTS (no Kokoro in-process); recordings are ephemeral                              |
+| No private services / workers  | Everything runs in-process in the one web container                                                        |
 
 After deploy:
 
@@ -231,7 +231,6 @@ Seeded sessions ship with `live-source.mp4` and per-room clips under `/media/rec
 | ------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------- |
 | Customer                        | `shopper@demo.test`   | starts with a wishlisted product, so `WISHLIST5` is _eligible_ and its suppression by `LIVE20` is visible |
 | Pulse Audio seller / host       | `seller@demo.test`    | owns the audio catalog and hosts the primary demo sessions                                                |
-| Co-host seller (Seller 2)       | `seller2@demo.test`   | second seller account — owns Priya Studio (empty catalog) and can be invited as co-host from the broadcast sidebar |
 | Cellverse seller / host         | `cellverse@demo.test` | owns the phone catalog and `phones-live`                                                                  |
 | Casa Nido seller / host         | `casanido@demo.test`  | owns the home catalog and `decor-live`                                                                    |
 | FlexFit Athletics seller / host | `flexfit@demo.test`   | owns apparel and lifestyle products and `gym-live`                                                        |
@@ -255,7 +254,7 @@ The fifteen journey stages, in the order the plan's manual verification steps ru
 3. **Discover live** — `/live` shows Upcoming, Live now and Watch again.
 4. **Go live** — Tab A: `seller@demo.test` → the console's `/live/<ready-to-go-live>` on :5174 → pick a publish source (**Camera & mic**, **Video file**, or **OBS / RTMP**) → start the preview → accept the recording notice → **Go live**. Tab B: `shopper@demo.test` → `/live/<slug>` on the storefront sees the host feed over RTC and the viewer count rises. Open the viewer room _before_ anyone goes live and it plays the labelled standby feed instead of a black rectangle.
    Two other ways to start, both from the console's `/shows` → **Schedule a session**: attach an mp4/webm and pick **Premiere the video** to have the server flip the room live at its start time with nobody at a console (`startDuePremieres`, background worker, every 5 s), or pick **Go live right now** to have the session created already live. A viewer who opens a room before its start time gets the cover art and a countdown on the server's clock, not a black rectangle.
-   **Co-host:** in the broadcast sidebar, invite `seller2@demo.test` (or `support@demo.test`). They open the room (no pre-flight), publish camera/mic, and appear in the host's PiP — a second publisher, not a second owner. Agora **Co-host Authentication** enforces `PUBLISHER` tokens; the app decides who may receive one.
+   **Co-host:** in the broadcast sidebar, create and copy a one-time co-host link, then send it to the second camera operator. Opening the link claims the slot for that browser identity — no seller account is required. The co-host publishes camera/mic and appears in the host's PiP as a second publisher, not a second owner. Agora **Co-host Authentication** enforces `PUBLISHER` tokens; the app decides who may receive one.
    **OBS:** choose **OBS / RTMP** in pre-flight, go live, copy the RTMP server + stream key into OBS, start streaming. The host monitor shows the feed when Media Gateway connects. Browser replay is not captured for OBS shows.
 5. **Engage** — chat both ways (note the viewer POSTs to the API and the message comes back published by `chat-service`), reactions aggregate at 1 Hz, open a poll, pin a product and watch the rail reorder.
 6. **Moderate** — from a third account post something offensive; the host deletes it and mutes the user, whose _next_ send is refused.

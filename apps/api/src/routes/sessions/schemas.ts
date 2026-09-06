@@ -70,4 +70,4 @@ export const transcriptBody = z.object({
         .min(1)
         .max(50),
 });
-export const coHostBody = z.object({ email: z.string().email().max(200) });
+export const coHostInviteBody = z.object({ token: z.string().min(32).max(200) });

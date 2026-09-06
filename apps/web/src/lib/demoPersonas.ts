@@ -1,6 +1,6 @@
 import type { PublicUser, Role } from '@shop/shared';
 
-import { api, ApiError } from './api';
+import { ApiError, api } from './api';
 import { sellerUrl, supportUrl } from './origins';
 
 export const DEMO_PASSWORD = 'demo1234';
@@ -24,13 +24,6 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
         email: 'seller@demo.test',
         label: 'Seller / host',
         blurb: 'Owns the demo shows: the broadcast room, catalog, audience log and reports.',
-        dashboard: sellerUrl('/'),
-    },
-    {
-        role: 'seller',
-        email: 'seller2@demo.test',
-        label: 'Seller 2 / co-host',
-        blurb: 'Second seller account — empty Priya Studio storefront, plus co-host testing from the host broadcast sidebar.',
         dashboard: sellerUrl('/'),
     },
     {
