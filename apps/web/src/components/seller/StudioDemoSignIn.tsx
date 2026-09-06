@@ -1,9 +1,11 @@
 import type { Role } from '@shop/shared';
 
+import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { ApiError } from '../../lib/api';
 import { demoPersonasForRole, signInWithDemoAccount } from '../../lib/demoPersonas';
+import { useSession } from '../../state/session';
 
 export const StudioDemoSignIn = ({
     roles,
@@ -12,6 +14,8 @@ export const StudioDemoSignIn = ({
     roles: Role[];
     currentRole: Role | null;
 }): JSX.Element | null => {
+    const { applyUser } = useSession();
+    const queryClient = useQueryClient();
     const [pending, setPending] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const offered = roles.includes('seller') || roles.includes('support');
@@ -22,8 +26,10 @@ export const StudioDemoSignIn = ({
         setPending(email);
         setError(null);
         try {
-            await signInWithDemoAccount(email, { logoutFirst: currentRole !== null });
-            window.location.reload();
+            await queryClient.cancelQueries({ queryKey: ['me'] });
+            const user = await signInWithDemoAccount(email, { logoutFirst: currentRole !== null });
+            queryClient.removeQueries({ queryKey: ['me'] });
+            applyUser(user);
         } catch (err) {
             const message =
                 err instanceof ApiError && err.code === 'invalid_credentials'

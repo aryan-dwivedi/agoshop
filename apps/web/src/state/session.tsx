@@ -22,16 +22,6 @@ const preferAuthenticated = (
     if (cached?.user && !cached.user.isGuest && (next.user === null || next.user.isGuest)) {
         return cached;
     }
-    if (
-        cached?.user &&
-        !cached.user.isGuest &&
-        next.user &&
-        !next.user.isGuest &&
-        cached.user.id === next.user.id &&
-        cached.user.role !== next.user.role
-    ) {
-        return cached;
-    }
     return next;
 };
 
