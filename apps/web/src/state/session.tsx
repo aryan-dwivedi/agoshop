@@ -14,6 +14,17 @@ type SessionValue = {
     refresh: () => Promise<void>;
 };
 const SessionContext = createContext<SessionValue | null>(null);
+
+const preferAuthenticated = (
+    next: { user: PublicUser | null },
+    cached: { user: PublicUser | null } | undefined,
+): { user: PublicUser | null } => {
+    if (cached?.user && !cached.user.isGuest && (next.user === null || next.user.isGuest)) {
+        return cached;
+    }
+    return next;
+};
+
 export const SessionProvider = ({ children }: { children: ReactNode }): JSX.Element => {
     const queryClient = useQueryClient();
     const configQuery = useQuery({
@@ -26,23 +37,25 @@ export const SessionProvider = ({ children }: { children: ReactNode }): JSX.Elem
         queryFn: async (): Promise<{
             user: PublicUser | null;
         }> => {
+            const cached = queryClient.getQueryData<{ user: PublicUser | null }>(['me']);
             try {
-                return await api.get<{
+                const result = await api.get<{
                     user: PublicUser;
                 }>('/api/auth/me');
+                return preferAuthenticated(result, cached);
             } catch (err) {
                 if (!(err instanceof ApiError && err.status === 401)) throw err;
             }
-            const cached = queryClient.getQueryData<{ user: PublicUser | null }>(['me']);
             if (cached?.user && !cached.user.isGuest) {
-                return { user: null };
+                return cached;
             }
             try {
-                return await api.post<{
+                const guest = await api.post<{
                     user: PublicUser;
                 }>('/api/auth/guest');
+                return preferAuthenticated(guest, cached);
             } catch {
-                return { user: null };
+                return cached ?? { user: null };
             }
         },
         staleTime: 60 * 1000,
@@ -53,6 +66,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }): JSX.Elem
             config: configQuery.data ?? null,
             loading: meQuery.isLoading || configQuery.isLoading,
             applyUser: (user: PublicUser) => {
+                queryClient.cancelQueries({ queryKey: ['me'] });
                 queryClient.setQueryData(['me'], { user });
             },
             refresh: async () => {

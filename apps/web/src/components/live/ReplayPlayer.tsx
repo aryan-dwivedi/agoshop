@@ -32,16 +32,46 @@ type ReplayPlayerProps = {
     captions: TranscriptLine[];
 };
 const CAPTION_HOLD_MS = 6000;
-const UNKNOWN_DURATION_SEEK = 1e101;
-const resolveDuration = (video: HTMLVideoElement, floor = 0): number => {
-    const media = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
+// Live shopping replays should never exceed a few hours; reject bogus probe values.
+const MAX_REASONABLE_DURATION_S = 8 * 60 * 60;
+const clampDuration = (seconds: number): number => {
+    if (!Number.isFinite(seconds) || seconds <= 0) return 0;
+    return Math.min(seconds, MAX_REASONABLE_DURATION_S);
+};
+const resolveDuration = (video: HTMLVideoElement, playbackTime = 0): number => {
+    const media = clampDuration(video.duration);
     const bufferedEnd =
-        video.buffered.length > 0 ? video.buffered.end(video.buffered.length - 1) : 0;
-    return Math.max(media, bufferedEnd, floor);
+        video.buffered.length > 0
+            ? clampDuration(video.buffered.end(video.buffered.length - 1))
+            : 0;
+    const seekableEnd =
+        video.seekable.length > 0
+            ? clampDuration(video.seekable.end(video.seekable.length - 1))
+            : 0;
+    const played = clampDuration(playbackTime);
+    return Math.max(media, bufferedEnd, seekableEnd, played);
+};
+const seekForDurationProbe = (video: HTMLVideoElement): boolean => {
+    if (video.seekable.length > 0) {
+        const end = clampDuration(video.seekable.end(video.seekable.length - 1));
+        if (end > 0) {
+            video.currentTime = end;
+            return true;
+        }
+    }
+    if (video.buffered.length > 0) {
+        const end = clampDuration(video.buffered.end(video.buffered.length - 1));
+        if (end > 0) {
+            video.currentTime = end;
+            return true;
+        }
+    }
+    return false;
 };
 const formatTime = (seconds: number): string => {
-    if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
-    const whole = Math.floor(seconds);
+    const safe = clampDuration(seconds);
+    if (safe <= 0) return '0:00';
+    const whole = Math.floor(safe);
     const hours = Math.floor(whole / 3600);
     const minutes = Math.floor((whole % 3600) / 60);
     const remaining = String(whole % 60).padStart(2, '0');
@@ -114,9 +144,12 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
             if (!probeUnknown || durationProbeRef.current !== null) return;
             durationProbeRef.current = video.currentTime;
             setProbingDuration(true);
-            video.currentTime = UNKNOWN_DURATION_SEEK;
+            if (!seekForDurationProbe(video)) {
+                finishDurationProbe(video, 0);
+                return;
+            }
             durationFallbackRef.current = window.setTimeout(() => {
-                finishDurationProbe(video, resolveDuration(video, video.currentTime));
+                finishDurationProbe(video, resolveDuration(video, 0));
             }, 4000);
         },
         [finishDurationProbe],
@@ -365,7 +398,10 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
                     <button
                         type="button"
                         className="rounded-full bg-white px-4 py-2 text-13 font-semibold text-black"
-                        onClick={() => videoRef.current?.load()}
+                        onClick={() => {
+                            setMediaError(null);
+                            videoRef.current?.load();
+                        }}
                     >
                         Try again
                     </button>

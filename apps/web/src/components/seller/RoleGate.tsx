@@ -10,7 +10,7 @@ import { useSession } from '../../state/session';
 import { ShieldIcon } from '../icons';
 
 const Denied = ({ roles, current }: { roles: Role[]; current: Role | null }): JSX.Element => {
-    const { applyUser, refresh } = useSession();
+    const { applyUser } = useSession();
     const [pending, setPending] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const offered = roles.includes('seller') || roles.includes('support');
@@ -25,7 +25,6 @@ const Denied = ({ roles, current }: { roles: Role[]; current: Role | null }): JS
                 password: DEMO_PASSWORD,
             });
             applyUser(user);
-            await refresh();
         } catch {
             setError(`Could not sign in as ${email}.`);
         } finally {

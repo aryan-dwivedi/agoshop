@@ -15,7 +15,7 @@ const LOGIN_MESSAGES: Record<string, string> = {
     email_taken: 'That email is already registered — sign in instead.',
 };
 const Login = (): JSX.Element => {
-    const { user, applyUser, refresh } = useSession();
+    const { user, applyUser } = useSession();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const [params] = useSearchParams();
@@ -38,14 +38,13 @@ const Login = (): JSX.Element => {
                 user: PublicUser;
             }>(path, credentials);
         },
-        onSuccess: async (data) => {
+        onSuccess: (data) => {
             const landed = pendingTab.current?.show() ?? null;
             pendingTab.current = null;
             applyUser(data.user);
-            if (landed === 'self') return;
             void queryClient.invalidateQueries({ queryKey: ['cart'] });
             void queryClient.invalidateQueries({ queryKey: ['wishlist'] });
-            await refresh();
+            if (landed === 'self') return;
             navigate(next);
         },
         onError: () => {
