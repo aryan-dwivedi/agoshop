@@ -57,6 +57,22 @@ jobs:
 
             - run: npm run typecheck
 
+            # App scripts load repo-root .env via --env-file; write one from CI env.
+            - name: Create .env
+              run: |
+                  cat > .env <<EOF
+                  NODE_ENV=test
+                  DATABASE_URL=${DATABASE_URL}
+                  REDIS_URL=${REDIS_URL}
+                  SESSION_COOKIE_SECRET=${SESSION_COOKIE_SECRET}
+                  CONVO_LLM_SHARED_SECRET=${CONVO_LLM_SHARED_SECRET}
+                  AGORA_APP_ID=${AGORA_APP_ID}
+                  AGORA_APP_CERTIFICATE=${AGORA_APP_CERTIFICATE}
+                  PUBLIC_API_URL=${PUBLIC_API_URL}
+                  LLM_PROVIDER=${LLM_PROVIDER}
+                  RECORDING_LOCAL_DIR=${RECORDING_LOCAL_DIR}
+                  EOF
+
             - run: npm run db:push
 
             - run: npm test

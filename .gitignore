@@ -38,6 +38,9 @@ coverage/
 # Turborepo cache
 .turbo/
 
+# Documents
+*.pdf
+
 # OS
 .DS_Store
 Thumbs.db
