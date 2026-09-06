@@ -444,7 +444,11 @@ export const runRetentionPurge = async (): Promise<{
 export const resumeLiveRttOnce = async (): Promise<number> => {
     if (env.TRANSCRIPTION_PROVIDER !== 'agora') return 0;
     const rows = await db
-        .select({ id: liveSessions.id, rtcChannel: liveSessions.rtcChannel })
+        .select({
+            id: liveSessions.id,
+            rtcChannel: liveSessions.rtcChannel,
+            language: liveSessions.language,
+        })
         .from(liveSessions)
         .where(
             and(

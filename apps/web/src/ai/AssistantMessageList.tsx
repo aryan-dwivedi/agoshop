@@ -87,12 +87,12 @@ export const AssistantMessageList = ({
                     <p className="mb-2 px-1 text-11 font-semibold uppercase tracking-[0.08em] text-t3">
                         Try asking
                     </p>
-                    <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 scroll-thin">
+                    <div className="flex flex-wrap gap-2">
                         {starterPrompts.map((example) => (
                             <button
                                 key={example}
                                 type="button"
-                                className="chip shrink-0 max-w-[min(100%,18rem)] whitespace-normal text-left"
+                                className="chip max-w-full whitespace-normal text-left"
                                 disabled={promptsDisabled}
                                 onClick={() => onPrompt(example)}
                             >

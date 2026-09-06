@@ -62,12 +62,18 @@ const repairSessionStart = async (
     sessionId: string,
     attemptSideServices: boolean,
 ): Promise<void> => {
-    let sideSession: { id: string; slug: string; rtcChannel: string } | null = null;
+    let sideSession: { id: string; slug: string; rtcChannel: string; language: string } | null =
+        null;
     await withLifecycleLock('start', sessionId, async (tx) => {
         const [row] = await tx.select().from(liveSessions).where(eq(liveSessions.id, sessionId));
         if (!row) throw notFound('session_not_found');
         if (row.status !== 'live') throw conflict('session_not_startable');
-        sideSession = { id: row.id, slug: row.slug, rtcChannel: row.rtcChannel };
+        sideSession = {
+            id: row.id,
+            slug: row.slug,
+            rtcChannel: row.rtcChannel,
+            language: row.language,
+        };
         if (row.startEffectsCompletedAt) return;
         await redis
             .pipeline()
@@ -83,10 +89,19 @@ const repairSessionStart = async (
         track({ type: 'session_started', sessionId });
     });
     if (!attemptSideServices || sideSession === null) return;
-    const current = sideSession as { id: string; slug: string; rtcChannel: string };
+    const current = sideSession as {
+        id: string;
+        slug: string;
+        rtcChannel: string;
+        language: string;
+    };
     const results = await Promise.allSettled([
         startRecording({ id: current.id, rtcChannel: current.rtcChannel }),
-        startRtt({ id: current.id, rtcChannel: current.rtcChannel }),
+        startRtt({
+            id: current.id,
+            rtcChannel: current.rtcChannel,
+            language: current.language,
+        }),
         createConverter({
             id: current.id,
             slug: current.slug,

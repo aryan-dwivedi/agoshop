@@ -91,7 +91,7 @@ envVarGroups:
           - key: TRANSCRIPTION_PROVIDER
             value: agora
           - key: TRANSCRIPTION_LANGUAGES
-            value: en-US
+            value: en-US,hi-IN,es-ES
           - key: PG_POOL_MAX
             value: '5'
           - key: NODE_OPTIONS

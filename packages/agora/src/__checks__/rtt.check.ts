@@ -6,7 +6,7 @@ import { liveSessions, sellers, users } from '@shop/db/schema.js';
 import { env } from '@shop/platform/env.js';
 import { closeRedis } from '@shop/platform/lib/redis.js';
 
-import { queryRtt, startRtt, stopRtt } from '../rtt.js';
+import { queryRtt, resolveRttLanguages, startRtt, stopRtt } from '../rtt.js';
 
 const results: string[] = [];
 let failures = 0;
@@ -62,9 +62,9 @@ const run = async (): Promise<void> => {
     });
     const session = { id: sessionId, rtcChannel, slug };
     console.log(`session ${session.slug} (${session.id})  channel ${session.rtcChannel}`);
-    console.log(`languages ${env.TRANSCRIPTION_LANGUAGES.join(', ')}\n`);
+    console.log(`languages ${resolveRttLanguages('en-US').join(', ')}\n`);
     try {
-        await startRtt({ id: session.id, rtcChannel: session.rtcChannel });
+        await startRtt({ id: session.id, rtcChannel: session.rtcChannel, language: 'en-US' });
         const after = await statusOf(session.id);
         check(
             'RTT task id persisted on the session',

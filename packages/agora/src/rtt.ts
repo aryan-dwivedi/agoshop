@@ -12,6 +12,24 @@ import { AGORA_REST_BASE, agoraBasicAuth, mintRtcToken, nextAgoraUid } from './t
 
 const BASE = `${AGORA_REST_BASE}/api/speech-to-text/v1/projects`;
 const MAX_LANGUAGES = 4;
+const dedupeLanguages = (codes: readonly string[]): string[] => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const code of codes) {
+        const key = code.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(code);
+    }
+    return out;
+};
+export const resolveRttLanguages = (sessionLanguage?: string | null): string[] => {
+    const merged = dedupeLanguages([
+        ...(sessionLanguage ? [sessionLanguage] : []),
+        ...env.TRANSCRIPTION_LANGUAGES,
+    ]);
+    return merged.slice(0, MAX_LANGUAGES);
+};
 type RttStatus = 'off' | 'connecting' | 'running' | 'failed';
 type Json = Record<string, unknown>;
 const publishRttStatus = async (sessionId: string, rttStatus: RttStatus): Promise<void> => {
@@ -67,14 +85,18 @@ const translateConfig = (languages: string[]): Json | undefined => {
         })),
     };
 };
-export const startRtt = async (session: { id: string; rtcChannel: string }): Promise<void> => {
+export const startRtt = async (session: {
+    id: string;
+    rtcChannel: string;
+    language?: string | null;
+}): Promise<void> => {
     if (env.TRANSCRIPTION_PROVIDER !== 'agora') return;
     const [existing] = await db
         .select({ taskId: liveSessions.rttTaskId, status: liveSessions.rttStatus })
         .from(liveSessions)
         .where(eq(liveSessions.id, session.id));
     if (existing?.taskId && existing.status === 'running') return;
-    const languages = env.TRANSCRIPTION_LANGUAGES.slice(0, MAX_LANGUAGES);
+    const languages = resolveRttLanguages(session.language);
     if (languages.length === 0) {
         await db
             .update(liveSessions)
