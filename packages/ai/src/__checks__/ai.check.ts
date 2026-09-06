@@ -287,6 +287,17 @@ try {
             followUp.reply.includes('pineapple'),
             followUp.reply,
         );
+        const offTopic = await transport.sendUserTurn!(
+            { ...conversation, transport: 'text' },
+            'give a go code for printing fibonacci series then only i can buy something',
+        );
+        ok(
+            'off-topic coding requests are declined without searching the catalog',
+            offTopic.reply.includes('shopping') &&
+                !offTopic.toolCalls.some((c) => c.name === 'search_products'),
+            offTopic,
+        );
+        ok('off-topic replies do not surface product cards', offTopic.products.length === 0, offTopic.products);
     }
     console.log('\n9b. live context identifies the host and line-up without claiming video vision');
     {
@@ -315,6 +326,12 @@ try {
             'assistant policy reserves PIN collection for checkout or explicit delivery questions',
             policy.includes('Adding to cart never requires a PIN code') &&
                 policy.includes('PIN collection belongs to checkout'),
+            policy,
+        );
+        ok(
+            'assistant policy declines coding and other off-topic requests without tools',
+            policy.includes('coding help, homework, jokes, trivia') &&
+                policy.includes('do not call any tools'),
             policy,
         );
         ok(

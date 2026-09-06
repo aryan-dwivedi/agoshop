@@ -1,6 +1,7 @@
 import type { ChatMessage, LlmChunk, LlmProvider, LlmRequest } from './index.js';
 
 import { LlmProviderError } from './index.js';
+import { extractShoppingSearchQuery, isOffTopicShoppingMessage, OFF_TOPIC_REPLY } from '../offTopic.js';
 
 export const mockStats = { streams: 0, aborted: 0, completed: 0 };
 let callSeq = 0;
@@ -46,6 +47,9 @@ type Script =
       }
     | {
           kind: 'greeting';
+      }
+    | {
+          kind: 'off_topic';
       };
 const GREETING = /^[\s!.,]*(?:hi|hey|hello|hiya|namaste|ji|yo|sup|good\s+(?:morning|afternoon|evening))[\s!.,]*$/iu;
 const PINCODE_IN_TEXT = /\b(\d{6})\b/;
@@ -53,22 +57,12 @@ const DELIVERY_INTENT =
     /\b(?:deliver(?:y|ies)?|ship(?:ping)?|pin\s*code|pincode|serviceable|serviceability)\b/iu;
 const PAYMENT_INTENT =
     /\b(?:pay(?:ment)?|upi|cod|cash(?:\s+on\s+delivery)?|credit\s+card|debit\s+card|card|emi|net\s*banking)\b/iu;
-const SHOPPING_PREFIX =
-    /\b(?:i\s+)?(?:need|want|looking\s+for|find(?:\s+me)?|search(?:\s+for)?|show\s+me|get(?:\s+me)?|buy|any)\s+(.+)/iu;
 const lastUserText = (messages: ChatMessage[]): string => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
         const message = messages[i]!;
         if (message.role === 'user' && typeof message.content === 'string') return message.content;
     }
     return '';
-};
-const extractSearchQuery = (text: string): string | null => {
-    const trimmed = text.trim().replace(/[?.!]+$/u, '').trim();
-    if (trimmed.length === 0 || GREETING.test(trimmed)) return null;
-    const prefixed = SHOPPING_PREFIX.exec(trimmed);
-    if (prefixed?.[1]) return prefixed[1].trim().slice(0, 200);
-    if (trimmed.length >= 2) return trimmed.slice(0, 200);
-    return null;
 };
 const lastToolResult = (messages: ChatMessage[]): ChatMessage | undefined =>
     [...messages].reverse().find((message) => message.role === 'tool');
@@ -94,8 +88,7 @@ const summarizeSearchResults = (messages: ChatMessage[]): string[] => {
         if (names.length === 1) {
             return [`I found ${names[0]}. Want details or should I add it to your cart?`];
         }
-        const tail = (data.total ?? results.length) > names.length ? ' and more' : '';
-        return [`I found ${names.join(', ')}${tail}. Which one interests you?`];
+        return ['I found a few options. Which one interests you?'];
     } catch {
         return ['I found a few options — tap a product card to see details.'];
     }
@@ -133,6 +126,7 @@ const chooseScript = (messages: ChatMessage[]): Script => {
     const match = DIRECTIVE.exec(text);
     if (!match) {
         if (GREETING.test(text.trim())) return { kind: 'greeting' };
+        if (isOffTopicShoppingMessage(text)) return { kind: 'off_topic' };
         const pinMatch = PINCODE_IN_TEXT.exec(text);
         if (pinMatch) {
             const pincode = pinMatch[1]!;
@@ -143,7 +137,7 @@ const chooseScript = (messages: ChatMessage[]): Script => {
                 return { kind: 'tool', tool: 'check_delivery', pincode };
             }
         }
-        const query = extractSearchQuery(text);
+        const query = extractShoppingSearchQuery(text);
         if (query) return { kind: 'search', query };
         return { kind: 'greeting' };
     }
@@ -298,6 +292,12 @@ async function* run(req: LlmRequest): AsyncGenerator<LlmChunk> {
                 if (req.signal.aborted) throw abortError();
                 yield { contentDelta: delta };
             }
+            yield { finishReason: 'stop' };
+            mockStats.completed += 1;
+            return;
+        }
+        if (script.kind === 'off_topic') {
+            yield { contentDelta: OFF_TOPIC_REPLY };
             yield { finishReason: 'stop' };
             mockStats.completed += 1;
             return;

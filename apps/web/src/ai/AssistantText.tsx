@@ -1,5 +1,7 @@
 import { Fragment } from 'react';
 
+import { displayAssistantText } from './displayAssistantText';
+
 const EMPHASIS = /(\*\*[^*]+\*\*|\*[^*\n]+\*)/g;
 const inline = (text: string, keyPrefix: string): JSX.Element[] =>
     text.split(EMPHASIS).map((part, index) => {
@@ -27,8 +29,14 @@ const inline = (text: string, keyPrefix: string): JSX.Element[] =>
         return <Fragment key={key}>{part}</Fragment>;
     });
 const BULLET = /^\s*(?:[-*•]|\d+\.)\s+/;
-export const AssistantText = ({ text }: { text: string }): JSX.Element => {
-    const lines = text
+export const AssistantText = ({
+    text,
+    productCount = 0,
+}: {
+    text: string;
+    productCount?: number;
+}): JSX.Element => {
+    const lines = displayAssistantText(text, productCount)
         .split('\n')
         .map((line) => line.replace(/^\s*#{1,6}\s*/, '').trimEnd())
         .filter(

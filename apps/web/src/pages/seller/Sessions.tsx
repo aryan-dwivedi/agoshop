@@ -3,11 +3,13 @@ import type { SellerSessionRow } from '../../lib/sellerApi';
 import type { LiveSessionDto, SessionStatus } from '@shop/shared';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Download } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { formatInr } from '@shop/shared';
 
+import { ComingSoonIconButton } from '../../components/seller/ComingSoon';
 import { RoleGate } from '../../components/seller/RoleGate';
 import { SessionScheduler, uploadSourceVideo } from '../../components/seller/SessionScheduler';
 import { api } from '../../lib/api';
@@ -64,13 +66,12 @@ const RetryRow = ({
         <tr className="bg-live-wash">
             <td
                 colSpan={8}
-                className="px-3 py-2"
+                className="px-4 py-2.5"
             >
                 <div className="flex flex-wrap items-center gap-3">
                     <span className="text-13 text-t1">
-                        This show is saved, but{' '}
-                        <span className="font-medium">{failure.file.name}</span> did not upload:{' '}
-                        {message} Nothing plays in the room until a video lands.
+                        Show saved, but{' '}
+                        <span className="font-medium">{failure.file.name}</span> failed: {message}
                     </span>
                     <button
                         type="button"
@@ -78,7 +79,7 @@ const RetryRow = ({
                         disabled={retry.isPending}
                         onClick={() => retry.mutate()}
                     >
-                        {retry.isPending ? 'Retrying…' : 'Retry the upload'}
+                        {retry.isPending ? 'Retrying…' : 'Retry upload'}
                     </button>
                     <button
                         type="button"
@@ -105,14 +106,14 @@ const ShowRow = ({
 }): JSX.Element => {
     const when = show.startedAt ?? show.scheduledFor ?? show.endedAt;
     return (
-        <tr className="h-[var(--row-h)] hover:bg-surface">
-            <td className="max-w-[22rem] px-3">
+        <tr>
+            <td className="max-w-[20rem]">
                 <span className="flex items-center gap-1.5">
                     <span className="min-w-0 truncate font-medium text-t1">{show.title}</span>
                     {broadcast?.autoStart === true && (
                         <span
-                            className="shrink-0 text-11 font-semibold uppercase tracking-[0.06em] text-accent"
-                            title="Goes live on schedule with nobody at the console."
+                            className="shrink-0 rounded-chip bg-accent-wash px-1.5 py-0.5 text-11 font-semibold uppercase tracking-wide text-accent-text"
+                            title="Auto-starts on schedule"
                         >
                             premiere
                         </span>
@@ -120,51 +121,44 @@ const ShowRow = ({
                     {broadcast?.hasUploadedVideo === true && (
                         <span
                             className="shrink-0 text-11 text-t3"
-                            title="A video stands in for the camera."
+                            title="Has uploaded video"
                         >
                             video
                         </span>
                     )}
                 </span>
             </td>
-
-            <td className="px-3">
+            <td>
                 {show.status === 'live' ? (
                     <span className="badge-live">
                         <span className="h-1.5 w-1.5 animate-breathe rounded-full bg-live-ink" />
                         live
                     </span>
                 ) : (
-                    <span className="text-t2">{show.status}</span>
+                    <span className="capitalize text-t2">{show.status}</span>
                 )}
             </td>
-
-            <td className="whitespace-nowrap px-3 tabular-nums text-t2">
-                {when === null ? 'unscheduled' : dateTime.format(new Date(when))}
+            <td className="whitespace-nowrap tabular-nums text-t2">
+                {when === null ? '—' : dateTime.format(new Date(when))}
             </td>
-
-            <td className="px-3 text-right tabular-nums text-t2">{nf.format(show.productCount)}</td>
-
-            <td className="px-3 text-right tabular-nums text-t2">
+            <td className="text-right tabular-nums text-t2">{nf.format(show.productCount)}</td>
+            <td className="text-right tabular-nums text-t2">
                 {show.status === 'live' && show.viewerCount >= 10
                     ? nf.format(show.viewerCount)
                     : show.peakViewers > 0
                       ? nf.format(show.peakViewers)
                       : '—'}
             </td>
-
-            <td className="px-3 text-right tabular-nums text-t2">
+            <td className="text-right tabular-nums text-t2">
                 {show.orders === 0 && show.status === 'scheduled' ? '—' : nf.format(show.orders)}
             </td>
-
-            <td className="px-3 text-right font-semibold tabular-nums text-t1">
+            <td className="text-right font-semibold tabular-nums text-t1">
                 {show.status === 'scheduled' && show.gmvMinorUnits === 0
                     ? '—'
                     : formatInr(show.gmvMinorUnits)}
             </td>
-
-            <td className="px-3">
-                <div className="flex items-center justify-end gap-2">
+            <td>
+                <div className="flex items-center justify-end gap-1.5">
                     {show.status === 'live' && (
                         <Link
                             to={`/live/${show.slug}`}
@@ -253,9 +247,7 @@ const Sessions = (): JSX.Element => {
     const publicSessions = useQuery({
         queryKey: ['sessions', 'all'],
         queryFn: () =>
-            api.get<{
-                sessions: LiveSessionDto[];
-            }>('/api/sessions'),
+            api.get<{ sessions: LiveSessionDto[] }>('/api/sessions'),
         staleTime: 60000,
     });
     const broadcastFlags = useMemo(
@@ -276,9 +268,9 @@ const Sessions = (): JSX.Element => {
         queryKey: ['session', prefillId ?? 'none'],
         queryFn: async () =>
             (
-                await api.get<{
-                    session: LiveSessionDto;
-                }>(`/api/sessions/${prefillId ?? ''}`)
+                await api.get<{ session: LiveSessionDto }>(
+                    `/api/sessions/${prefillId ?? ''}`,
+                )
             ).session,
         enabled: prefillId !== null,
     });
@@ -302,18 +294,25 @@ const Sessions = (): JSX.Element => {
         <RoleGate
             roles={['seller']}
             title="Shows"
-            subtitle="Schedule a show, put products on its line-up, take it on air, then read what it earned."
+            subtitle="Schedule, line up products, go live, and review performance."
             actions={
-                <button
-                    type="button"
-                    className="btn-commit"
-                    onClick={() => {
-                        closeBuilder();
-                        setCreating(true);
-                    }}
-                >
-                    New show
-                </button>
+                <div className="flex items-center gap-2">
+                    <ComingSoonIconButton
+                        feature="analyticsExport"
+                        icon={Download}
+                        label="Export shows"
+                    />
+                    <button
+                        type="button"
+                        className="btn-commit"
+                        onClick={() => {
+                            closeBuilder();
+                            setCreating(true);
+                        }}
+                    >
+                        New show
+                    </button>
+                </div>
             }
             scope={
                 sessions.data === undefined
@@ -327,30 +326,32 @@ const Sessions = (): JSX.Element => {
         >
             {builderOpen &&
                 (prefillId !== null && prefill === null ? (
-                    <div className="card mb-4 p-3">
-                        {prefillRead.isError ? (
-                            <p
-                                role="alert"
-                                className="text-13 text-danger"
-                            >
-                                Could not open that show.{' '}
-                                <button
-                                    type="button"
-                                    className="link"
-                                    onClick={closeBuilder}
+                    <div
+                        className="studio-modal-backdrop"
+                        aria-busy="true"
+                    >
+                        <div className="studio-modal p-8">
+                            {prefillRead.isError ? (
+                                <p
+                                    role="alert"
+                                    className="text-13 text-danger"
                                 >
-                                    Close
-                                </button>
-                            </p>
-                        ) : (
-                            <div
-                                className="space-y-2"
-                                aria-busy="true"
-                            >
-                                <div className="skeleton h-4 w-40" />
-                                <div className="skeleton h-32 w-full" />
-                            </div>
-                        )}
+                                    Could not open that show.{' '}
+                                    <button
+                                        type="button"
+                                        className="link"
+                                        onClick={closeBuilder}
+                                    >
+                                        Close
+                                    </button>
+                                </p>
+                            ) : (
+                                <div className="space-y-2">
+                                    <div className="skeleton h-5 w-40" />
+                                    <div className="skeleton h-48 w-full" />
+                                </div>
+                            )}
+                        </div>
                     </div>
                 ) : (
                     <SessionScheduler
@@ -373,7 +374,7 @@ const Sessions = (): JSX.Element => {
                     />
                 ))}
 
-            <div className="mb-3 flex flex-wrap items-center gap-1.5">
+            <div className="studio-filter-bar">
                 {FILTERS.map((entry) => {
                     const count =
                         entry.key === 'all'
@@ -388,7 +389,7 @@ const Sessions = (): JSX.Element => {
                             aria-pressed={filter === entry.key}
                         >
                             {entry.label}
-                            <span className="tabular-nums">{count}</span>
+                            <span className="tabular-nums text-t3">{count}</span>
                         </button>
                     );
                 })}
@@ -396,30 +397,30 @@ const Sessions = (): JSX.Element => {
 
             {sessions.isLoading && (
                 <div
-                    className="card space-y-1 p-3"
+                    className="card space-y-1.5 p-4"
                     aria-busy="true"
-                    aria-label="Loading your shows"
+                    aria-label="Loading shows"
                 >
                     {[0, 1, 2, 3, 4].map((row) => (
                         <div
                             key={row}
-                            className="skeleton h-8"
+                            className="skeleton h-9 rounded-ctl"
                         />
                     ))}
                 </div>
             )}
 
             {sessions.isError && (
-                <div className="card p-3">
+                <div className="studio-empty">
                     <p
                         role="alert"
-                        className="text-13 text-danger"
+                        className="text-14 text-danger"
                     >
                         Could not load your shows.
                     </p>
                     <button
                         type="button"
-                        className="btn-standard btn-sm mt-2"
+                        className="btn-standard btn-sm mt-3"
                         onClick={() => void sessions.refetch()}
                     >
                         Retry
@@ -428,15 +429,14 @@ const Sessions = (): JSX.Element => {
             )}
 
             {sessions.isSuccess && rows.length === 0 && (
-                <div className="card px-3 py-10 text-center">
-                    <p className="text-14 font-medium text-t1">No shows yet.</p>
-                    <p className="mx-auto mt-1 max-w-md text-13 leading-relaxed text-t2">
-                        A show is what everything else hangs off: the room shoppers join, the chat,
-                        the line-up that makes the live price apply, and the report afterwards.
+                <div className="studio-empty">
+                    <p className="text-16 font-semibold text-t1">No shows yet</p>
+                    <p className="mx-auto mt-2 max-w-md text-14 leading-relaxed text-t2">
+                        A show is your live room — schedule one, add products, and go on air.
                     </p>
                     <button
                         type="button"
-                        className="btn-commit mt-3"
+                        className="btn-commit mt-4"
                         onClick={() => setCreating(true)}
                     >
                         Schedule your first show
@@ -445,31 +445,25 @@ const Sessions = (): JSX.Element => {
             )}
 
             {sessions.isSuccess && rows.length > 0 && visible.length === 0 && (
-                <p className="card px-3 py-8 text-center text-13 text-t2">No {filter} shows.</p>
+                <p className="studio-empty text-14 text-t2">No {filter} shows.</p>
             )}
 
             {visible.length > 0 && (
-                <div className="card overflow-x-auto">
-                    <table className="w-full min-w-[860px] text-13">
+                <div className="studio-table-wrap overflow-x-auto">
+                    <table className="studio-table min-w-[800px]">
                         <thead>
-                            <tr className="border-b border-line text-left">
-                                <th className="px-3 py-1.5 font-medium text-t3">Show</th>
-                                <th className="px-3 py-1.5 font-medium text-t3">Status</th>
-                                <th className="px-3 py-1.5 font-medium text-t3">When</th>
-                                <th className="px-3 py-1.5 text-right font-medium text-t3">
-                                    Line-up
-                                </th>
-                                <th className="px-3 py-1.5 text-right font-medium text-t3">
-                                    Viewers
-                                </th>
-                                <th className="px-3 py-1.5 text-right font-medium text-t3">
-                                    Orders
-                                </th>
-                                <th className="px-3 py-1.5 text-right font-medium text-t3">GMV</th>
-                                <th className="px-3 py-1.5" />
+                            <tr>
+                                <th>Show</th>
+                                <th>Status</th>
+                                <th>When</th>
+                                <th className="text-right">Line-up</th>
+                                <th className="text-right">Viewers</th>
+                                <th className="text-right">Orders</th>
+                                <th className="text-right">GMV</th>
+                                <th />
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-line">
+                        <tbody>
                             {visible.map((show) => (
                                 <>
                                     <ShowRow

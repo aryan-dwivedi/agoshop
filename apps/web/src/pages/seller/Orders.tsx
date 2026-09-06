@@ -1,7 +1,9 @@
 import { useSearchParams } from 'react-router-dom';
+import { Download, Truck } from 'lucide-react';
 
 import { formatInr } from '@shop/shared';
 
+import { ComingSoonIconButton } from '../../components/seller/ComingSoon';
 import { RoleGate } from '../../components/seller/RoleGate';
 import { customerUrl } from '../../lib/origins';
 import { useSellerOrders } from '../../lib/sellerApi';
@@ -31,8 +33,21 @@ const Orders = (): JSX.Element => {
         <RoleGate
             roles={['seller']}
             title="Orders"
-            subtitle="Paid orders containing products from your storefront."
-            theme="light"
+            subtitle="Paid orders from your storefront. Read-only for now."
+            actions={
+                <div className="flex items-center gap-2">
+                    <ComingSoonIconButton
+                        feature="orderExport"
+                        icon={Download}
+                        label="Export orders"
+                    />
+                    <ComingSoonIconButton
+                        feature="orderFulfillment"
+                        icon={Truck}
+                        label="Fulfillment"
+                    />
+                </div>
+            }
             scope={
                 query.data
                     ? {
@@ -74,38 +89,38 @@ const Orders = (): JSX.Element => {
             )}
 
             {!query.isLoading && !query.isError && orders.length === 0 && (
-                <div className="card p-8 text-center">
-                    <h2 className="text-19 font-semibold text-t1">No paid orders yet</h2>
-                    <p className="mt-1 text-13 text-t2">New storefront orders will appear here.</p>
+                <div className="studio-empty">
+                    <h2 className="text-16 font-semibold text-t1">No paid orders yet</h2>
+                    <p className="mt-2 text-14 text-t2">New storefront orders will appear here.</p>
                 </div>
             )}
 
             {orders.length > 0 && (
-                <div className="card overflow-hidden">
+                <div className="studio-table-wrap overflow-hidden">
                     <div className="overflow-x-auto">
-                        <table className="w-full min-w-[760px] border-collapse text-left text-13">
-                            <thead className="border-b border-line bg-bg text-t3">
+                        <table className="studio-table min-w-[760px]">
+                            <thead>
                                 <tr>
-                                    <th className="px-3 py-2 font-medium">Order</th>
-                                    <th className="px-3 py-2 font-medium">Products</th>
-                                    <th className="px-3 py-2 font-medium">Payment</th>
-                                    <th className="px-3 py-2 font-medium">Placed</th>
-                                    <th className="px-3 py-2 text-right font-medium">Total</th>
+                                    <th>Order</th>
+                                    <th>Products</th>
+                                    <th>Payment</th>
+                                    <th>Placed</th>
+                                    <th className="text-right">Total</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-line">
+                            <tbody>
                                 {orders.map((order) => (
                                     <tr
                                         key={order.id}
-                                        className="align-top hover:bg-bg"
+                                        className="align-top"
                                     >
-                                        <td className="px-3 py-3">
+                                        <td>
                                             <div className="font-medium text-t1">
                                                 #{order.id.slice(-8).toUpperCase()}
                                             </div>
                                             <span className="badge-success mt-1">Paid</span>
                                         </td>
-                                        <td className="max-w-md px-3 py-3">
+                                        <td className="max-w-md py-3">
                                             <ul className="space-y-1.5">
                                                 {order.items.map((item) => (
                                                     <li
@@ -127,14 +142,14 @@ const Orders = (): JSX.Element => {
                                                 ))}
                                             </ul>
                                         </td>
-                                        <td className="px-3 py-3 text-t2">
+                                        <td className="py-3 text-t2">
                                             {methodLabel[order.paymentMethod] ??
                                                 order.paymentMethod}
                                         </td>
-                                        <td className="whitespace-nowrap px-3 py-3 text-t2">
+                                        <td className="whitespace-nowrap py-3 text-t2">
                                             {dateTime.format(new Date(order.createdAt))}
                                         </td>
-                                        <td className="tnum whitespace-nowrap px-3 py-3 text-right font-semibold text-t1">
+                                        <td className="tnum whitespace-nowrap py-3 text-right font-semibold text-t1">
                                             {formatInr(order.totalMinorUnits)}
                                         </td>
                                     </tr>

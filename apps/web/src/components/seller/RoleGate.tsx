@@ -1,5 +1,5 @@
 import type { SellerRef } from '../../lib/sellerApi';
-import type { Role } from '@shop/shared';
+import type { PublicUser, Role } from '@shop/shared';
 import type { ReactNode } from 'react';
 
 import { useState } from 'react';
@@ -10,7 +10,7 @@ import { useSession } from '../../state/session';
 import { ShieldIcon } from '../icons';
 
 const Denied = ({ roles, current }: { roles: Role[]; current: Role | null }): JSX.Element => {
-    const { refresh } = useSession();
+    const { applyUser, refresh } = useSession();
     const [pending, setPending] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const offered = roles.includes('seller') || roles.includes('support');
@@ -20,7 +20,11 @@ const Denied = ({ roles, current }: { roles: Role[]; current: Role | null }): JS
         setPending(demoRole);
         setError(null);
         try {
-            await api.post('/api/auth/login', { email, password: DEMO_PASSWORD });
+            const { user } = await api.post<{ user: PublicUser }>('/api/auth/login', {
+                email,
+                password: DEMO_PASSWORD,
+            });
+            applyUser(user);
             await refresh();
         } catch {
             setError(`Could not sign in as ${email}.`);
@@ -29,34 +33,33 @@ const Denied = ({ roles, current }: { roles: Role[]; current: Role | null }): JS
         }
     };
     return (
-        <div className="card animate-slide-up mx-auto mt-12 max-w-lg p-5 text-center">
-            <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-accent-wash text-accent">
-                <ShieldIcon className="h-5 w-5" />
+        <div className="studio-empty mx-auto mt-16 max-w-md animate-slide-up">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-wash text-accent">
+                <ShieldIcon className="h-6 w-6" />
             </span>
-            <h1 className="mt-3 text-19 font-semibold text-t1">Studio access required</h1>
-            <p className="mx-auto mt-1.5 max-w-md text-13 leading-relaxed text-t2">
+            <h1 className="mt-4 text-19 font-semibold text-t1">Studio access required</h1>
+            <p className="mx-auto mt-2 max-w-sm text-14 leading-relaxed text-t2">
                 {current === null
                     ? 'Sign in with a seller account to continue.'
                     : `This ${current} account does not have access to the seller panel.`}
             </p>
             {offered && (
-                <div className="mt-4 flex justify-center">
-                    <button
-                        type="button"
-                        className="btn-commit"
-                        disabled={pending !== null}
-                        onClick={() => void signInAs()}
-                    >
-                        {pending === demoRole
-                            ? 'Signing in…'
-                            : `Sign in as ${demoPersona(demoRole).email}`}
-                    </button>
-                </div>
+                <button
+                    type="button"
+                    className="btn-commit mt-5"
+                    disabled={pending !== null}
+                    onClick={() => void signInAs()}
+                >
+                    {pending === demoRole
+                        ? 'Signing in…'
+                        : `Sign in as ${demoPersona(demoRole).email}`}
+                </button>
             )}
             {error !== null && <p className="field-error mt-3">{error}</p>}
         </div>
     );
 };
+
 export const RoleGate = ({
     roles,
     title,
@@ -83,7 +86,7 @@ export const RoleGate = ({
     const frame = (body: ReactNode): JSX.Element => (
         <div
             data-theme={theme}
-            className="min-h-full bg-bg px-4 py-3 text-t1"
+            className="studio-page min-h-full bg-bg text-t1"
         >
             {body}
         </div>
@@ -91,12 +94,13 @@ export const RoleGate = ({
     if (loading) {
         return frame(
             <div
-                className="mt-12 space-y-2"
+                className="mt-16 space-y-3"
                 aria-busy="true"
                 aria-label="Checking your session"
             >
-                <div className="skeleton mx-auto h-5 w-48" />
-                <div className="skeleton mx-auto h-4 w-64" />
+                <div className="skeleton h-7 w-48" />
+                <div className="skeleton h-4 w-72" />
+                <div className="skeleton mt-4 h-40 w-full rounded-panel" />
             </div>,
         );
     }
@@ -110,21 +114,23 @@ export const RoleGate = ({
     }
     return frame(
         <>
-            <header className="mb-3 flex flex-wrap items-end justify-between gap-3 border-b border-line pb-3">
+            <header className="mb-5 flex flex-wrap items-end justify-between gap-4">
                 <div className="min-w-0">
-                    <h1 className="text-23 font-semibold tracking-[-0.01em] text-t1">{title}</h1>
+                    <h1 className="font-display text-28 font-semibold tracking-[-0.02em] text-t1">
+                        {title}
+                    </h1>
                     {subtitle !== undefined && (
-                        <p className="mt-0.5 max-w-2xl text-13 leading-relaxed text-t2">
+                        <p className="mt-1 max-w-2xl text-14 leading-relaxed text-t2">
                             {subtitle}
                         </p>
                     )}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     {scope !== undefined && scope.sellers.length > 1 && (
                         <label className="flex items-center gap-2 text-13 font-medium text-t2">
                             Storefront
                             <select
-                                className="input w-auto"
+                                className="input-studio w-auto min-w-[140px]"
                                 value={scope.value ?? ''}
                                 onChange={(e) =>
                                     scope.onChange(e.target.value === '' ? null : e.target.value)
@@ -147,7 +153,6 @@ export const RoleGate = ({
                     {actions}
                 </div>
             </header>
-
             {children}
         </>,
     );

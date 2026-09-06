@@ -10,6 +10,7 @@ type SessionValue = {
     user: PublicUser | null;
     config: AppConfig | null;
     loading: boolean;
+    applyUser: (user: PublicUser) => void;
     refresh: () => Promise<void>;
 };
 const SessionContext = createContext<SessionValue | null>(null);
@@ -32,6 +33,10 @@ export const SessionProvider = ({ children }: { children: ReactNode }): JSX.Elem
             } catch (err) {
                 if (!(err instanceof ApiError && err.status === 401)) throw err;
             }
+            const cached = queryClient.getQueryData<{ user: PublicUser | null }>(['me']);
+            if (cached?.user && !cached.user.isGuest) {
+                return { user: null };
+            }
             try {
                 return await api.post<{
                     user: PublicUser;
@@ -47,8 +52,11 @@ export const SessionProvider = ({ children }: { children: ReactNode }): JSX.Elem
             user: meQuery.data?.user ?? null,
             config: configQuery.data ?? null,
             loading: meQuery.isLoading || configQuery.isLoading,
+            applyUser: (user: PublicUser) => {
+                queryClient.setQueryData(['me'], { user });
+            },
             refresh: async () => {
-                await queryClient.invalidateQueries({ queryKey: ['me'] });
+                await queryClient.refetchQueries({ queryKey: ['me'] });
             },
         }),
         [meQuery.data, meQuery.isLoading, configQuery.data, configQuery.isLoading, queryClient],

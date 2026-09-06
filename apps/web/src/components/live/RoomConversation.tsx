@@ -674,7 +674,14 @@ const AssistantBlock = ({
                         <div
                             className={`max-w-[92%] rounded-ctl px-3 py-1.5 text-14 ${line.role === 'user' ? 'bg-accent text-accent-ink' : 'bg-elev text-t1'}`}
                         >
-                            {line.role === 'user' ? line.text : <AssistantText text={line.text} />}
+                            {line.role === 'user' ? (
+                                line.text
+                            ) : (
+                                <AssistantText
+                                    text={line.text}
+                                    productCount={line.products.length}
+                                />
+                            )}
                             {!line.final && (
                                 <TypingDots
                                     className={`ml-1.5 ${line.role === 'user' ? 'text-accent-ink' : 'text-t3'}`}

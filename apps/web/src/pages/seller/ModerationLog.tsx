@@ -2,7 +2,9 @@ import type { ModerationAction, SellerSessionsDto } from '../../lib/sellerApi';
 import type { UseQueryResult } from '@tanstack/react-query';
 
 import { useSearchParams } from 'react-router-dom';
+import { Shield } from 'lucide-react';
 
+import { ComingSoonIconButton } from '../../components/seller/ComingSoon';
 import { RoleGate } from '../../components/seller/RoleGate';
 import { useSellerSessions, useSessionModeration } from '../../lib/sellerApi';
 import { useSession } from '../../state/session';
@@ -174,7 +176,15 @@ const ModerationLog = (): JSX.Element => {
         <RoleGate
             roles={['seller']}
             title="Audience"
-            subtitle="Review moderation actions taken during each show."
+            subtitle="Moderation log for each show. Actions are taken from the live room."
+            actions={
+                <ComingSoonIconButton
+                    feature="audienceModeration"
+                    icon={Shield}
+                    label="Moderate from here"
+                    message="Moderation from this page will be live soon. Use the live room chat panel for now."
+                />
+            }
             scope={
                 sessions.data === undefined
                     ? undefined

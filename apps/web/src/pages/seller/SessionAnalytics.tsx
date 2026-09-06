@@ -2,9 +2,11 @@ import type { SessionAnalyticsDto } from '@shop/shared';
 import type { ReactNode } from 'react';
 
 import { Link, useParams } from 'react-router-dom';
+import { Download } from 'lucide-react';
 
 import { formatInr } from '@shop/shared';
 
+import { ComingSoonIconButton } from '../../components/seller/ComingSoon';
 import { Metric } from '../../components/seller/Metric';
 import { RoleGate } from '../../components/seller/RoleGate';
 import { ViewerChart } from '../../components/seller/ViewerChart';
@@ -247,16 +249,23 @@ const SessionAnalytics = (): JSX.Element => {
             title="Show report"
             subtitle="Audience, engagement, product activity, and paid sales from this show."
             actions={
-                <Link
-                    to="/shows"
-                    className="btn-standard"
-                >
-                    All shows
-                </Link>
+                <div className="flex items-center gap-2">
+                    <ComingSoonIconButton
+                        feature="analyticsExport"
+                        icon={Download}
+                        label="Export report"
+                    />
+                    <Link
+                        to="/shows"
+                        className="btn-standard"
+                    >
+                        All shows
+                    </Link>
+                </div>
             }
         >
             {id === undefined ? (
-                <div className="card p-6 text-sm text-slate-600">No session id in the URL.</div>
+                <div className="card p-6 text-14 text-t2">No session id in the URL.</div>
             ) : (
                 <Body sessionId={id} />
             )}

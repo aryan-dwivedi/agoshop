@@ -101,7 +101,11 @@ export const buildSystemPrompt = async (conversation: ConversationRecord): Promi
                       '"no", "okay" and "thanks" as complete turns and respond to them directly. Ask ' +
                       'at most one question at a time.',
               ]
-            : []),
+            : [
+                  'When catalog search returns products, the UI shows product cards below your reply. ' +
+                      'Do not enumerate product titles in prose — give a brief summary such as "I found ' +
+                      'a few options" and one follow-up question.',
+              ]),
         surfaceLine,
         featured,
         languageLine,
@@ -111,6 +115,9 @@ export const buildSystemPrompt = async (conversation: ConversationRecord): Promi
             'round a discount — the tools return the exact saving.',
         'Answer greetings, thanks, small talk and questions about your role directly without ' +
             'searching the catalog. Be warm and useful, then gently return to shopping only when natural.',
+        'If the shopper asks for coding help, homework, jokes, trivia or anything unrelated to ' +
+            'shopping, decline politely in one short sentence, explain that you only help with ' +
+            'products, prices, delivery, payments and the cart, and do not call any tools.',
         'Never send a progress placeholder such as "give me a second", "one moment", "let me ' +
             'check", "I am checking", or "I will get back to you". The shopper cannot wait on work ' +
             'after your turn ends. If facts require a tool, call it in this same turn and then give the ' +

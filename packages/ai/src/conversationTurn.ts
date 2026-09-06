@@ -12,6 +12,7 @@ import { logger } from '@shop/platform/lib/logger.js';
 import { persistBodies, redact } from '@shop/platform/lib/pii.js';
 import { SHOPPING_TOOLS, toolSchemas } from '@shop/shared';
 
+import { isOffTopicShoppingMessage, OFF_TOPIC_REPLY } from './offTopic.js';
 import { getProvider } from './providers/index.js';
 import { SurfacedProducts } from './surfacedProducts.js';
 import { executeToolCalls } from './toolExecutor.js';
@@ -218,6 +219,13 @@ const forceClosingAnswer = async (
     await persistAssistantText(conversation, turnId, closing);
     return closing;
 };
+const lastUserText = (messages: ChatMessage[]): string => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+        const message = messages[i]!;
+        if (message.role === 'user' && typeof message.content === 'string') return message.content;
+    }
+    return '';
+};
 export const runConversationTurn = async (
     input: ConversationTurnInput,
 ): Promise<ConversationTurnResult> => {
@@ -226,6 +234,18 @@ export const runConversationTurn = async (
     await persistUserText(conversation, turnId, messages).catch((err: unknown) =>
         logger.warn({ err, conversationId: conversation.id }, 'user turn persist failed'),
     );
+    const userText = lastUserText(messages);
+    if (userText.length > 0 && isOffTopicShoppingMessage(userText)) {
+        onText(OFF_TOPIC_REPLY);
+        await persistAssistantText(conversation, turnId, OFF_TOPIC_REPLY);
+        return {
+            text: OFF_TOPIC_REPLY,
+            rounds: 0,
+            executed: [],
+            capped: false,
+            products: [],
+        };
+    }
     const executed: ExecutedToolCall[] = [];
     const surfaced = new SurfacedProducts();
     let fullText = '';

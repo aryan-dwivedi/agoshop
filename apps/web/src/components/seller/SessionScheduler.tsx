@@ -2,13 +2,15 @@ import type { LiveSessionDto } from '@shop/shared';
 import type { ReactNode } from 'react';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useRef, useState } from 'react';
+import { ImagePlus, Star, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { formatInr } from '@shop/shared';
 
 import { ApiError, api } from '../../lib/api';
 import { useSellerProducts } from '../../lib/sellerApi';
 import { useSession } from '../../state/session';
+import { ComingSoonIconButton } from './ComingSoon';
 
 type StartMode = 'manual' | 'premiere' | 'now';
 export type EditableShow = {
@@ -31,6 +33,8 @@ type Draft = {
     liveDiscountPercent: string;
     coverImageUrl: string;
 };
+type Tab = 'details' | 'lineup' | 'schedule';
+
 const localInputToIso = (value: string): string | null => {
     if (value === '') return null;
     const parsed = new Date(value);
@@ -57,19 +61,28 @@ const START_MODES: {
     {
         value: 'manual',
         label: 'I’ll go live',
-        hint: 'Nothing is broadcast until you open the room and start it.',
+        hint: 'Nothing broadcasts until you open the room.',
     },
     {
         value: 'premiere',
         label: 'Premiere a video',
-        hint: 'Goes live by itself at the start time, playing the uploaded video.',
+        hint: 'Goes live automatically at the start time.',
     },
     {
         value: 'now',
         label: 'Go live now',
-        hint: 'Created already on air — open the room to publish camera or the video.',
+        hint: 'Created on air — open the room to start.',
     },
 ];
+const TABS: {
+    id: Tab;
+    label: string;
+}[] = [
+    { id: 'details', label: 'Details' },
+    { id: 'lineup', label: 'Line-up' },
+    { id: 'schedule', label: 'Schedule' },
+];
+
 export const uploadSourceVideo = async (sessionId: string, file: File): Promise<LiveSessionDto> => {
     const form = new FormData();
     form.append('video', file);
@@ -88,39 +101,36 @@ export const uploadSourceVideo = async (sessionId: string, file: File): Promise<
     if (!res.ok) {
         const failure = (
             parsed as {
-                error?: {
-                    code?: string;
-                    message?: string;
-                };
+                error?: { code?: string; message?: string };
             } | null
         )?.error;
         throw new Error(
             failure?.message ?? failure?.code ?? `The server rejected the upload (${res.status}).`,
         );
     }
-    const body = parsed as {
-        session?: LiveSessionDto;
-    } | null;
+    const body = parsed as { session?: LiveSessionDto } | null;
     if (!body?.session) throw new Error('The upload succeeded but the server returned no session.');
     return body.session;
 };
-const Column = ({
-    title,
-    note,
+
+const Field = ({
+    label,
+    hint,
     children,
 }: {
-    title: string;
-    note?: string;
+    label: string;
+    hint?: string;
     children: ReactNode;
 }): JSX.Element => (
-    <section className="min-w-0 border-line px-3 py-3 lg:border-l lg:first:border-l-0">
-        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-            <h3 className="text-14 font-semibold text-t1">{title}</h3>
-            {note !== undefined && <span className="text-11 text-t3">{note}</span>}
-        </div>
+    <label className="studio-field">
+        <span className="label">{label}</span>
         {children}
-    </section>
+        {hint !== undefined && (
+            <span className="mt-1 block text-11 leading-relaxed text-t3">{hint}</span>
+        )}
+    </label>
 );
+
 export const SessionScheduler = ({
     show,
     mode,
@@ -138,6 +148,7 @@ export const SessionScheduler = ({
     const source = show ?? null;
     const existing = mode === 'edit' ? source : null;
     const onAir = existing?.session.status === 'live';
+    const [tab, setTab] = useState<Tab>('details');
     const [draft, setDraft] = useState<Draft>(() => ({
         title:
             source === null
@@ -190,6 +201,15 @@ export const SessionScheduler = ({
         const byId = new Map(catalogue.map((product) => [product.productId, product]));
         return picked.filter((id) => byId.get(id)?.totalStock === 0).length;
     }, [catalogue, picked]);
+
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent): void => {
+            if (e.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [onClose]);
+
     const save = useMutation({
         mutationFn: async (): Promise<SchedulerResult> => {
             const discount = parseLiveDiscount(draft.liveDiscountPercent);
@@ -210,30 +230,33 @@ export const SessionScheduler = ({
                     startNow: startMode === 'now',
                 });
             } else {
-                const body = await api.patch<{
-                    session: LiveSessionDto;
-                }>(`/api/sessions/${existing.session.id}`, {
-                    title: draft.title.trim(),
-                    description: draft.description.trim(),
-                    hostName: draft.hostName.trim(),
-                    language: draft.language,
-                    coverImageUrl:
-                        draft.coverImageUrl.trim() === '' ? null : draft.coverImageUrl.trim(),
-                    ...(onAir
-                        ? {}
-                        : {
-                              scheduledFor: localInputToIso(draft.scheduledFor),
-                              expectedPeakViewers: Number.parseInt(draft.expectedPeakViewers, 10),
-                              autoStart: startMode === 'premiere',
-                          }),
-                });
+                const body = await api.patch<{ session: LiveSessionDto }>(
+                    `/api/sessions/${existing.session.id}`,
+                    {
+                        title: draft.title.trim(),
+                        description: draft.description.trim(),
+                        hostName: draft.hostName.trim(),
+                        language: draft.language,
+                        coverImageUrl:
+                            draft.coverImageUrl.trim() === '' ? null : draft.coverImageUrl.trim(),
+                        ...(onAir
+                            ? {}
+                            : {
+                                  scheduledFor: localInputToIso(draft.scheduledFor),
+                                  expectedPeakViewers: Number.parseInt(
+                                      draft.expectedPeakViewers,
+                                      10,
+                                  ),
+                                  autoStart: startMode === 'premiere',
+                              }),
+                    },
+                );
                 session = body.session;
                 if (discount !== (existing.session.discountPercent ?? null)) {
-                    const priced = await api.patch<{
-                        session: LiveSessionDto;
-                    }>(`/api/sessions/${session.id}/pricing`, {
-                        discountPercent: discount,
-                    });
+                    const priced = await api.patch<{ session: LiveSessionDto }>(
+                        `/api/sessions/${session.id}/pricing`,
+                        { discountPercent: discount },
+                    );
                     session = priced.session;
                 }
             }
@@ -271,7 +294,7 @@ export const SessionScheduler = ({
             if (err instanceof ApiError) {
                 setError(
                     err.code === 'slug_taken'
-                        ? 'That address is taken — pick another, or leave it blank to derive one from the title.'
+                        ? 'That address is taken — pick another, or leave it blank.'
                         : err.code === 'multiple_featured'
                           ? 'Only one product can be on camera first.'
                           : err.message,
@@ -281,6 +304,7 @@ export const SessionScheduler = ({
             setError(err instanceof Error ? err.message : 'Could not save this show.');
         },
     });
+
     const expected = Number.parseInt(draft.expectedPeakViewers, 10);
     const premiereNeedsVideo =
         startMode === 'premiere' && videoFile === null && existing?.session.sourceVideoUrl == null;
@@ -296,439 +320,527 @@ export const SessionScheduler = ({
             : !onAir && (!Number.isFinite(expected) || expected <= 0)
               ? 'an expected peak above zero'
               : premiereNeedsVideo
-                ? 'a video — a premiere has no host to fall back on'
+                ? 'a video for the premiere'
                 : premiereNeedsTime
-                  ? 'a start time — that instant is what the server watches for'
+                  ? 'a start time for the premiere'
                   : discountOutOfRange
                     ? `a live price at or under ${MAX_LIVE_DISCOUNT_PERCENT}% off`
                     : emptiedLineUp
                       ? 'at least one product on the line-up'
                       : null;
+
+    const title =
+        existing !== null
+            ? `Edit ${existing.session.title}`
+            : source === null
+              ? 'New show'
+              : `Duplicate of ${source.session.title}`;
+
     return (
-        <form
-            className="card mb-4 overflow-hidden"
-            onSubmit={(event) => {
-                event.preventDefault();
-                save.mutate();
+        <div
+            className="studio-modal-backdrop"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="scheduler-title"
+            onClick={(e) => {
+                if (e.target === e.currentTarget) onClose();
             }}
         >
-            <header className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line px-3 py-2">
-                <h2 className="text-14 font-semibold text-t1">
-                    {existing !== null
-                        ? `Editing ${existing.session.title}`
-                        : source === null
-                          ? 'New show'
-                          : `Duplicate of ${source.session.title}`}
-                </h2>
-                <div className="flex items-center gap-2">
-                    {onAir && (
-                        <span className="badge-live">
-                            <span className="h-1.5 w-1.5 animate-breathe rounded-full bg-live-ink" />
-                            on air
+            <form
+                className="studio-modal"
+                onSubmit={(event) => {
+                    event.preventDefault();
+                    save.mutate();
+                }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <header className="studio-modal-header">
+                    <div className="min-w-0">
+                        <h2
+                            id="scheduler-title"
+                            className="truncate text-16 font-semibold text-t1"
+                        >
+                            {title}
+                        </h2>
+                        {onAir && (
+                            <span className="badge-live mt-1">
+                                <span className="h-1.5 w-1.5 animate-breathe rounded-full bg-live-ink" />
+                                on air
+                            </span>
+                        )}
+                    </div>
+                    <button
+                        type="button"
+                        className="flex h-8 w-8 items-center justify-center rounded-ctl text-t3 transition hover:bg-surface hover:text-t1"
+                        onClick={onClose}
+                        aria-label="Close"
+                    >
+                        <X
+                            className="h-4 w-4"
+                            strokeWidth={2}
+                        />
+                    </button>
+                </header>
+
+                <nav
+                    className="studio-tabs"
+                    aria-label="Show form sections"
+                >
+                    {TABS.map((entry) => (
+                        <button
+                            key={entry.id}
+                            type="button"
+                            className={tab === entry.id ? 'studio-tab-active' : 'studio-tab'}
+                            onClick={() => setTab(entry.id)}
+                            aria-selected={tab === entry.id}
+                        >
+                            {entry.label}
+                            {entry.id === 'lineup' && picked.length > 0 && (
+                                <span className="ml-1.5 tabular-nums text-t3">
+                                    ({picked.length})
+                                </span>
+                            )}
+                        </button>
+                    ))}
+                </nav>
+
+                <div className="studio-modal-body">
+                    {tab === 'details' && (
+                        <div className="studio-form-grid">
+                            <Field
+                                label="Title"
+                                hint="What shoppers see on the show card."
+                            >
+                                <input
+                                    className="input-studio"
+                                    value={draft.title}
+                                    onChange={(e) =>
+                                        setDraft({ ...draft, title: e.target.value })
+                                    }
+                                    placeholder="Festive Edit — handloom sarees"
+                                    required
+                                />
+                            </Field>
+
+                            <Field
+                                label="Host name"
+                                hint="Shown on the show card and in the room."
+                            >
+                                <input
+                                    className="input-studio"
+                                    value={draft.hostName}
+                                    onChange={(e) =>
+                                        setDraft({ ...draft, hostName: e.target.value })
+                                    }
+                                />
+                            </Field>
+
+                            <Field
+                                label="Address"
+                                hint={
+                                    existing === null
+                                        ? 'Derived from the title if left blank.'
+                                        : 'Fixed once the show exists.'
+                                }
+                            >
+                                <input
+                                    className="input-studio"
+                                    value={draft.slug}
+                                    disabled={existing !== null}
+                                    onChange={(e) =>
+                                        setDraft({ ...draft, slug: e.target.value })
+                                    }
+                                    placeholder="festive-edit"
+                                    pattern="[a-z0-9][a-z0-9-]{1,60}"
+                                />
+                            </Field>
+
+                            <Field label="Language">
+                                <select
+                                    className="input-studio"
+                                    value={draft.language}
+                                    onChange={(e) =>
+                                        setDraft({ ...draft, language: e.target.value })
+                                    }
+                                >
+                                    {languages.length === 0 ? (
+                                        <option value="en-US">en-US</option>
+                                    ) : (
+                                        languages.map((code) => (
+                                            <option
+                                                key={code}
+                                                value={code}
+                                            >
+                                                {code}
+                                            </option>
+                                        ))
+                                    )}
+                                </select>
+                            </Field>
+
+                            <div className="studio-field-full">
+                                <Field
+                                    label="Description"
+                                    hint="Optional — appears on the show card."
+                                >
+                                    <textarea
+                                        className="input-studio"
+                                        value={draft.description}
+                                        onChange={(e) =>
+                                            setDraft({ ...draft, description: e.target.value })
+                                        }
+                                        placeholder="What shoppers see on the show card."
+                                    />
+                                </Field>
+                            </div>
+
+                            <div className="studio-field-full">
+                                <span className="label">Cover image</span>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <ComingSoonIconButton
+                                        feature="coverImageUpload"
+                                        icon={ImagePlus}
+                                        label="Upload cover image"
+                                        message="Cover image upload will be live soon. For now, paste a URL below."
+                                    />
+                                    <input
+                                        className="input-studio min-w-0 flex-1"
+                                        value={draft.coverImageUrl}
+                                        onChange={(e) =>
+                                            setDraft({ ...draft, coverImageUrl: e.target.value })
+                                        }
+                                        placeholder="Or paste image URL — /media/covers/…"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {tab === 'lineup' && (
+                        <div>
+                            <input
+                                className="input-studio mb-3"
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                placeholder="Search your catalog…"
+                                aria-label="Search catalog"
+                            />
+
+                            {products.isLoading && (
+                                <div className="space-y-1.5">
+                                    {[0, 1, 2, 3].map((row) => (
+                                        <div
+                                            key={row}
+                                            className="skeleton h-10 rounded-ctl"
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                            {products.isError && (
+                                <p
+                                    role="alert"
+                                    className="text-13 text-danger"
+                                >
+                                    Could not load your catalog.
+                                </p>
+                            )}
+                            {products.isSuccess && catalogue.length === 0 && (
+                                <p className="text-14 text-t2">
+                                    No products yet — list one from Catalog first.
+                                </p>
+                            )}
+                            {products.isSuccess && catalogue.length > 0 && matches.length === 0 && (
+                                <p className="text-14 text-t2">No matches for that search.</p>
+                            )}
+
+                            {matches.length > 0 && (
+                                <ul className="divide-y divide-line rounded-ctl border border-line">
+                                    {matches.map((product) => {
+                                        const index = picked.indexOf(product.productId);
+                                        const isPicked = index >= 0;
+                                        return (
+                                            <li
+                                                key={product.productId}
+                                                className={`flex items-center gap-3 px-3 py-2.5 transition ${isPicked ? 'bg-accent-wash/50' : 'hover:bg-surface'}`}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    className="h-4 w-4 shrink-0 accent-accent"
+                                                    checked={isPicked}
+                                                    onChange={() => {
+                                                        setPicked((current) =>
+                                                            current.includes(product.productId)
+                                                                ? current.filter(
+                                                                      (id) =>
+                                                                          id !== product.productId,
+                                                                  )
+                                                                : [...current, product.productId],
+                                                        );
+                                                        setFeatured((current) =>
+                                                            current === product.productId
+                                                                ? null
+                                                                : current,
+                                                        );
+                                                    }}
+                                                    aria-label={`Add ${product.title}`}
+                                                />
+                                                <span className="w-5 shrink-0 text-center text-11 tabular-nums text-t3">
+                                                    {isPicked ? index + 1 : ''}
+                                                </span>
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="truncate text-13 font-medium text-t1">
+                                                            {product.title}
+                                                        </span>
+                                                        {product.totalStock === 0 && (
+                                                            <span className="shrink-0 text-11 font-bold uppercase text-danger">
+                                                                Out
+                                                            </span>
+                                                        )}
+                                                        {product.totalStock > 0 &&
+                                                            product.lowStock && (
+                                                                <span className="shrink-0 text-11 font-bold uppercase text-accent">
+                                                                    Low
+                                                                </span>
+                                                            )}
+                                                    </div>
+                                                    <span className="block truncate text-11 text-t3">
+                                                        {product.brand} ·{' '}
+                                                        {formatInr(product.priceMinorUnits)}
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    disabled={!isPicked}
+                                                    title={
+                                                        isPicked
+                                                            ? 'Pin on camera first'
+                                                            : 'Add to line-up first'
+                                                    }
+                                                    onClick={() => setFeatured(product.productId)}
+                                                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-ctl transition ${featured === product.productId ? 'bg-accent text-accent-ink' : 'text-t3 hover:bg-surface hover:text-t1'} disabled:opacity-30`}
+                                                >
+                                                    <Star
+                                                        className="h-3.5 w-3.5"
+                                                        fill={
+                                                            featured === product.productId
+                                                                ? 'currentColor'
+                                                                : 'none'
+                                                        }
+                                                        strokeWidth={2}
+                                                    />
+                                                </button>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            )}
+
+                            <p className="mt-3 text-11 leading-relaxed text-t3">
+                                Star marks the product on camera first. Order here is the scroll
+                                order for shoppers.
+                                {outOfStock > 0 && (
+                                    <span className="mt-1 block font-medium text-danger">
+                                        {outOfStock} product{outOfStock === 1 ? '' : 's'} out of
+                                        stock on this line-up.
+                                    </span>
+                                )}
+                            </p>
+                        </div>
+                    )}
+
+                    {tab === 'schedule' && (
+                        <div className="space-y-5">
+                            <fieldset>
+                                <legend className="label">Live price</legend>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                    {DISCOUNT_PRESETS.map((percent) => (
+                                        <button
+                                            key={percent}
+                                            type="button"
+                                            className={
+                                                liveDiscount === percent ? 'chip-active' : 'chip'
+                                            }
+                                            onClick={() =>
+                                                setDraft({
+                                                    ...draft,
+                                                    liveDiscountPercent:
+                                                        liveDiscount === percent
+                                                            ? ''
+                                                            : String(percent),
+                                                })
+                                            }
+                                        >
+                                            −{percent}%
+                                        </button>
+                                    ))}
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        max={MAX_LIVE_DISCOUNT_PERCENT}
+                                        className="input-studio w-20"
+                                        value={draft.liveDiscountPercent}
+                                        onChange={(e) =>
+                                            setDraft({
+                                                ...draft,
+                                                liveDiscountPercent: e.target.value,
+                                            })
+                                        }
+                                        placeholder="none"
+                                        aria-label="Custom discount percent"
+                                    />
+                                </div>
+                                <p className="mt-1.5 text-11 text-t3">
+                                    Off shop price, only while the show is on air.
+                                </p>
+                                {discountOutOfRange && (
+                                    <p className="field-error">
+                                        Cannot exceed {MAX_LIVE_DISCOUNT_PERCENT}% off.
+                                    </p>
+                                )}
+                            </fieldset>
+
+                            <Field
+                                label="Starts at"
+                                hint={
+                                    onAir
+                                        ? 'This show is already on air.'
+                                        : startMode === 'now'
+                                          ? 'Not used — starts when you save.'
+                                          : startMode === 'premiere'
+                                            ? 'Server takes it live at this time.'
+                                            : 'When shoppers are told to tune in.'
+                                }
+                            >
+                                <input
+                                    type="datetime-local"
+                                    className="input-studio"
+                                    value={startMode === 'now' ? '' : draft.scheduledFor}
+                                    disabled={startMode === 'now' || onAir}
+                                    onChange={(e) =>
+                                        setDraft({ ...draft, scheduledFor: e.target.value })
+                                    }
+                                />
+                            </Field>
+
+                            <Field
+                                label="Expected peak viewers"
+                                hint={
+                                    onAir
+                                        ? 'Fixed for the rest of this show.'
+                                        : 'Capacity hint for chat — not a hard cap.'
+                                }
+                            >
+                                <input
+                                    type="number"
+                                    min={1}
+                                    className="input-studio max-w-[120px]"
+                                    value={draft.expectedPeakViewers}
+                                    disabled={onAir}
+                                    onChange={(e) =>
+                                        setDraft({
+                                            ...draft,
+                                            expectedPeakViewers: e.target.value,
+                                        })
+                                    }
+                                />
+                            </Field>
+
+                            {!onAir && (
+                                <fieldset>
+                                    <legend className="label">Mode</legend>
+                                    <div className="space-y-1">
+                                        {START_MODES.filter(
+                                            (option) =>
+                                                existing === null || option.value !== 'now',
+                                        ).map((option) => (
+                                            <label
+                                                key={option.value}
+                                                className={`flex cursor-pointer gap-3 rounded-ctl border px-3 py-2.5 transition ${startMode === option.value ? 'border-accent bg-accent-wash' : 'border-line hover:border-line-ctl'}`}
+                                            >
+                                                <input
+                                                    type="radio"
+                                                    name="start-mode"
+                                                    className="mt-0.5 h-4 w-4 shrink-0 accent-accent"
+                                                    checked={startMode === option.value}
+                                                    onChange={() => setStartMode(option.value)}
+                                                />
+                                                <span className="min-w-0">
+                                                    <span className="block text-13 font-medium text-t1">
+                                                        {option.label}
+                                                    </span>
+                                                    <span className="block text-11 text-t3">
+                                                        {option.hint}
+                                                    </span>
+                                                </span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </fieldset>
+                            )}
+
+                            <Field
+                                label="Video to broadcast"
+                                hint={
+                                    videoFile !== null
+                                        ? `${videoFile.name} · ${(videoFile.size / (1024 * 1024)).toFixed(1)} MB`
+                                        : existing?.session.sourceVideoUrl != null
+                                          ? 'A video is attached — upload to replace.'
+                                          : 'Optional unless premiering. Uploaded after save.'
+                                }
+                            >
+                                <input
+                                    ref={videoInputRef}
+                                    type="file"
+                                    accept="video/mp4,video/webm"
+                                    className="input-studio py-1.5 file:mr-2 file:rounded-chip file:border-0 file:bg-surface file:px-2 file:py-1 file:text-11 file:font-semibold"
+                                    onChange={(e) =>
+                                        setVideoFile(e.target.files?.[0] ?? null)
+                                    }
+                                />
+                            </Field>
+                        </div>
+                    )}
+                </div>
+
+                <footer className="studio-modal-footer">
+                    <button
+                        type="submit"
+                        className="btn-commit"
+                        disabled={blocked !== null || save.isPending}
+                    >
+                        {save.isPending
+                            ? videoFile === null
+                                ? 'Saving…'
+                                : 'Uploading video…'
+                            : existing !== null
+                              ? 'Save changes'
+                              : startMode === 'now'
+                                ? 'Go live now'
+                                : startMode === 'premiere'
+                                  ? 'Schedule premiere'
+                                  : 'Schedule show'}
+                    </button>
+                    {blocked !== null && (
+                        <span className="text-13 text-t2">Needs {blocked}.</span>
+                    )}
+                    {error !== null && (
+                        <span
+                            role="alert"
+                            className="text-13 text-danger"
+                        >
+                            {error}
                         </span>
                     )}
                     <button
                         type="button"
-                        className="btn-quiet btn-sm"
+                        className="btn-quiet ml-auto"
                         onClick={onClose}
                     >
-                        Close
+                        Cancel
                     </button>
-                </div>
-            </header>
-
-            <div className="grid lg:grid-cols-3">
-                <Column title="Details">
-                    <label className="mb-2 block">
-                        <span className="label">Title</span>
-                        <input
-                            className="input"
-                            value={draft.title}
-                            onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-                            placeholder="Festive Edit — handloom sarees"
-                            required
-                        />
-                    </label>
-
-                    <label className="mb-2 block">
-                        <span className="label">Address</span>
-                        <input
-                            className="input"
-                            value={draft.slug}
-                            disabled={existing !== null}
-                            onChange={(event) => setDraft({ ...draft, slug: event.target.value })}
-                            placeholder="derived from the title if left blank"
-                            pattern="[a-z0-9][a-z0-9-]{1,60}"
-                        />
-                        <span className="mt-1 block text-11 text-t3">
-                            {existing === null
-                                ? 'The address shoppers open this show at.'
-                                : 'Fixed once the show exists — shoppers may already hold the link.'}
-                        </span>
-                    </label>
-
-                    <label className="mb-2 block">
-                        <span className="label">Description</span>
-                        <textarea
-                            className="input min-h-[64px]"
-                            value={draft.description}
-                            onChange={(event) =>
-                                setDraft({ ...draft, description: event.target.value })
-                            }
-                            placeholder="What shoppers see on the show card."
-                        />
-                    </label>
-
-                    <label className="mb-2 block">
-                        <span className="label">Host name</span>
-                        <input
-                            className="input"
-                            value={draft.hostName}
-                            onChange={(event) =>
-                                setDraft({ ...draft, hostName: event.target.value })
-                            }
-                        />
-                    </label>
-
-                    <label className="mb-2 block">
-                        <span className="label">Language</span>
-                        <select
-                            className="input"
-                            value={draft.language}
-                            onChange={(event) =>
-                                setDraft({ ...draft, language: event.target.value })
-                            }
-                        >
-                            {languages.length === 0 ? (
-                                <option value="en-US">en-US</option>
-                            ) : (
-                                languages.map((code) => (
-                                    <option
-                                        key={code}
-                                        value={code}
-                                    >
-                                        {code}
-                                    </option>
-                                ))
-                            )}
-                        </select>
-                    </label>
-
-                    <label className="mb-2 block">
-                        <span className="label">Cover image</span>
-                        <input
-                            className="input"
-                            value={draft.coverImageUrl}
-                            onChange={(event) =>
-                                setDraft({ ...draft, coverImageUrl: event.target.value })
-                            }
-                            placeholder="/media/covers/festive-edit.jpg"
-                        />
-                    </label>
-
-                    <label className="block">
-                        <span className="label">Expected peak viewers</span>
-                        <input
-                            type="number"
-                            min={1}
-                            className="input"
-                            value={draft.expectedPeakViewers}
-                            disabled={onAir}
-                            onChange={(event) =>
-                                setDraft({ ...draft, expectedPeakViewers: event.target.value })
-                            }
-                        />
-                        <span className="mt-1 block text-11 leading-tight text-t3">
-                            {onAir
-                                ? 'Fixed for the rest of this show — chat capacity was set when it went on air.'
-                                : 'A capacity hint, not a cap. Chat capacity is set from it at go-live and holds for the whole show.'}
-                        </span>
-                    </label>
-                </Column>
-
-                <Column
-                    title="Line-up"
-                    note={
-                        picked.length === 0
-                            ? 'only products here can carry the live price'
-                            : `${picked.length} selected${outOfStock === 0 ? '' : ` · ${outOfStock} out of stock`}`
-                    }
-                >
-                    <input
-                        className="input mb-2"
-                        value={query}
-                        onChange={(event) => setQuery(event.target.value)}
-                        placeholder="Search your catalog"
-                        aria-label="Search your catalog"
-                    />
-
-                    {products.isLoading && (
-                        <div className="space-y-1">
-                            {[0, 1, 2, 3, 4].map((row) => (
-                                <div
-                                    key={row}
-                                    className="skeleton h-8"
-                                />
-                            ))}
-                        </div>
-                    )}
-                    {products.isError && (
-                        <p
-                            role="alert"
-                            className="text-13 text-danger"
-                        >
-                            Could not read your catalog, so nothing can go on the line-up right now.
-                        </p>
-                    )}
-                    {products.isSuccess && catalogue.length === 0 && (
-                        <p className="text-13 text-t2">
-                            No products are assigned to you yet, so there is nothing to sell.
-                        </p>
-                    )}
-                    {products.isSuccess && catalogue.length > 0 && matches.length === 0 && (
-                        <p className="text-13 text-t2">Nothing in your catalog matches that.</p>
-                    )}
-
-                    {matches.length > 0 && (
-                        <ul className="max-h-[22rem] divide-y divide-line overflow-y-auto scroll-thin">
-                            {matches.map((product) => {
-                                const index = picked.indexOf(product.productId);
-                                const isPicked = index >= 0;
-                                return (
-                                    <li
-                                        key={product.productId}
-                                        className="flex items-center gap-2 py-1"
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            className="h-3.5 w-3.5 shrink-0 accent-accent"
-                                            checked={isPicked}
-                                            onChange={() => {
-                                                setPicked((current) =>
-                                                    current.includes(product.productId)
-                                                        ? current.filter(
-                                                              (id) => id !== product.productId,
-                                                          )
-                                                        : [...current, product.productId],
-                                                );
-                                                setFeatured((current) =>
-                                                    current === product.productId ? null : current,
-                                                );
-                                            }}
-                                            aria-label={`Put ${product.title} on the line-up`}
-                                        />
-                                        <span className="w-4 shrink-0 text-11 tabular-nums text-t3">
-                                            {isPicked ? index + 1 : '·'}
-                                        </span>
-                                        <span className="min-w-0 flex-1">
-                                            <span className="flex items-center gap-1.5">
-                                                <span className="min-w-0 truncate text-13 text-t1">
-                                                    {product.title}
-                                                </span>
-                                                {product.totalStock === 0 && (
-                                                    <span className="shrink-0 text-11 font-semibold text-danger">
-                                                        OUT
-                                                    </span>
-                                                )}
-                                                {product.totalStock > 0 && product.lowStock && (
-                                                    <span className="shrink-0 text-11 font-semibold text-accent">
-                                                        LOW
-                                                    </span>
-                                                )}
-                                            </span>
-                                            <span className="block truncate text-11 text-t3">
-                                                {product.brand} ·{' '}
-                                                {formatInr(product.priceMinorUnits)}
-                                            </span>
-                                        </span>
-                                        <label
-                                            className={`flex shrink-0 items-center gap-1 text-11 ${isPicked ? 'text-t2' : 'text-t3'}`}
-                                            title="On camera first"
-                                        >
-                                            <input
-                                                type="radio"
-                                                name="featured-product"
-                                                className="h-3 w-3 accent-accent"
-                                                disabled={!isPicked}
-                                                checked={featured === product.productId}
-                                                onChange={() => setFeatured(product.productId)}
-                                            />
-                                            <span aria-hidden="true">★</span>
-                                            <span className="sr-only">On camera first</span>
-                                        </label>
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    )}
-
-                    <p className="mt-2 text-11 leading-tight text-t3">
-                        ★ is on camera first — the pin bar opens on it. The order here is the order
-                        shoppers scroll.
-                        {picked.length > 0 &&
-                            featured === null &&
-                            ' No star yet, so the first product opens.'}
-                    </p>
-                    {outOfStock > 0 && (
-                        <p className="mt-1 text-11 font-medium text-danger">
-                            {outOfStock} product{outOfStock === 1 ? '' : 's'} on this line-up cannot
-                            be bought. Restock or remove {outOfStock === 1 ? 'it' : 'them'} before
-                            you go on camera.
-                        </p>
-                    )}
-                </Column>
-
-                <Column title="Pricing & schedule">
-                    <fieldset className="mb-3">
-                        <legend className="label">Live price</legend>
-                        <div className="flex flex-wrap items-center gap-1.5">
-                            {DISCOUNT_PRESETS.map((percent) => (
-                                <button
-                                    key={percent}
-                                    type="button"
-                                    className={liveDiscount === percent ? 'chip-active' : 'chip'}
-                                    onClick={() =>
-                                        setDraft({
-                                            ...draft,
-                                            liveDiscountPercent:
-                                                liveDiscount === percent ? '' : String(percent),
-                                        })
-                                    }
-                                >
-                                    −{percent}%
-                                </button>
-                            ))}
-                            <input
-                                type="number"
-                                min={0}
-                                max={MAX_LIVE_DISCOUNT_PERCENT}
-                                className="input w-20"
-                                value={draft.liveDiscountPercent}
-                                onChange={(event) =>
-                                    setDraft({
-                                        ...draft,
-                                        liveDiscountPercent: event.target.value,
-                                    })
-                                }
-                                placeholder="none"
-                                aria-label="Live price, percent off"
-                            />
-                        </div>
-                        <p className="mt-1 text-11 leading-tight text-t3">
-                            Off your shop price, and only while this show is on air. Blank means the
-                            show adds no rule of its own.
-                        </p>
-                        {discountOutOfRange && (
-                            <p className="field-error">
-                                A live price cannot go past {MAX_LIVE_DISCOUNT_PERCENT}% off.
-                            </p>
-                        )}
-                    </fieldset>
-
-                    <label className="mb-3 block">
-                        <span className="label">Starts at</span>
-                        <input
-                            type="datetime-local"
-                            className="input"
-                            value={startMode === 'now' ? '' : draft.scheduledFor}
-                            disabled={startMode === 'now' || onAir}
-                            onChange={(event) =>
-                                setDraft({ ...draft, scheduledFor: event.target.value })
-                            }
-                        />
-                        <span className="mt-1 block text-11 leading-tight text-t3">
-                            {onAir
-                                ? 'This show is already on air.'
-                                : startMode === 'now'
-                                  ? 'Not used — the show starts the moment you save.'
-                                  : startMode === 'premiere'
-                                    ? 'The server takes the premiere live at this instant, whether or not you are here.'
-                                    : 'When shoppers are told to turn up; you still press Go live.'}
-                        </span>
-                    </label>
-
-                    {!onAir && (
-                        <fieldset className="mb-3">
-                            <legend className="label">Mode</legend>
-                            <div className="space-y-1">
-                                {START_MODES.filter(
-                                    (option) => existing === null || option.value !== 'now',
-                                ).map((option) => (
-                                    <label
-                                        key={option.value}
-                                        className="flex cursor-pointer gap-2 rounded-ctl px-1 py-1 transition duration-ctl hover:bg-surface"
-                                    >
-                                        <input
-                                            type="radio"
-                                            name="start-mode"
-                                            className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-accent"
-                                            checked={startMode === option.value}
-                                            onChange={() => setStartMode(option.value)}
-                                        />
-                                        <span className="min-w-0">
-                                            <span className="block text-13 font-medium text-t1">
-                                                {option.label}
-                                            </span>
-                                            <span className="block text-11 leading-tight text-t3">
-                                                {option.hint}
-                                            </span>
-                                        </span>
-                                    </label>
-                                ))}
-                            </div>
-                        </fieldset>
-                    )}
-
-                    <label className="block">
-                        <span className="label">Video to broadcast</span>
-                        <input
-                            ref={videoInputRef}
-                            type="file"
-                            accept="video/mp4,video/webm"
-                            className="input py-1 file:mr-2 file:rounded-chip file:border-0 file:bg-surface file:px-2 file:py-1 file:text-11 file:font-semibold file:text-t1"
-                            onChange={(event) => setVideoFile(event.target.files?.[0] ?? null)}
-                        />
-                        <span className="mt-1 block text-11 leading-tight text-t3">
-                            {videoFile !== null
-                                ? `${videoFile.name} · ${(videoFile.size / (1024 * 1024)).toFixed(1)} MB`
-                                : existing?.session.sourceVideoUrl != null
-                                  ? 'A video is already attached — upload another to replace it.'
-                                  : 'Optional, unless this show premieres. Uploaded after the show is saved.'}
-                        </span>
-                    </label>
-                </Column>
-            </div>
-
-            <footer className="flex flex-wrap items-center gap-3 border-t border-line bg-surface px-3 py-2">
-                <button
-                    type="submit"
-                    className="btn-commit"
-                    disabled={blocked !== null || save.isPending}
-                >
-                    {save.isPending
-                        ? videoFile === null
-                            ? 'Saving…'
-                            : 'Uploading the video…'
-                        : existing !== null
-                          ? 'Save changes'
-                          : startMode === 'now'
-                            ? 'Go live now'
-                            : startMode === 'premiere'
-                              ? 'Schedule premiere'
-                              : 'Schedule show'}
-                </button>
-                {blocked !== null && (
-                    <span className="text-13 text-t2">Still needs {blocked}.</span>
-                )}
-                {error !== null && (
-                    <span
-                        role="alert"
-                        className="text-13 text-danger"
-                    >
-                        {error}
-                    </span>
-                )}
-            </footer>
-        </form>
+                </footer>
+            </form>
+        </div>
     );
 };

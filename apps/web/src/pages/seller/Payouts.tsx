@@ -2,8 +2,10 @@ import { useSearchParams } from 'react-router-dom';
 
 import { formatInr } from '@shop/shared';
 
+import { ComingSoonPanel } from '../../components/seller/ComingSoon';
 import { Metric } from '../../components/seller/Metric';
 import { RoleGate } from '../../components/seller/RoleGate';
+import { isFeatureLive } from '../../components/seller/studioFeatures';
 import { useSellerOrders } from '../../lib/sellerApi';
 import { useSession } from '../../state/session';
 
@@ -17,12 +19,13 @@ const Payouts = (): JSX.Element => {
         (total, order) => total + order.totalMinorUnits,
         0,
     );
+    const payoutsLive = isFeatureLive('payouts');
+
     return (
         <RoleGate
             roles={['seller']}
             title="Payouts"
             subtitle="Sales collected through your storefront."
-            theme="light"
             scope={
                 orders.data
                     ? {
@@ -43,26 +46,29 @@ const Payouts = (): JSX.Element => {
                     <Metric
                         label="Paid sales"
                         value={orders.isLoading ? null : formatInr(grossPaid)}
-                        hint="Total from the paid orders currently listed in Studio."
+                        hint="Total from paid orders in Studio."
                     />
                 </div>
-                <div className="card">
-                    <Metric
-                        label="Available payout"
-                        value={null}
-                        hint="Payout processing is not connected yet."
-                    />
-                </div>
+                {!payoutsLive && (
+                    <div className="card">
+                        <Metric
+                            label="Available payout"
+                            value={null}
+                            hint="Bank settlement is not connected yet."
+                        />
+                    </div>
+                )}
             </div>
 
-            <section className="card mt-4 p-5">
-                <h2 className="section-title">Payout setup is coming next</h2>
-                <p className="mt-2 max-w-2xl text-14 leading-relaxed text-t2">
-                    Studio records paid sales, but bank details, fees, settlement schedules, and
-                    transfers are not connected. This page will show those details only when they
-                    are backed by real payout data.
-                </p>
-            </section>
+            {!payoutsLive && (
+                <div className="mt-4">
+                    <ComingSoonPanel
+                        feature="payouts"
+                        title="Payouts are coming soon"
+                        description="Studio tracks your paid sales. Bank details, fees, settlement schedules, and transfers will be available in a future release."
+                    />
+                </div>
+            )}
         </RoleGate>
     );
 };

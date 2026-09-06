@@ -189,4 +189,111 @@
             rgb(11 12 14 / 0) 100%
         );
     }
+
+    /* ── Studio seller panel ── */
+    .studio-page {
+        @apply mx-auto w-full max-w-[var(--page-max)] px-5 py-5;
+    }
+
+    .studio-modal-backdrop {
+        @apply fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-[rgb(0_30_96/0.35)] p-4 backdrop-blur-[2px] sm:items-center sm:p-6;
+    }
+
+    .studio-modal {
+        @apply relative w-full max-w-4xl animate-slide-up rounded-sheet border border-line bg-elev shadow-sheet;
+    }
+
+    .studio-modal-header {
+        @apply flex items-center justify-between gap-3 border-b border-line px-5 py-4;
+    }
+
+    .studio-modal-body {
+        @apply max-h-[min(72vh,680px)] overflow-y-auto scroll-thin px-5 py-4;
+    }
+
+    .studio-modal-footer {
+        @apply flex flex-wrap items-center gap-3 border-t border-line bg-surface px-5 py-3;
+    }
+
+    .studio-tabs {
+        @apply flex gap-1 border-b border-line px-5;
+    }
+
+    .studio-tab {
+        @apply relative -mb-px px-3 py-2.5 text-13 font-medium text-t3 transition duration-ctl hover:text-t1;
+    }
+
+    .studio-tab-active {
+        @apply studio-tab font-semibold text-accent-text;
+    }
+
+    .studio-tab-active::after {
+        content: '';
+        @apply absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-accent;
+    }
+
+    .studio-form-grid {
+        @apply grid gap-4 sm:grid-cols-2;
+    }
+
+    .studio-field {
+        @apply block;
+    }
+
+    .studio-field-full {
+        @apply studio-field sm:col-span-2;
+    }
+
+    .input-studio {
+        @apply h-9 w-full rounded-ctl border border-line-ctl bg-bg px-3 text-13 text-t1
+            outline-none transition placeholder:text-t3 focus:border-accent focus:ring-1 focus:ring-accent;
+    }
+
+    textarea.input-studio {
+        @apply min-h-[72px] py-2;
+    }
+
+    .studio-coming-soon {
+        @apply card flex flex-col items-center px-6 py-14 text-center;
+    }
+
+    .studio-coming-soon-icon {
+        @apply flex h-12 w-12 items-center justify-center rounded-full bg-accent-wash text-accent;
+    }
+
+    .studio-table-wrap {
+        @apply card overflow-hidden;
+    }
+
+    .studio-table {
+        @apply w-full text-13;
+    }
+
+    .studio-table thead {
+        @apply border-b border-line bg-surface text-left;
+    }
+
+    .studio-table th {
+        @apply px-4 py-2 font-medium text-t3;
+    }
+
+    .studio-table tbody {
+        @apply divide-y divide-line;
+    }
+
+    .studio-table tr {
+        @apply h-[var(--row-h)] transition duration-ctl hover:bg-surface;
+    }
+
+    .studio-table td {
+        @apply px-4;
+    }
+
+    .studio-empty {
+        @apply card flex flex-col items-center px-6 py-12 text-center;
+    }
+
+    .studio-filter-bar {
+        @apply mb-4 flex flex-wrap items-center gap-2;
+    }
 }

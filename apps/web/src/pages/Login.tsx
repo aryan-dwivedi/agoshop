@@ -15,7 +15,7 @@ const LOGIN_MESSAGES: Record<string, string> = {
     email_taken: 'That email is already registered — sign in instead.',
 };
 const Login = (): JSX.Element => {
-    const { user, refresh } = useSession();
+    const { user, applyUser, refresh } = useSession();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const [params] = useSearchParams();
@@ -38,11 +38,13 @@ const Login = (): JSX.Element => {
                 user: PublicUser;
             }>(path, credentials);
         },
-        onSuccess: async () => {
+        onSuccess: async (data) => {
             const landed = pendingTab.current?.show() ?? null;
             pendingTab.current = null;
+            applyUser(data.user);
             if (landed === 'self') return;
-            queryClient.clear();
+            void queryClient.invalidateQueries({ queryKey: ['cart'] });
+            void queryClient.invalidateQueries({ queryKey: ['wishlist'] });
             await refresh();
             navigate(next);
         },
@@ -68,7 +70,7 @@ const Login = (): JSX.Element => {
                 </div>
 
                 <div className="p-5">
-                    {user !== null && (
+                    {user !== null && !user.isGuest && (
                         <p className="mb-4 rounded-ctl bg-surface px-3 py-2 text-14 text-t2">
                             Signed in as {user.displayName}.{' '}
                             <Link

@@ -66,7 +66,7 @@ const NextUp = ({ show, now }: { show: SellerSessionRow; now: number }): JSX.Ele
     const untilMs = show.scheduledFor === null ? 0 : Date.parse(show.scheduledFor) - now;
     const minutes = Math.round(Math.abs(untilMs) / 60000);
     return (
-        <section className="card animate-slide-up mb-4 border-accent p-4">
+        <section className="card mb-5 border-accent/40 p-5 shadow-e1">
             <p className="eyebrow text-accent">Next up</p>
             <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <h2 className="text-19 font-semibold tracking-[-0.01em] text-t1">{show.title}</h2>
@@ -121,9 +121,9 @@ const NextUp = ({ show, now }: { show: SellerSessionRow; now: number }): JSX.Ele
     );
 };
 const LiveNow = ({ shows, now }: { shows: SellerSessionRow[]; now: number }): JSX.Element => (
-    <section className="mb-4">
-        <h2 className="eyebrow mb-1.5">Live now</h2>
-        <ul className="card divide-y divide-line">
+    <section className="mb-5">
+        <h2 className="eyebrow mb-2">Live now</h2>
+        <ul className="studio-table-wrap divide-y divide-line">
             {shows.map((show) => (
                 <li
                     key={show.id}
@@ -249,8 +249,8 @@ const Today = (): JSX.Element => {
                 />
             )}
 
-            <section className="mb-4">
-                <h2 className="eyebrow mb-1.5">Across every show you have run</h2>
+            <section className="mb-5">
+                <h2 className="eyebrow mb-2">Across every show you have run</h2>
                 {overview.isLoading ? (
                     <div className="skeleton h-20 w-full" />
                 ) : overview.isError ? (
@@ -304,8 +304,8 @@ const Today = (): JSX.Element => {
                 )}
             </section>
 
-            <section className="mb-4">
-                <h2 className="eyebrow mb-1.5">Needs you</h2>
+            <section className="mb-5">
+                <h2 className="eyebrow mb-2">Needs you</h2>
                 {overview.isLoading ? (
                     <div className="skeleton h-8 w-72" />
                 ) : needs.length === 0 ? (
@@ -331,11 +331,11 @@ const Today = (): JSX.Element => {
             </section>
 
             <section>
-                <h2 className="eyebrow mb-1.5">Last five shows</h2>
+                <h2 className="eyebrow mb-2">Last five shows</h2>
                 {overview.isLoading ? (
                     <div className="skeleton h-32 w-full" />
                 ) : data === undefined || data.recentSessions.length === 0 ? (
-                    <div className="card px-3 py-8 text-center">
+                    <div className="studio-empty">
                         <p className="text-14 font-medium text-t1">You have not run a show yet.</p>
                         <p className="mx-auto mt-1 max-w-sm text-13 leading-relaxed text-t2">
                             Schedule one, put products on its line-up, then go live. Everything on
@@ -349,50 +349,41 @@ const Today = (): JSX.Element => {
                         </Link>
                     </div>
                 ) : (
-                    <div className="card overflow-x-auto">
-                        <table className="w-full min-w-[720px] text-13">
+                    <div className="studio-table-wrap overflow-x-auto">
+                        <table className="studio-table min-w-[720px]">
                             <thead>
-                                <tr className="border-b border-line text-left">
-                                    <th className="px-3 py-1.5 font-medium text-t3">Show</th>
-                                    <th className="px-3 py-1.5 font-medium text-t3">When</th>
-                                    <th className="px-3 py-1.5 text-right font-medium text-t3">
-                                        Peak
-                                    </th>
-                                    <th className="px-3 py-1.5 text-right font-medium text-t3">
-                                        Orders
-                                    </th>
-                                    <th className="px-3 py-1.5 text-right font-medium text-t3">
-                                        GMV
-                                    </th>
-                                    <th className="px-3 py-1.5" />
+                                <tr>
+                                    <th>Show</th>
+                                    <th>When</th>
+                                    <th className="text-right">Peak</th>
+                                    <th className="text-right">Orders</th>
+                                    <th className="text-right">GMV</th>
+                                    <th />
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-line">
+                            <tbody>
                                 {data.recentSessions.slice(0, 5).map((show) => {
                                     const when = show.startedAt ?? show.scheduledFor;
                                     return (
-                                        <tr
-                                            key={show.id}
-                                            className="h-[var(--row-h)] hover:bg-surface"
-                                        >
-                                            <td className="max-w-[24rem] truncate px-3 font-medium text-t1">
+                                        <tr key={show.id}>
+                                            <td className="max-w-[24rem] truncate font-medium text-t1">
                                                 {show.title}
                                             </td>
-                                            <td className="whitespace-nowrap px-3 tabular-nums text-t2">
+                                            <td className="whitespace-nowrap tabular-nums text-t2">
                                                 {when === null
                                                     ? 'unscheduled'
                                                     : dateTime.format(new Date(when))}
                                             </td>
-                                            <td className="px-3 text-right tabular-nums text-t2">
+                                            <td className="text-right tabular-nums text-t2">
                                                 {nf.format(show.peakViewers)}
                                             </td>
-                                            <td className="px-3 text-right tabular-nums text-t2">
+                                            <td className="text-right tabular-nums text-t2">
                                                 {nf.format(show.orders)}
                                             </td>
-                                            <td className="px-3 text-right font-semibold tabular-nums text-t1">
+                                            <td className="text-right font-semibold tabular-nums text-t1">
                                                 {formatInr(show.gmvMinorUnits)}
                                             </td>
-                                            <td className="px-3 text-right">
+                                            <td className="text-right">
                                                 <Link
                                                     to={`/shows/${show.id}/report`}
                                                     className="link"

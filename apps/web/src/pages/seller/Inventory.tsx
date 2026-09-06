@@ -8,9 +8,11 @@ import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
 
 import { Fragment, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { Pencil, Upload } from 'lucide-react';
 
 import { formatInr, minorUnitsToDecimalString, offPercent, rupeesToMinorUnits } from '@shop/shared';
 
+import { ComingSoonIconButton } from '../../components/seller/ComingSoon';
 import { Metric } from '../../components/seller/Metric';
 import { RoleGate } from '../../components/seller/RoleGate';
 import { customerUrl } from '../../lib/origins';
@@ -86,8 +88,8 @@ const VariantEditor = ({
     return (
         <>
             <tr>
-                <td className="py-1.5 pr-3 font-mono text-slate-500">{variant.sku}</td>
-                <td className="py-1.5 pr-3 text-slate-700">{variant.label}</td>
+                <td className="py-1.5 pr-3 font-mono text-t3">{variant.sku}</td>
+                <td className="py-1.5 pr-3 text-t2">{variant.label}</td>
                 <td className="py-1.5 pr-2">
                     <input
                         type="text"
@@ -123,17 +125,17 @@ const VariantEditor = ({
                     {invalid === null ? (
                         <div className="flex flex-wrap items-baseline justify-end gap-1.5">
                             {mrpMinorUnits !== null && off !== null && (
-                                <span className="tabular-nums text-slate-400 line-through">
+                                <span className="tabular-nums text-t3 line-through">
                                     {formatInr(mrpMinorUnits)}
                                 </span>
                             )}
-                            <span className="font-bold tabular-nums text-slate-900">
+                            <span className="font-bold tabular-nums text-t1">
                                 {formatInr(priceMinorUnits)}
                             </span>
                             {off !== null && <span className="badge-success">{off}% off</span>}
                         </div>
                     ) : (
-                        <div className="text-right text-slate-400">—</div>
+                        <div className="text-right text-t3">—</div>
                     )}
                 </td>
                 <td className="py-1.5 text-right">
@@ -159,7 +161,7 @@ const VariantEditor = ({
                 <tr>
                     <td
                         colSpan={7}
-                        className="pb-2 text-[11px] font-medium text-rose-600"
+                        className="pb-2 text-11 font-medium text-danger"
                     >
                         {invalid ?? failure}
                     </td>
@@ -197,13 +199,13 @@ const Body = ({
         return [...filtered].sort((a, b) => (ascending ? 1 : -1) * compare(a, b, sortKey));
     }, [all, ascending, lowOnly, query, sortKey]);
     if (products.isLoading) {
-        return <div className="card p-8 text-sm text-slate-500">Loading inventory…</div>;
+        return <div className="card p-8 text-14 text-t3">Loading catalog…</div>;
     }
     if (products.isError) {
         return (
             <div className="card p-6">
-                <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-600">
-                    Could not load inventory.
+                <p className="rounded-ctl border border-live bg-live-wash px-3 py-2 text-14 text-danger">
+                    Could not load catalog.
                 </p>
                 <button
                     type="button"
@@ -248,13 +250,13 @@ const Body = ({
 
             <div className="card flex flex-wrap items-center gap-3 px-4 py-3">
                 <input
-                    className="input max-w-xs"
+                    className="input-studio max-w-xs"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Filter by title, brand, category or SKU"
-                    aria-label="Filter inventory"
+                    placeholder="Search title, brand, category or SKU"
+                    aria-label="Filter catalog"
                 />
-                <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <label className="flex items-center gap-2 text-13 font-medium text-t2">
                     <input
                         type="checkbox"
                         className="h-4 w-4 accent-accent"
@@ -263,21 +265,25 @@ const Body = ({
                     />
                     Low stock only
                 </label>
-                <span className="ml-auto text-xs tabular-nums text-slate-500">
-                    {rows.length === all.length
-                        ? `${nf.format(all.length)} products`
-                        : `${nf.format(rows.length)} of ${nf.format(all.length)} products`}
-                </span>
+                <div className="ml-auto flex items-center gap-2">
+                    <ComingSoonIconButton
+                        feature="bulkCatalog"
+                        icon={Upload}
+                        label="Bulk import"
+                    />
+                    <span className="text-11 tabular-nums text-t3">
+                        {rows.length === all.length
+                            ? `${nf.format(all.length)} products`
+                            : `${nf.format(rows.length)} of ${nf.format(all.length)}`}
+                    </span>
+                </div>
             </div>
 
             {all.length === 0 ? (
-                <div className="card px-4 py-12 text-center">
-                    <p className="text-sm font-semibold text-slate-800">
-                        No products are assigned to you.
-                    </p>
-                    <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-slate-500">
-                        Inventory is seeded per seller; a session's rail can only attach products
-                        you own.
+                <div className="studio-empty">
+                    <p className="text-14 font-semibold text-t1">No products assigned to you.</p>
+                    <p className="mx-auto mt-2 max-w-md text-13 leading-relaxed text-t2">
+                        List a product to add it to your catalog and show line-ups.
                     </p>
                     <Link
                         to="/catalog/new"
@@ -287,22 +293,20 @@ const Body = ({
                     </Link>
                 </div>
             ) : rows.length === 0 ? (
-                <div className="card px-4 py-10 text-center text-sm text-slate-600">
-                    Nothing matches that filter.
-                </div>
+                <div className="studio-empty text-14 text-t2">Nothing matches that filter.</div>
             ) : (
-                <div className="card overflow-x-auto">
-                    <table className="w-full min-w-[760px] text-sm">
-                        <thead className="bg-slate-50 text-[11px] uppercase tracking-widest text-slate-500">
-                            <tr className="border-b border-slate-200">
+                <div className="studio-table-wrap overflow-x-auto">
+                    <table className="studio-table min-w-[760px]">
+                        <thead>
+                            <tr>
                                 {COLUMNS.map((col) => (
                                     <th
                                         key={col.key}
-                                        className={`px-4 py-2 font-semibold ${col.align === 'right' ? 'text-right' : 'text-left'}`}
+                                        className={`px-4 py-2 font-medium ${col.align === 'right' ? 'text-right' : 'text-left'}`}
                                     >
                                         <button
                                             type="button"
-                                            className="inline-flex items-center gap-1 transition hover:text-slate-900"
+                                            className="inline-flex items-center gap-1 transition hover:text-t1"
                                             onClick={() => {
                                                 setAscending(
                                                     sortKey === col.key ? !ascending : true,
@@ -333,11 +337,11 @@ const Body = ({
                                 <th className="px-4 py-2" />
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-200">
+                        <tbody>
                             {rows.map((p) => (
                                 <Fragment key={p.productId}>
-                                    <tr className="transition hover:bg-slate-50">
-                                        <td className="px-4 py-2.5">
+                                    <tr>
+                                        <td>
                                             <a
                                                 href={customerUrl(`/p/${p.slug}`)}
                                                 target="_blank"
@@ -346,35 +350,33 @@ const Body = ({
                                             >
                                                 {p.title}
                                             </a>
-                                            <div className="text-xs text-slate-500">{p.brand}</div>
+                                            <div className="text-11 text-t3">{p.brand}</div>
                                         </td>
-                                        <td className="px-4 py-2.5 text-slate-600">
-                                            {p.categorySlug}
-                                        </td>
-                                        <td className="px-4 py-2.5 text-right font-bold tabular-nums text-slate-900">
+                                        <td className="text-t2">{p.categorySlug}</td>
+                                        <td className="text-right font-bold tabular-nums text-t1">
                                             {formatInr(p.priceMinorUnits)}
                                         </td>
-                                        <td className="px-4 py-2.5 text-right tabular-nums text-slate-600">
+                                        <td className="text-right tabular-nums text-t2">
                                             {p.rating === 0 ? (
-                                                <span className="text-slate-400">—</span>
+                                                <span className="text-t3">—</span>
                                             ) : (
                                                 p.rating.toFixed(1)
                                             )}
                                         </td>
-                                        <td className="px-4 py-2.5 text-right">
+                                        <td className="text-right">
                                             <span
                                                 className={`font-semibold tabular-nums ${
                                                     p.totalStock === 0
-                                                        ? 'text-rose-600'
+                                                        ? 'text-danger'
                                                         : p.lowStock
                                                           ? 'text-accent-text'
-                                                          : 'text-slate-900'
+                                                          : 'text-t1'
                                                 }`}
                                             >
                                                 {nf.format(p.totalStock)}
                                             </span>
                                             {p.totalStock === 0 && (
-                                                <span className="ml-2 pill bg-rose-50 text-rose-600">
+                                                <span className="ml-2 pill bg-live-wash text-danger">
                                                     out
                                                 </span>
                                             )}
@@ -382,32 +384,40 @@ const Body = ({
                                                 <span className="badge-accent ml-2">low</span>
                                             )}
                                         </td>
-                                        <td className="px-4 py-2.5 text-right">
-                                            <button
-                                                type="button"
-                                                className="text-13 font-semibold text-accent-text hover:underline"
-                                                onClick={() =>
-                                                    setExpanded(
-                                                        expanded === p.productId
-                                                            ? null
-                                                            : p.productId,
-                                                    )
-                                                }
-                                            >
-                                                {expanded === p.productId
-                                                    ? 'Hide variants'
-                                                    : `${p.variants.length} variant${p.variants.length === 1 ? '' : 's'}`}
-                                            </button>
+                                        <td className="text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <ComingSoonIconButton
+                                                    feature="productEdit"
+                                                    icon={Pencil}
+                                                    label="Edit product"
+                                                    message="Full product editing will be live soon. You can update variant price and stock below."
+                                                />
+                                                <button
+                                                    type="button"
+                                                    className="text-13 font-semibold text-accent-text hover:underline"
+                                                    onClick={() =>
+                                                        setExpanded(
+                                                            expanded === p.productId
+                                                                ? null
+                                                                : p.productId,
+                                                        )
+                                                    }
+                                                >
+                                                    {expanded === p.productId
+                                                        ? 'Hide'
+                                                        : `${p.variants.length} variant${p.variants.length === 1 ? '' : 's'}`}
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                     {expanded === p.productId && (
-                                        <tr className="bg-slate-50">
+                                        <tr className="bg-surface">
                                             <td
                                                 colSpan={6}
                                                 className="px-4 py-3"
                                             >
-                                                <table className="w-full text-xs">
-                                                    <thead className="text-slate-500">
+                                                <table className="w-full text-11">
+                                                    <thead className="text-t3">
                                                         <tr>
                                                             <th className="py-1 pr-3 text-left font-semibold">
                                                                 SKU
@@ -430,7 +440,7 @@ const Body = ({
                                                             <th className="py-1" />
                                                         </tr>
                                                     </thead>
-                                                    <tbody className="divide-y divide-slate-200">
+                                                    <tbody className="divide-y divide-line">
                                                         {p.variants.map((v) => (
                                                             <VariantEditor
                                                                 key={`${v.id}:${v.mrpMinorUnits ?? 'none'}:${v.priceMinorUnits}:${v.stock}`}
@@ -441,11 +451,9 @@ const Body = ({
                                                         ))}
                                                     </tbody>
                                                 </table>
-                                                <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
-                                                    Saving publishes immediately: open storefront
-                                                    and live-session tabs are told to drop their
-                                                    cached price, so nobody is shown a number you
-                                                    have just moved.
+                                                <p className="mt-2 text-11 leading-relaxed text-t3">
+                                                    Saving publishes immediately — storefront and
+                                                    live tabs refresh their cached prices.
                                                 </p>
                                             </td>
                                         </tr>
@@ -468,8 +476,8 @@ const Inventory = (): JSX.Element => {
     return (
         <RoleGate
             roles={['seller']}
-            title="Inventory"
-            subtitle="Manage listings, prices, variants, and the stock available to shoppers."
+            title="Catalog"
+            subtitle="Manage products, prices, and stock for your storefront."
             actions={
                 <Link
                     to="/catalog/new"
