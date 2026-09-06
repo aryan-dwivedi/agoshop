@@ -196,8 +196,7 @@ export const useLiveSession = (
         if (!session) return;
         if (!liveViewerCountRef.current) setViewerCount(session.viewerCount);
         setServerSkewMs(skewRef.current);
-        const rttReady =
-            session.rttStatus === 'connecting' || session.rttStatus === 'running';
+        const rttReady = session.rttStatus === 'connecting' || session.rttStatus === 'running';
         setCaptionsEnabled(rttReady);
         const featured = session.products.find((p) => p.isFeatured || p.pinnedAt !== null);
         setPinnedProductId(featured?.productId ?? null);

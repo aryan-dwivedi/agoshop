@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { LANGUAGE_AUTO, captionTextForLocale, detectLanguage, resolveSpokenLanguage } from './language.js';
+import {
+    LANGUAGE_AUTO,
+    captionTextForLocale,
+    detectLanguage,
+    resolveSpokenLanguage,
+} from './language.js';
 
 const SUPPORTED = ['en-US', 'hi-IN', 'es-ES'] as const;
 describe('detectLanguage', () => {

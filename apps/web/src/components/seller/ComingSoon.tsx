@@ -1,3 +1,4 @@
+import type { StudioFeature } from './studioFeatures';
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -5,7 +6,7 @@ import { Clock, Sparkles, X } from 'lucide-react';
 import { useEffect } from 'react';
 import { create } from 'zustand';
 
-import { FEATURE_LABELS, isFeatureLive, type StudioFeature } from './studioFeatures';
+import { FEATURE_LABELS, isFeatureLive } from './studioFeatures';
 
 type Toast = {
     id: number;
@@ -192,11 +193,5 @@ export const FeatureGate = ({
     fallback?: ReactNode;
 }): JSX.Element => {
     if (isFeatureLive(feature)) return <>{children}</>;
-    return (
-        <>
-            {fallback ?? (
-                <ComingSoonPanel feature={feature} />
-            )}
-        </>
-    );
+    return <>{fallback ?? <ComingSoonPanel feature={feature} />}</>;
 };

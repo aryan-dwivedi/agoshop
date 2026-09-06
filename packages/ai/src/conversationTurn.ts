@@ -12,7 +12,7 @@ import { logger } from '@shop/platform/lib/logger.js';
 import { persistBodies, redact } from '@shop/platform/lib/pii.js';
 import { SHOPPING_TOOLS, toolSchemas } from '@shop/shared';
 
-import { isOffTopicShoppingMessage, OFF_TOPIC_REPLY } from './offTopic.js';
+import { OFF_TOPIC_REPLY, isOffTopicShoppingMessage } from './offTopic.js';
 import { getProvider } from './providers/index.js';
 import { SurfacedProducts } from './surfacedProducts.js';
 import { executeToolCalls } from './toolExecutor.js';

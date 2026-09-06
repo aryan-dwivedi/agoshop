@@ -11,8 +11,8 @@ import type {
 import {
     AgoraVoiceAI,
     AgoraVoiceAIEvents,
-    ChatMessageType,
     ChatMessagePriority,
+    ChatMessageType,
     MessageType,
     TranscriptHelperMode,
     TurnStatus,
@@ -391,9 +391,7 @@ export const useVoiceAgent = (opts: {
                     await api.post(`/api/ai/conversations/${conversation.conversationId}/start`);
                     const heartbeat = window.setInterval(() => {
                         void api
-                            .post(
-                                `/api/ai/conversations/${conversation?.conversationId}/heartbeat`,
-                            )
+                            .post(`/api/ai/conversations/${conversation?.conversationId}/heartbeat`)
                             .catch(() => undefined);
                     }, HEARTBEAT_MS);
                     const session: ActiveSession = {
@@ -502,12 +500,7 @@ export const useVoiceAgent = (opts: {
                 viewerUidRef.current = handoff.viewerUid;
                 const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
                 bindClientHandlers(client);
-                await client.join(
-                    appId,
-                    handoff.rtcChannel,
-                    handoff.rtcToken,
-                    handoff.viewerUid,
-                );
+                await client.join(appId, handoff.rtcChannel, handoff.rtcToken, handoff.viewerUid);
                 const mic = await AgoraRTC.createMicrophoneAudioTrack({
                     AEC: true,
                     ANS: true,
@@ -517,7 +510,10 @@ export const useVoiceAgent = (opts: {
                 await client.publish([mic]);
                 setMicTrack(mic);
                 duckRef.current?.setVolume(DUCKED_VOLUME);
-                const releaseRtm = await rtmRef.current.subscribe(handoff.rtcChannel, () => undefined);
+                const releaseRtm = await rtmRef.current.subscribe(
+                    handoff.rtcChannel,
+                    () => undefined,
+                );
                 sessionRef.current = {
                     conversationId,
                     rtcChannel: handoff.rtcChannel,

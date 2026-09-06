@@ -279,9 +279,7 @@ const fetchDatasetCsv = async (url: string, attempts = 4): Promise<Response> => 
         }
     }
     const cause =
-        lastError instanceof Error
-            ? `${lastError.name}: ${lastError.message}`
-            : String(lastError);
+        lastError instanceof Error ? `${lastError.name}: ${lastError.message}` : String(lastError);
     throw new Error(`seed: failed to download ${url} (${cause})`);
 };
 const ensureDatasetCsv = async (fileName: string): Promise<string> => {

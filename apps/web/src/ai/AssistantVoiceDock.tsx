@@ -1,9 +1,10 @@
+import type { AgoAvatarState } from './AgoAvatar';
 import type { ILocalAudioTrack } from 'agora-rtc-sdk-ng';
 
 import { AgentState } from 'agora-agent-client-toolkit';
 
 import { StopIcon } from '../components/icons';
-import { AgoAvatar, type AgoAvatarState } from './AgoAvatar';
+import { AgoAvatar } from './AgoAvatar';
 import { MicWaveform } from './MicWaveform';
 
 const AGENT_LABEL: Record<AgentState, string> = {

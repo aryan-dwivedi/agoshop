@@ -119,9 +119,7 @@ export const RoleGate = ({
                         {title}
                     </h1>
                     {subtitle !== undefined && (
-                        <p className="mt-1 max-w-2xl text-14 leading-relaxed text-t2">
-                            {subtitle}
-                        </p>
+                        <p className="mt-1 max-w-2xl text-14 leading-relaxed text-t2">{subtitle}</p>
                     )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">

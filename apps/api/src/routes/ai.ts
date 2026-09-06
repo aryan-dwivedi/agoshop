@@ -145,7 +145,10 @@ router.get('/api/ai/conversations/:id/handoff', ensureIdentity, async (req, res,
                 ticket.status !== 'assigned' &&
                 ticket.status !== 'active')
         ) {
-            throw conflict('no_active_handoff', 'no support handoff is active for this conversation');
+            throw conflict(
+                'no_active_handoff',
+                'no support handoff is active for this conversation',
+            );
         }
         res.json({
             conversationId: conversation.id,

@@ -1,5 +1,5 @@
-import { useSearchParams } from 'react-router-dom';
 import { Download, Truck } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 
 import { formatInr } from '@shop/shared';
 

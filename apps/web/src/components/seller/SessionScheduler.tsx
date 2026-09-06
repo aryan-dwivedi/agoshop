@@ -414,9 +414,7 @@ export const SessionScheduler = ({
                                 <input
                                     className="input-studio"
                                     value={draft.title}
-                                    onChange={(e) =>
-                                        setDraft({ ...draft, title: e.target.value })
-                                    }
+                                    onChange={(e) => setDraft({ ...draft, title: e.target.value })}
                                     placeholder="Festive Edit — handloom sarees"
                                     required
                                 />
@@ -447,9 +445,7 @@ export const SessionScheduler = ({
                                     className="input-studio"
                                     value={draft.slug}
                                     disabled={existing !== null}
-                                    onChange={(e) =>
-                                        setDraft({ ...draft, slug: e.target.value })
-                                    }
+                                    onChange={(e) => setDraft({ ...draft, slug: e.target.value })}
                                     placeholder="festive-edit"
                                     pattern="[a-z0-9][a-z0-9-]{1,60}"
                                 />
@@ -751,8 +747,7 @@ export const SessionScheduler = ({
                                     <legend className="label">Mode</legend>
                                     <div className="space-y-1">
                                         {START_MODES.filter(
-                                            (option) =>
-                                                existing === null || option.value !== 'now',
+                                            (option) => existing === null || option.value !== 'now',
                                         ).map((option) => (
                                             <label
                                                 key={option.value}
@@ -794,9 +789,7 @@ export const SessionScheduler = ({
                                     type="file"
                                     accept="video/mp4,video/webm"
                                     className="input-studio py-1.5 file:mr-2 file:rounded-chip file:border-0 file:bg-surface file:px-2 file:py-1 file:text-11 file:font-semibold"
-                                    onChange={(e) =>
-                                        setVideoFile(e.target.files?.[0] ?? null)
-                                    }
+                                    onChange={(e) => setVideoFile(e.target.files?.[0] ?? null)}
                                 />
                             </Field>
                         </div>
@@ -821,9 +814,7 @@ export const SessionScheduler = ({
                                   ? 'Schedule premiere'
                                   : 'Schedule show'}
                     </button>
-                    {blocked !== null && (
-                        <span className="text-13 text-t2">Needs {blocked}.</span>
-                    )}
+                    {blocked !== null && <span className="text-13 text-t2">Needs {blocked}.</span>}
                     {error !== null && (
                         <span
                             role="alert"

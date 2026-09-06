@@ -187,15 +187,18 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
             video.load();
         };
     }, [src, syncDuration]);
-    const seekTo = useCallback((seconds: number): void => {
-        const video = videoRef.current;
-        if (!video) return;
-        if (durationProbeRef.current !== null) return;
-        const limit = resolveDuration(video, duration);
-        video.currentTime = Math.max(0, Math.min(seconds, limit > 0 ? limit : seconds));
-        setCurrentTime(video.currentTime);
-        if (limit > 0) setDuration((current) => Math.max(current, limit));
-    }, [duration]);
+    const seekTo = useCallback(
+        (seconds: number): void => {
+            const video = videoRef.current;
+            if (!video) return;
+            if (durationProbeRef.current !== null) return;
+            const limit = resolveDuration(video, duration);
+            video.currentTime = Math.max(0, Math.min(seconds, limit > 0 ? limit : seconds));
+            setCurrentTime(video.currentTime);
+            if (limit > 0) setDuration((current) => Math.max(current, limit));
+        },
+        [duration],
+    );
     useImperativeHandle(ref, () => ({ seekTo }), [seekTo]);
     const togglePlayback = useCallback((): void => {
         const video = videoRef.current;

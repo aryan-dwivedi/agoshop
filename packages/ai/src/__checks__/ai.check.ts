@@ -297,7 +297,11 @@ try {
                 !offTopic.toolCalls.some((c) => c.name === 'search_products'),
             offTopic,
         );
-        ok('off-topic replies do not surface product cards', offTopic.products.length === 0, offTopic.products);
+        ok(
+            'off-topic replies do not surface product cards',
+            offTopic.products.length === 0,
+            offTopic.products,
+        );
     }
     console.log('\n9b. live context identifies the host and line-up without claiming video vision');
     {

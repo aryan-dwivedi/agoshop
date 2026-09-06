@@ -31,7 +31,10 @@ export const isOffTopicShoppingMessage = (text: string): boolean => {
 };
 
 export const extractShoppingSearchQuery = (text: string): string | null => {
-    const trimmed = text.trim().replace(/[?.!]+$/u, '').trim();
+    const trimmed = text
+        .trim()
+        .replace(/[?.!]+$/u, '')
+        .trim();
     if (trimmed.length === 0 || GREETING.test(trimmed) || isOffTopicShoppingMessage(trimmed)) {
         return null;
     }

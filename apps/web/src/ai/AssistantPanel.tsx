@@ -1,18 +1,10 @@
+import type { AgoAvatarState } from './AgoAvatar';
 import type { AssistantLine } from './useVoiceAgent';
 import type { Surface } from '@shop/shared';
 import type { IRemoteAudioTrack } from 'agora-rtc-sdk-ng';
 
 import { AgentState } from 'agora-agent-client-toolkit';
 import { useEffect, useRef, useState } from 'react';
-
-import { AgoAvatar, type AgoAvatarState } from './AgoAvatar';
-import { AssistantHistoryDrawer } from './AssistantHistoryDrawer';
-import { AssistantMessageList } from './AssistantMessageList';
-import { AssistantVoiceDock } from './AssistantVoiceDock';
-import { ASSISTANT_EXAMPLES } from './browseExamples';
-import { MicWaveform } from './MicWaveform';
-import { useAssistantEvents } from './useAssistantEvents';
-import { isToolProtocolText, useVoiceAgent } from './useVoiceAgent';
 
 import {
     AudioLinesIcon,
@@ -23,6 +15,14 @@ import {
     SendIcon,
 } from '../components/icons';
 import { useSession } from '../state/session';
+import { AgoAvatar } from './AgoAvatar';
+import { AssistantHistoryDrawer } from './AssistantHistoryDrawer';
+import { AssistantMessageList } from './AssistantMessageList';
+import { AssistantVoiceDock } from './AssistantVoiceDock';
+import { MicWaveform } from './MicWaveform';
+import { ASSISTANT_EXAMPLES } from './browseExamples';
+import { useAssistantEvents } from './useAssistantEvents';
+import { isToolProtocolText, useVoiceAgent } from './useVoiceAgent';
 
 const STILL_LOOKING_MS = 4000;
 const MAX_SESSION_HISTORY_LINES = 100;
@@ -198,13 +198,11 @@ export const AssistantPanel = ({
 
     const humanWaiting = agent.phase === 'human_waiting';
     const humanActive = agent.phase === 'human_active';
-    const voiceConnecting =
-        agent.phase === 'starting' || humanWaiting;
+    const voiceConnecting = agent.phase === 'starting' || humanWaiting;
     const voiceBusy =
         humanWaiting ||
         humanActive ||
-        (agent.mode === 'voice' &&
-            (agent.phase === 'starting' || agent.phase === 'active'));
+        (agent.mode === 'voice' && (agent.phase === 'starting' || agent.phase === 'active'));
     const voiceCall = agent.mode === 'voice' && (agent.phase === 'active' || humanActive);
     const micLive = voiceBusy || dictation.listening;
     const thinking =
@@ -383,9 +381,7 @@ export const AssistantPanel = ({
                     humanActive={humanActive}
                     elapsed={elapsed}
                     micTrack={agent.micTrack}
-                    handoffNotice={
-                        humanWaiting || humanActive ? agent.handoffNotice : null
-                    }
+                    handoffNotice={humanWaiting || humanActive ? agent.handoffNotice : null}
                     supportAudioReady={agent.supportAudioReady}
                     onResumeSupportAudio={agent.resumeSupportAudio}
                     onEnd={() => void agent.stop()}
@@ -461,11 +457,7 @@ export const AssistantPanel = ({
                                       ? 'Start voice chat'
                                       : 'Dictate a question'
                             }
-                            title={
-                                agent.available
-                                    ? 'Start live voice'
-                                    : 'Dictate your question'
-                            }
+                            title={agent.available ? 'Start live voice' : 'Dictate your question'}
                             aria-pressed={micLive}
                             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition ${
                                 micLive

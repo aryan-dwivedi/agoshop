@@ -206,9 +206,7 @@ export const SellerLayout = ({ children }: { children: ReactNode }): JSX.Element
                                         <p className="truncate text-13 font-semibold text-t1">
                                             {account.displayName}
                                         </p>
-                                        <p className="truncate text-11 text-t3">
-                                            {account.email}
-                                        </p>
+                                        <p className="truncate text-11 text-t3">{account.email}</p>
                                     </div>
                                     <a
                                         href={customerUrl('/')}
@@ -273,9 +271,7 @@ export const SellerLayout = ({ children }: { children: ReactNode }): JSX.Element
                                 strokeWidth={1.8}
                             />
                         )}
-                        {!collapsed && (
-                            <span className="text-11 text-t3">{MOD_LABEL}\</span>
-                        )}
+                        {!collapsed && <span className="text-11 text-t3">{MOD_LABEL}\</span>}
                     </button>
                 </div>
             </nav>

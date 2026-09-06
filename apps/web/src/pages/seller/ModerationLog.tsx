@@ -1,8 +1,8 @@
 import type { ModerationAction, SellerSessionsDto } from '../../lib/sellerApi';
 import type { UseQueryResult } from '@tanstack/react-query';
 
-import { useSearchParams } from 'react-router-dom';
 import { Shield } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 
 import { ComingSoonIconButton } from '../../components/seller/ComingSoon';
 import { RoleGate } from '../../components/seller/RoleGate';

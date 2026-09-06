@@ -9,7 +9,12 @@ import { personalizedOffers, resolveLiveOffer } from '@shop/domain-commerce/prom
 import { checkDelivery } from '@shop/domain-commerce/serviceability.js';
 import { addToWishlist } from '@shop/domain-commerce/wishlist.js';
 import { publishToUser } from '@shop/platform/lib/sse.js';
-import { BLOCKED_REASON_LABELS, EVENTS, PAYMENT_METHOD_LABELS, minorUnitsToDecimalString } from '@shop/shared';
+import {
+    BLOCKED_REASON_LABELS,
+    EVENTS,
+    PAYMENT_METHOD_LABELS,
+    minorUnitsToDecimalString,
+} from '@shop/shared';
 
 import { publishToolExecuted, speakableCart, toolError } from '../speakable.js';
 

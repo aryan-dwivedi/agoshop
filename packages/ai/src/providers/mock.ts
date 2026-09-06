@@ -1,7 +1,11 @@
 import type { ChatMessage, LlmChunk, LlmProvider, LlmRequest } from './index.js';
 
+import {
+    OFF_TOPIC_REPLY,
+    extractShoppingSearchQuery,
+    isOffTopicShoppingMessage,
+} from '../offTopic.js';
 import { LlmProviderError } from './index.js';
-import { extractShoppingSearchQuery, isOffTopicShoppingMessage, OFF_TOPIC_REPLY } from '../offTopic.js';
 
 export const mockStats = { streams: 0, aborted: 0, completed: 0 };
 let callSeq = 0;
@@ -51,7 +55,8 @@ type Script =
     | {
           kind: 'off_topic';
       };
-const GREETING = /^[\s!.,]*(?:hi|hey|hello|hiya|namaste|ji|yo|sup|good\s+(?:morning|afternoon|evening))[\s!.,]*$/iu;
+const GREETING =
+    /^[\s!.,]*(?:hi|hey|hello|hiya|namaste|ji|yo|sup|good\s+(?:morning|afternoon|evening))[\s!.,]*$/iu;
 const PINCODE_IN_TEXT = /\b(\d{6})\b/;
 const DELIVERY_INTENT =
     /\b(?:deliver(?:y|ies)?|ship(?:ping)?|pin\s*code|pincode|serviceable|serviceability)\b/iu;
@@ -68,7 +73,8 @@ const lastToolResult = (messages: ChatMessage[]): ChatMessage | undefined =>
     [...messages].reverse().find((message) => message.role === 'tool');
 const summarizeSearchResults = (messages: ChatMessage[]): string[] => {
     const tool = lastToolResult(messages);
-    if (!tool?.content) return ['I could not find anything matching that. What else can I help with?'];
+    if (!tool?.content)
+        return ['I could not find anything matching that. What else can I help with?'];
     try {
         const data = JSON.parse(tool.content) as {
             total?: number;
@@ -76,7 +82,9 @@ const summarizeSearchResults = (messages: ChatMessage[]): string[] => {
         };
         const results = data.results ?? [];
         if (results.length === 0) {
-            return ['I did not find anything matching that in the catalog. What else can I help with?'];
+            return [
+                'I did not find anything matching that in the catalog. What else can I help with?',
+            ];
         }
         const names = results
             .map((item) => item.title?.trim())

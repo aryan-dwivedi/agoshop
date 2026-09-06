@@ -6,9 +6,9 @@ import type {
 } from '../../lib/sellerApi';
 import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
 
+import { Pencil, Upload } from 'lucide-react';
 import { Fragment, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Pencil, Upload } from 'lucide-react';
 
 import { formatInr, minorUnitsToDecimalString, offPercent, rupeesToMinorUnits } from '@shop/shared';
 

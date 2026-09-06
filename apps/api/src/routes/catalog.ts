@@ -61,8 +61,7 @@ router.get('/api/products', products, async (req, res, next) => {
         }
         const { category, includeFacets, ...rest } = parsed.data;
         const query: ProductQuery = { ...rest, categorySlug: category };
-        const useSearch =
-            Boolean(query.q) && (!query.sort || query.sort === 'relevance');
+        const useSearch = Boolean(query.q) && (!query.sort || query.sort === 'relevance');
         const page = await listProductsPage(query, {
             includeFacets,
             list: useSearch

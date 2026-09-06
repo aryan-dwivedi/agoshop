@@ -22,7 +22,9 @@ const mergeVoiceProducts = (
     lines: readonly AssistantLine[],
     voiceProducts: Readonly<Record<number, AiProductCard[]>>,
 ): AssistantLine[] => {
-    const byTurn = new Map(Object.entries(voiceProducts).map(([turnId, products]) => [Number(turnId), products]));
+    const byTurn = new Map(
+        Object.entries(voiceProducts).map(([turnId, products]) => [Number(turnId), products]),
+    );
     let lastAssistantIdx = -1;
     for (let i = lines.length - 1; i >= 0; i -= 1) {
         if (lines[i]?.role === 'assistant') {

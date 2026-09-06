@@ -3,7 +3,10 @@ import { Router } from 'express';
 import { handleMcpRequest } from '@shop/ai/mcp/server.js';
 
 export const mcpRouter = Router();
-const forwardMcp = (req: Parameters<typeof handleMcpRequest>[0], res: Parameters<typeof handleMcpRequest>[1]): void => {
+const forwardMcp = (
+    req: Parameters<typeof handleMcpRequest>[0],
+    res: Parameters<typeof handleMcpRequest>[1],
+): void => {
     handleMcpRequest(req, res).catch((err: unknown) => {
         if (!res.headersSent) {
             res.status(500).json({

@@ -204,8 +204,7 @@ export const RoomConversation = ({
     const humanWaiting = agent.phase === 'human_waiting';
     const humanLive = agent.phase === 'human_active';
     const voiceConnecting = agent.phase === 'starting' || humanWaiting;
-    const voiceLive =
-        humanLive || (agent.mode === 'voice' && agent.phase === 'active');
+    const voiceLive = humanLive || (agent.mode === 'voice' && agent.phase === 'active');
     const dictation = agent.textAssist.dictation;
     const aiMode = assistantEnabled && mode === 'ai';
     const state =

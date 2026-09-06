@@ -6,9 +6,9 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
-import { ASSISTANT_EXAMPLES } from '../ai/browseExamples';
 import { AssistantPanel } from '../ai/AssistantPanel';
 import { useAssistantSurface } from '../ai/assistantSurface';
+import { ASSISTANT_EXAMPLES } from '../ai/browseExamples';
 import { AskIcon, ChatIcon, ChevronRight, SearchIcon } from '../components/icons';
 import { ChatPanel } from '../components/live/ChatPanel';
 import { LiveBadge } from '../components/live/LiveBadge';

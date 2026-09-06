@@ -82,11 +82,11 @@ Read the hop types off the diagram: `<-->` is media, `==>` is Agora calling back
 
 `apps/web` holds one source tree and **three** Vite entries:
 
-| Entry | Origin | Audience |
-| ----- | ------ | -------- |
-| `index.html` → `src/customer/` | :5173 | shoppers |
-| `seller.html` → `src/seller/` | :5174 | hosts / sellers (Studio) |
-| `support.html` → `src/support/` | :5175 | support agents |
+| Entry                           | Origin | Audience                 |
+| ------------------------------- | ------ | ------------------------ |
+| `index.html` → `src/customer/`  | :5173  | shoppers                 |
+| `seller.html` → `src/seller/`   | :5174  | hosts / sellers (Studio) |
+| `support.html` → `src/support/` | :5175  | support agents           |
 
 Cross-origin links use `src/lib/origins.ts` (`customerUrl` / `sellerUrl` / `supportUrl`). The session cookie is host-scoped to `localhost` (ports ignored), so a demo login on the storefront is already signed in on Studio.
 

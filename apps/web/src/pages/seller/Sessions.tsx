@@ -70,8 +70,8 @@ const RetryRow = ({
             >
                 <div className="flex flex-wrap items-center gap-3">
                     <span className="text-13 text-t1">
-                        Show saved, but{' '}
-                        <span className="font-medium">{failure.file.name}</span> failed: {message}
+                        Show saved, but <span className="font-medium">{failure.file.name}</span>{' '}
+                        failed: {message}
                     </span>
                     <button
                         type="button"
@@ -246,8 +246,7 @@ const Sessions = (): JSX.Element => {
     const visible = filter === 'all' ? rows : rows.filter((show) => show.status === filter);
     const publicSessions = useQuery({
         queryKey: ['sessions', 'all'],
-        queryFn: () =>
-            api.get<{ sessions: LiveSessionDto[] }>('/api/sessions'),
+        queryFn: () => api.get<{ sessions: LiveSessionDto[] }>('/api/sessions'),
         staleTime: 60000,
     });
     const broadcastFlags = useMemo(
@@ -267,11 +266,8 @@ const Sessions = (): JSX.Element => {
     const prefillRead = useQuery({
         queryKey: ['session', prefillId ?? 'none'],
         queryFn: async () =>
-            (
-                await api.get<{ session: LiveSessionDto }>(
-                    `/api/sessions/${prefillId ?? ''}`,
-                )
-            ).session,
+            (await api.get<{ session: LiveSessionDto }>(`/api/sessions/${prefillId ?? ''}`))
+                .session,
         enabled: prefillId !== null,
     });
     const prefillRow = rows.find((show) => show.id === prefillId) ?? null;

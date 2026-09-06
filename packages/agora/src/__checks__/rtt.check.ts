@@ -1,5 +1,6 @@
-import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
+
+import { eq } from 'drizzle-orm';
 
 import { db, pool } from '@shop/db/client.js';
 import { liveSessions, sellers, users } from '@shop/db/schema.js';
