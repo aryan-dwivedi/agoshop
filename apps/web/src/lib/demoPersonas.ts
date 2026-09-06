@@ -1,6 +1,6 @@
 import type { PublicUser, Role } from '@shop/shared';
 
-import { api } from './api';
+import { api, ApiError } from './api';
 import { sellerUrl, supportUrl } from './origins';
 
 export const DEMO_PASSWORD = 'demo1234';
@@ -59,11 +59,20 @@ export const signInWithDemoAccount = async (
             /* switching accounts — ignore logout failures */
         }
     }
-    const { user } = await api.post<{ user: PublicUser }>('/api/auth/login', {
+    const { user: loginUser } = await api.post<{ user: PublicUser }>('/api/auth/login', {
         email,
         password: DEMO_PASSWORD,
     });
-    return user;
+    const { user: sessionUser } = await api.get<{ user: PublicUser }>('/api/auth/me');
+    if (sessionUser.id !== loginUser.id || sessionUser.email !== loginUser.email) {
+        throw new ApiError(
+            401,
+            'session_not_switched',
+            'Sign-in succeeded but the browser kept the previous session. Try again or sign out first.',
+            null,
+        );
+    }
+    return sessionUser;
 };
 export type ReservedTab = {
     show: () => 'popup' | 'self';

@@ -4,7 +4,6 @@ import { useState } from 'react';
 
 import { ApiError } from '../../lib/api';
 import { demoPersonasForRole, signInWithDemoAccount } from '../../lib/demoPersonas';
-import { useSession } from '../../state/session';
 
 export const StudioDemoSignIn = ({
     roles,
@@ -13,7 +12,6 @@ export const StudioDemoSignIn = ({
     roles: Role[];
     currentRole: Role | null;
 }): JSX.Element | null => {
-    const { applyUser, refresh } = useSession();
     const [pending, setPending] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const offered = roles.includes('seller') || roles.includes('support');
@@ -24,18 +22,18 @@ export const StudioDemoSignIn = ({
         setPending(email);
         setError(null);
         try {
-            const user = await signInWithDemoAccount(email, { logoutFirst: currentRole !== null });
-            applyUser(user);
-            await refresh();
+            await signInWithDemoAccount(email, { logoutFirst: currentRole !== null });
+            window.location.reload();
         } catch (err) {
             const message =
                 err instanceof ApiError && err.code === 'invalid_credentials'
                     ? 'That email and password do not match an account. Run npm run db:seed if this is a fresh database.'
-                    : err instanceof ApiError && err.code === 'rate_limited'
-                      ? 'Too many sign-in attempts. Wait a minute and try again.'
-                      : `Could not sign in as ${email}.`;
+                    : err instanceof ApiError && err.code === 'session_not_switched'
+                      ? err.message
+                      : err instanceof ApiError && err.code === 'rate_limited'
+                        ? 'Too many sign-in attempts. Wait a minute and try again.'
+                        : `Could not sign in as ${email}.`;
             setError(message);
-        } finally {
             setPending(null);
         }
     };
