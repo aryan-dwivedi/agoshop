@@ -14,7 +14,7 @@ export const StudioDemoSignIn = ({
     roles: Role[];
     currentRole: Role | null;
 }): JSX.Element | null => {
-    const { applyUser, refresh } = useSession();
+    const { applyUser } = useSession();
     const queryClient = useQueryClient();
     const [pending, setPending] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -30,8 +30,7 @@ export const StudioDemoSignIn = ({
             const user = await signInWithDemoAccount(email, { logoutFirst: currentRole !== null });
             queryClient.removeQueries({ queryKey: ['me'] });
             applyUser(user);
-            await refresh();
-            setPending(null);
+            window.location.reload();
         } catch (err) {
             const message =
                 err instanceof ApiError && err.code === 'invalid_credentials'

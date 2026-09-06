@@ -59,6 +59,7 @@ ENV EXTRA_SQL_PATH=/app/apps/api/extra.sql
 ENV MARKETPLACE_CSV_DIR=/app/apps/api/marketplace-data
 ENV RECORDING_LOCAL_DIR=/tmp/recordings
 ENV PG_POOL_MAX=5
+ENV PG_CONNECTION_TIMEOUT_MS=60000
 ENV NODE_OPTIONS=--max-old-space-size=256
 ENV RECORDING_PROVIDER=browser
 
@@ -89,7 +90,7 @@ RUN chmod +x /usr/local/bin/start-free.sh
 
 EXPOSE 10000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=6 \
-  CMD ["sh", "-c", "curl -fsS http://127.0.0.1:${PORT:-10000}/api/health/live || exit 1"]
+HEALTHCHECK --interval=30s --timeout=15s --start-period=180s --retries=10 \
+  CMD ["sh", "-c", "curl -fsS http://127.0.0.1:${PORT:-10000}/api/health/ready || exit 1"]
 
 CMD ["/usr/local/bin/start-free.sh"]

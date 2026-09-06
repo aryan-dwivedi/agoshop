@@ -37,25 +37,39 @@ export const SessionProvider = ({ children }: { children: ReactNode }): JSX.Elem
         queryFn: async ({ signal }): Promise<{
             user: PublicUser | null;
         }> => {
-            const cached = queryClient.getQueryData<{ user: PublicUser | null }>(['me']);
+            const readCached = (): { user: PublicUser | null } | undefined =>
+                queryClient.getQueryData<{ user: PublicUser | null }>(['me']);
+            const preferLatestAuthenticated = (
+                next: { user: PublicUser | null },
+            ): { user: PublicUser | null } => {
+                const latest = readCached();
+                if (latest?.user && !latest.user.isGuest) {
+                    return latest;
+                }
+                return preferAuthenticated(next, latest);
+            };
             try {
                 const result = await api.get<{
                     user: PublicUser;
                 }>('/api/auth/me', signal);
-                return preferAuthenticated(result, cached);
+                return preferLatestAuthenticated(result);
             } catch (err) {
+                if (signal.aborted) throw err;
                 if (!(err instanceof ApiError && err.status === 401)) throw err;
             }
+            const cached = readCached();
             if (cached?.user && !cached.user.isGuest) {
                 return cached;
             }
             try {
                 const guest = await api.post<{
                     user: PublicUser;
-                }>('/api/auth/guest');
-                return preferAuthenticated(guest, cached);
-            } catch {
-                return cached ?? { user: null };
+                }>('/api/auth/guest', {}, undefined, signal);
+                return preferLatestAuthenticated(guest);
+            } catch (err) {
+                if (signal.aborted) throw err;
+                const latest = readCached();
+                return latest ?? { user: null };
             }
         },
         staleTime: 60 * 1000,

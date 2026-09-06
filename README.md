@@ -181,7 +181,7 @@ cookie.
 
 | Limit                          | Effect                                                                        |
 | ------------------------------ | ----------------------------------------------------------------------------- |
-| Spin-down after ~15 min idle   | First request after idle can take ~1 minute                                   |
+| Spin-down after ~15 min idle   | First request after idle can take ~1 minute; free Postgres also hibernates and may need up to ~60s to wake |
 | Postgres expires after 30 days | Upgrade the database before expiry to keep data                               |
 | 512 MB RAM, no persistent disk | Voice uses Agora managed TTS (no Kokoro in-process); recordings are ephemeral |
 | No private services / workers  | Everything runs in-process in the one web container                           |

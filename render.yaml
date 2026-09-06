@@ -15,7 +15,7 @@ services:
       plan: free
       dockerfilePath: ./infra/Dockerfile.free
       dockerContext: .
-      healthCheckPath: /api/health/live
+      healthCheckPath: /api/health/ready
       envVars:
           - fromGroup: agoshop-runtime-free
           - key: DATABASE_URL
@@ -96,6 +96,8 @@ envVarGroups:
             value: en-US,hi-IN
           - key: PG_POOL_MAX
             value: '5'
+          - key: PG_CONNECTION_TIMEOUT_MS
+            value: '60000'
           - key: NODE_OPTIONS
             value: '--max-old-space-size=256'
           - key: MEDIA_GATEWAY_ENABLED
