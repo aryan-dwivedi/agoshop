@@ -78,12 +78,14 @@ const call = async (
 const translateConfig = (languages: string[]): Json | undefined => {
     const targets = env.TRANSCRIPTION_TRANSLATE_TARGETS;
     if (targets.length === 0) return undefined;
-    return {
-        languages: languages.map((source) => ({
+    const pairs = languages
+        .map((source) => ({
             source,
-            target: targets.filter((t) => t !== source),
-        })),
-    };
+            target: targets.filter((t) => t.toLowerCase() !== source.toLowerCase()),
+        }))
+        .filter((pair) => pair.target.length > 0);
+    if (pairs.length === 0) return undefined;
+    return { languages: pairs };
 };
 export const startRtt = async (session: {
     id: string;
@@ -143,7 +145,7 @@ export const startRtt = async (session: {
         .set({ rttTaskId: taskId, rttStatus: 'running' })
         .where(eq(liveSessions.id, session.id));
     await publishRttStatus(session.id, 'running');
-    logger.info({ sessionId: session.id, taskId }, 'rtt task running');
+    logger.info({ sessionId: session.id, taskId, languages, translate }, 'rtt task running');
 };
 export const stopRtt = async (sessionId: string): Promise<void> => {
     const [row] = await db

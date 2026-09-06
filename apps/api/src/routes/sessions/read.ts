@@ -101,6 +101,7 @@ export const registerReadRoutes = (router: Router): void => {
                     speaker: sessionTranscripts.speaker,
                     language: sessionTranscripts.language,
                     text: sessionTranscripts.text,
+                    translatedText: sessionTranscripts.translatedText,
                     startMs: sessionTranscripts.startMs,
                 })
                 .from(sessionTranscripts)
@@ -121,6 +122,9 @@ export const registerReadRoutes = (router: Router): void => {
                 language: row.language,
                 text: row.text,
                 startMs: row.startMs,
+                ...(Object.keys(row.translatedText).length > 0
+                    ? { translatedText: row.translatedText }
+                    : {}),
             }));
             res.json({ lines, summary: session.transcriptSummary });
         } catch (err) {

@@ -65,7 +65,7 @@ const schema = z
         RECORDING_PUBLIC_BASE_URL: z.string().default(''),
         TRANSCRIPTION_PROVIDER: z.enum(['off', 'agora']).default('agora'),
         TRANSCRIPTION_LANGUAGES: csv('en-US,hi-IN,es-ES'),
-        TRANSCRIPTION_TRANSLATE_TARGETS: csv(''),
+        TRANSCRIPTION_TRANSLATE_TARGETS: csv('en-US,hi-IN'),
         MEDIA_PUSH_ENABLED: bool.default('false'),
         MEDIA_PUSH_REGION: z.enum(['cn', 'ap', 'na', 'eu']).default('ap'),
         MEDIA_PUSH_RTMP_URL: z.string().default(''),

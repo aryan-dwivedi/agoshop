@@ -81,6 +81,7 @@ export const BroadcastMonitor = ({
                     <CaptionOverlay
                         captions={broadcast.captions}
                         enabled={captionsVisible && broadcast.captions.length > 0}
+                        preferOriginal
                     />
 
                     {broadcast.remotePublishers.map((publisher) => (

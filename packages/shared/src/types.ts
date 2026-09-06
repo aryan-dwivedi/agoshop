@@ -194,6 +194,7 @@ export type TranscriptLine = {
     language: string;
     text: string;
     startMs: number;
+    translatedText?: Record<string, string>;
 };
 export type PaymentMethod = 'card' | 'upi' | 'cod' | 'emi' | 'netbanking';
 export type CheckoutOptionsDto = {

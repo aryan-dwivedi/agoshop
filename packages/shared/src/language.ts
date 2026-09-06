@@ -86,3 +86,23 @@ export const resolveSpokenLanguage = (
     }
     return fallback;
 };
+export const captionTextForLocale = (
+    line: {
+        text: string;
+        language: string;
+        translatedText?: Record<string, string>;
+    },
+    locale: string,
+    options: { preferOriginal?: boolean } = {},
+): string => {
+    if (options.preferOriginal) return line.text;
+    const translations = line.translatedText;
+    if (!translations || Object.keys(translations).length === 0) return line.text;
+    if (baseOf(line.language) === baseOf(locale)) return line.text;
+    const exact = translations[locale];
+    if (exact) return exact;
+    const byBase = Object.entries(translations).find(
+        ([code]) => baseOf(code) === baseOf(locale),
+    )?.[1];
+    return byBase ?? line.text;
+};

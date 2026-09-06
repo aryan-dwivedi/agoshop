@@ -1,19 +1,31 @@
 import type { CaptionLine } from '../../hooks/useLiveSession';
 
+import { captionTextForLocale } from '@shop/shared';
+
 const SEGMENTS_SHOWN = 2;
 export const CaptionOverlay = ({
     captions,
     enabled,
     className,
+    locale,
+    preferOriginal = false,
 }: {
     captions: CaptionLine[];
     enabled: boolean;
     className?: string;
+    locale?: string;
+    preferOriginal?: boolean;
 }): JSX.Element | null => {
     if (!enabled) return null;
+    const viewerLocale =
+        locale ?? (typeof navigator === 'undefined' ? 'en-US' : navigator.language);
     const text = captions
         .slice(-SEGMENTS_SHOWN)
-        .map((line) => line.text)
+        .map((line) =>
+            captionTextForLocale(line, viewerLocale, {
+                preferOriginal,
+            }),
+        )
         .join(' ')
         .trim();
     if (text.length === 0) return null;

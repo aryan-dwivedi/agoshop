@@ -152,6 +152,9 @@ export const registerEngagementRoutes = (router: Router): void => {
                     startMs: line.startMs,
                     speaker: line.speaker,
                     finalized: line.finalized,
+                    ...(Object.keys(line.translatedText).length > 0
+                        ? { translatedText: line.translatedText }
+                        : {}),
                 });
             }
             res.json({

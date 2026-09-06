@@ -35,6 +35,7 @@ export type CaptionLine = {
     language: string;
     startMs: number;
     speaker: string;
+    translatedText?: Record<string, string>;
 };
 export type ReactionState = {
     counts: Record<string, number>;
@@ -91,6 +92,7 @@ type CaptionData = {
     startMs: number;
     speaker: string;
     finalized: boolean;
+    translatedText?: Record<string, string>;
 };
 type PollOpenedData = {
     sessionId: string;
@@ -332,6 +334,9 @@ export const useLiveSession = (
                         language: data.language,
                         startMs: data.startMs,
                         speaker: data.speaker,
+                        ...(data.translatedText && Object.keys(data.translatedText).length > 0
+                            ? { translatedText: data.translatedText }
+                            : {}),
                     };
                     setCaptions((current) => {
                         const index = current.findIndex((caption) => caption.id === line.id);

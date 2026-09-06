@@ -38,6 +38,7 @@ x-api-env: &api-env
     RECORDING_PROVIDER: ${RECORDING_PROVIDER:-browser}
     TRANSCRIPTION_PROVIDER: ${TRANSCRIPTION_PROVIDER:-agora}
     TRANSCRIPTION_LANGUAGES: ${TRANSCRIPTION_LANGUAGES:-en-US,hi-IN,es-ES}
+    TRANSCRIPTION_TRANSLATE_TARGETS: ${TRANSCRIPTION_TRANSLATE_TARGETS:-en-US,hi-IN}
     # Must match the mount path below in every service, including nginx.
     RECORDING_LOCAL_DIR: /var/lib/live-commerce/recordings
 

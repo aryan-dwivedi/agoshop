@@ -62,7 +62,8 @@ const run = async (): Promise<void> => {
     });
     const session = { id: sessionId, rtcChannel, slug };
     console.log(`session ${session.slug} (${session.id})  channel ${session.rtcChannel}`);
-    console.log(`languages ${resolveRttLanguages('en-US').join(', ')}\n`);
+    console.log(`languages ${resolveRttLanguages('en-US').join(', ')}`);
+    console.log(`translate targets ${env.TRANSCRIPTION_TRANSLATE_TARGETS.join(', ')}\n`);
     try {
         await startRtt({ id: session.id, rtcChannel: session.rtcChannel, language: 'en-US' });
         const after = await statusOf(session.id);

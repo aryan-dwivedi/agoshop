@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { LANGUAGE_AUTO, detectLanguage, resolveSpokenLanguage } from './language.js';
+import { LANGUAGE_AUTO, captionTextForLocale, detectLanguage, resolveSpokenLanguage } from './language.js';
 
 const SUPPORTED = ['en-US', 'hi-IN', 'es-ES'] as const;
 describe('detectLanguage', () => {
@@ -45,5 +45,44 @@ describe('resolveSpokenLanguage', () => {
     it('falls back to the deployment default, never to the sentinel', () => {
         expect(resolveSpokenLanguage(LANGUAGE_AUTO, SUPPORTED, {})).toBe('en-US');
         expect(resolveSpokenLanguage(LANGUAGE_AUTO, SUPPORTED, { locale: 'ja-JP' })).toBe('en-US');
+    });
+});
+describe('captionTextForLocale', () => {
+    it('shows a translation when the viewer locale differs from the spoken language', () => {
+        expect(
+            captionTextForLocale(
+                {
+                    text: 'Hello everyone',
+                    language: 'en-US',
+                    translatedText: { 'hi-IN': 'नमस्ते सभी' },
+                },
+                'hi-IN',
+            ),
+        ).toBe('नमस्ते सभी');
+    });
+    it('keeps the original text when the viewer speaks the same language', () => {
+        expect(
+            captionTextForLocale(
+                {
+                    text: 'Hello everyone',
+                    language: 'en-US',
+                    translatedText: { 'hi-IN': 'नमस्ते सभी' },
+                },
+                'en-US',
+            ),
+        ).toBe('Hello everyone');
+    });
+    it('can force the original caption for the host monitor', () => {
+        expect(
+            captionTextForLocale(
+                {
+                    text: 'Hello everyone',
+                    language: 'en-US',
+                    translatedText: { 'hi-IN': 'नमस्ते सभी' },
+                },
+                'hi-IN',
+                { preferOriginal: true },
+            ),
+        ).toBe('Hello everyone');
     });
 });

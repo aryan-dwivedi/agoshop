@@ -28,6 +28,7 @@ describe('Agora RTT JSON caption parsing', () => {
                 language: 'en-US',
                 finalized: true,
                 absoluteMs: 1710000012345,
+                kind: 'transcript',
             },
             {
                 id: '42:1710000012000:1300',
@@ -35,6 +36,7 @@ describe('Agora RTT JSON caption parsing', () => {
                 language: 'en-US',
                 finalized: false,
                 absoluteMs: 1710000012645,
+                kind: 'transcript',
             },
         ]);
     });
@@ -79,6 +81,7 @@ describe('Agora RTT JSON caption parsing', () => {
                 language: 'en-US',
                 finalized: true,
                 absoluteMs: 1710000012345,
+                kind: 'transcript',
             },
         ]);
     });
@@ -100,5 +103,33 @@ describe('Agora RTT JSON caption parsing', () => {
         ]);
         expect(interim[0]?.id).toBe('42:1710000012000:1300');
         expect(finalized[0]?.id).toBe(interim[0]?.id);
+    });
+    it('parses translation segments from the JSON protocol', async () => {
+        const payload = encode({
+            translation: {
+                uid: 42,
+                textTs: 1710000012345,
+                offset: 1000,
+                sentenceId: 1710000012000,
+                results: [
+                    {
+                        language: 'hi-IN',
+                        texts: ['नमस्ते'],
+                        isFinal: true,
+                        offset: 1000,
+                    },
+                ],
+            },
+        });
+        await expect(parseAgoraRttCaption(payload)).resolves.toEqual([
+            {
+                id: '42:1710000012000:1000',
+                text: 'नमस्ते',
+                language: 'hi-IN',
+                finalized: true,
+                absoluteMs: 1710000012345,
+                kind: 'translation',
+            },
+        ]);
     });
 });

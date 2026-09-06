@@ -74,6 +74,7 @@ type TranscriptLineInput = {
     startMs: number;
     speaker: string;
     finalized: boolean;
+    translatedText: Record<string, string>;
 };
 const CAPTION_FORWARD_MS = 150;
 const MAX_CAPTIONS = 40;
@@ -182,12 +183,33 @@ export const useHostBroadcast = (opts: {
                 0,
                 segment.absoluteMs - (startedAtRef.current ?? segment.absoluteMs),
             );
+            const existingPending = pendingLinesRef.current.get(segment.id);
+            const translatedText =
+                segment.kind === 'translation'
+                    ? {
+                          ...(existingPending?.translatedText ?? {}),
+                          [segment.language]: segment.text,
+                      }
+                    : (existingPending?.translatedText ?? {});
+            const text =
+                segment.kind === 'translation'
+                    ? (existingPending?.text ?? segment.text)
+                    : segment.text;
+            const language =
+                segment.kind === 'translation'
+                    ? (existingPending?.language ?? segment.language)
+                    : segment.language;
+            const finalized =
+                segment.kind === 'translation'
+                    ? (existingPending?.finalized ?? segment.finalized)
+                    : segment.finalized;
             const line: CaptionLine = {
                 id: segment.id,
-                text: segment.text,
-                language: segment.language,
-                startMs,
+                text,
+                language,
+                startMs: existingPending?.startMs ?? startMs,
                 speaker: 'host',
+                ...(Object.keys(translatedText).length > 0 ? { translatedText } : {}),
             };
             setCaptions((current) => {
                 const index = current.findIndex((caption) => caption.id === line.id);
@@ -198,11 +220,12 @@ export const useHostBroadcast = (opts: {
             });
             pendingLinesRef.current.set(segment.id, {
                 captionId: segment.id,
-                text: segment.text,
-                language: segment.language,
-                startMs,
+                text: line.text,
+                language: line.language,
+                startMs: line.startMs,
                 speaker: 'host',
-                finalized: segment.finalized,
+                finalized,
+                translatedText,
             });
             if (flushTimerRef.current === null) {
                 flushTimerRef.current = window.setTimeout(() => {
