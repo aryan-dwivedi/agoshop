@@ -34,9 +34,13 @@ export const createSession = async (res: Response, record: SessionRecord): Promi
     });
     return id;
 };
-export const destroySession = async (req: Request, res: Response): Promise<void> => {
+export const destroySession = async (
+    req: Request,
+    res: Response,
+    clearClientCookie = true,
+): Promise<void> => {
     if (req.session) await redis.del(keys.session(req.session.id));
-    res.clearCookie(COOKIE, cookieScope);
+    if (clearClientCookie) res.clearCookie(COOKIE, cookieScope);
 };
 export const loadSession = async (
     req: Request,
