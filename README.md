@@ -231,7 +231,7 @@ Seeded sessions ship with `live-source.mp4` and per-room clips under `/media/rec
 | ------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------- |
 | Customer                        | `shopper@demo.test`   | starts with a wishlisted product, so `WISHLIST5` is _eligible_ and its suppression by `LIVE20` is visible |
 | Pulse Audio seller / host       | `seller@demo.test`    | owns the audio catalog and hosts the primary demo sessions                                                |
-| Co-host seller (Seller 2)       | `seller2@demo.test`   | second seller account for co-host broadcast testing (no storefront)                                       |
+| Co-host seller (Seller 2)       | `seller2@demo.test`   | second seller account — owns Priya Studio (empty catalog) and can be invited as co-host from the broadcast sidebar |
 | Cellverse seller / host         | `cellverse@demo.test` | owns the phone catalog and `phones-live`                                                                  |
 | Casa Nido seller / host         | `casanido@demo.test`  | owns the home catalog and `decor-live`                                                                    |
 | FlexFit Athletics seller / host | `flexfit@demo.test`   | owns apparel and lifestyle products and `gym-live`                                                        |

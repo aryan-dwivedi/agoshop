@@ -94,6 +94,15 @@ const SELLERS: {
         logoUrl: 'https://m.media-amazon.com/images/I/71R9LjXf-8L._SL900_.jpg',
     },
     {
+        slug: 'priya-studio',
+        displayName: 'Priya Studio',
+        ownerEmail: 'seller2@demo.test',
+        ownerName: 'Priya Sharma',
+        rating: 4.3,
+        logoUrl:
+            'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=900&q=80',
+    },
+    {
         slug: 'cellverse',
         displayName: 'Cellverse',
         ownerEmail: 'cellverse@demo.test',
@@ -2930,14 +2939,6 @@ const seed = async (): Promise<void> => {
                 defaultPincode: '560001',
                 preferredLanguage: 'en-US',
             },
-            {
-                email: 'seller2@demo.test',
-                passwordHash,
-                displayName: 'Priya Sharma',
-                role: 'seller',
-                defaultPincode: '560103',
-                preferredLanguage: 'en-US',
-            },
             ...SELLERS.map((s) => ({
                 email: s.ownerEmail,
                 passwordHash,
@@ -3380,7 +3381,7 @@ const seed = async (): Promise<void> => {
             '',
             `  shopper logins  shopper@demo.test / loyal@demo.test / admin@demo.test`,
             `  seller logins   ${SELLERS.map((s) => `${s.ownerEmail} (${s.displayName})`).join(', ')}`,
-            `  co-host login   seller2@demo.test (Priya Sharma — invite from broadcast sidebar)`,
+            `  co-host login   seller2@demo.test (Priya Studio — also invite from broadcast sidebar)`,
             `  password        ${PASSWORD}`,
             '  sessions        none — schedule a new show from the seller console',
             '  live now        0',

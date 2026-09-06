@@ -34,14 +34,14 @@ export const SessionProvider = ({ children }: { children: ReactNode }): JSX.Elem
     });
     const meQuery = useQuery({
         queryKey: ['me'],
-        queryFn: async (): Promise<{
+        queryFn: async ({ signal }): Promise<{
             user: PublicUser | null;
         }> => {
             const cached = queryClient.getQueryData<{ user: PublicUser | null }>(['me']);
             try {
                 const result = await api.get<{
                     user: PublicUser;
-                }>('/api/auth/me');
+                }>('/api/auth/me', signal);
                 return preferAuthenticated(result, cached);
             } catch (err) {
                 if (!(err instanceof ApiError && err.status === 401)) throw err;

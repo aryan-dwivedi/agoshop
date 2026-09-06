@@ -48,7 +48,7 @@ const request = async <T>(
     return parsed as T;
 };
 export const api = {
-    get: <T>(path: string) => request<T>('GET', path),
+    get: <T>(path: string, signal?: AbortSignal) => request<T>('GET', path, undefined, undefined, signal),
     post: <T>(
         path: string,
         body?: unknown,

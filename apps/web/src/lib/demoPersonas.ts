@@ -30,7 +30,7 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
         role: 'seller',
         email: 'seller2@demo.test',
         label: 'Seller 2 / co-host',
-        blurb: 'Second seller account for co-host testing — invite from the host broadcast sidebar.',
+        blurb: 'Second seller account — empty Priya Studio storefront, plus co-host testing from the host broadcast sidebar.',
         dashboard: sellerUrl('/'),
     },
     {
