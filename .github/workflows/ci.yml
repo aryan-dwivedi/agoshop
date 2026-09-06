@@ -39,6 +39,8 @@ jobs:
             CONVO_LLM_SHARED_SECRET: ci-test-llm-secret-min-32-chars
             AGORA_APP_ID: '00000000000000000000000000000000'
             AGORA_APP_CERTIFICATE: '0000000000000000000000000000000000000000000000000000000000000000'
+            AGORA_CUSTOMER_ID: ci-test-customer
+            AGORA_CUSTOMER_SECRET: ci-test-secret
             PUBLIC_API_URL: http://localhost:8080
             LLM_PROVIDER: mock
             RECORDING_LOCAL_DIR: ./var/recordings
@@ -68,11 +70,15 @@ jobs:
                   CONVO_LLM_SHARED_SECRET=${CONVO_LLM_SHARED_SECRET}
                   AGORA_APP_ID=${AGORA_APP_ID}
                   AGORA_APP_CERTIFICATE=${AGORA_APP_CERTIFICATE}
+                  AGORA_CUSTOMER_ID=${AGORA_CUSTOMER_ID}
+                  AGORA_CUSTOMER_SECRET=${AGORA_CUSTOMER_SECRET}
                   PUBLIC_API_URL=${PUBLIC_API_URL}
                   LLM_PROVIDER=${LLM_PROVIDER}
                   RECORDING_LOCAL_DIR=${RECORDING_LOCAL_DIR}
                   EOF
 
             - run: npm run db:push
+
+            - run: npm run db:seed
 
             - run: npm test

@@ -26,6 +26,13 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
         dashboard: sellerUrl('/'),
     },
     {
+        role: 'seller',
+        email: 'seller2@demo.test',
+        label: 'Seller 2 / co-host',
+        blurb: 'Second seller account for co-host testing — invite from the host broadcast sidebar.',
+        dashboard: sellerUrl('/'),
+    },
+    {
         role: 'support',
         email: 'support@demo.test',
         label: 'Support agent',

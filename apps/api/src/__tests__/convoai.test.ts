@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-if (!process.env.PUBLIC_API_URL) {
-    try {
-        process.loadEnvFile('.env');
-    } catch {}
-}
+try {
+    process.loadEnvFile('.env');
+} catch {}
+if (!process.env.AGORA_CUSTOMER_ID?.trim()) process.env.AGORA_CUSTOMER_ID = 'ci-test-customer';
+if (!process.env.AGORA_CUSTOMER_SECRET?.trim())
+    process.env.AGORA_CUSTOMER_SECRET = 'ci-test-secret';
 const { buildConvoAiJoinBody, buildConvoAiTtsBlock, joinConvoAiAgent } =
     await import('@shop/agora/convoai.js');
 const input = {
