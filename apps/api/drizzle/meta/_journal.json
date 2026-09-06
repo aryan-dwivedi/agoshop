@@ -64,6 +64,13 @@
             "when": 1788695714000,
             "tag": "0008_cohost_invite_links",
             "breakpoints": true
+        },
+        {
+            "idx": 9,
+            "version": "7",
+            "when": 1788699533000,
+            "tag": "0009_ensure_cohost_invite_links",
+            "breakpoints": true
         }
     ]
 }
