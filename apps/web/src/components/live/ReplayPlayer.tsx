@@ -30,11 +30,11 @@ type ReplayPlayerProps = {
     poster: string | null;
     title: string;
     captions: TranscriptLine[];
+    fallbackDurationSeconds: number | null;
 };
 const CAPTION_HOLD_MS = 6000;
-// Live shopping replays should never exceed a few hours; reject bogus probe values.
+// Live shopping replays should never exceed a few hours; reject bogus media values.
 const MAX_REASONABLE_DURATION_S = 8 * 60 * 60;
-const DURATION_PROBE_TIME_S = Number.MAX_SAFE_INTEGER;
 const boundedTime = (seconds: number): number => {
     if (!Number.isFinite(seconds) || seconds <= 0) return 0;
     return Math.min(seconds, MAX_REASONABLE_DURATION_S);
@@ -44,18 +44,6 @@ const validDuration = (seconds: number): number => {
     return seconds;
 };
 const readDuration = (video: HTMLVideoElement): number => validDuration(video.duration);
-const readProbedDuration = (video: HTMLVideoElement): number =>
-    readDuration(video) || validDuration(video.currentTime);
-const startDurationProbe = (video: HTMLVideoElement): boolean => {
-    try {
-        // MediaRecorder WebM files can expose `Infinity` until a seek forces the
-        // browser to parse the final cluster. A distant seek is clamped to the real end.
-        video.currentTime = DURATION_PROBE_TIME_S;
-        return true;
-    } catch {
-        return false;
-    }
-};
 const formatTime = (seconds: number): string => {
     const safe = boundedTime(seconds);
     if (safe <= 0) return '0:00';
@@ -68,18 +56,15 @@ const formatTime = (seconds: number): string => {
         : `${minutes}:${remaining}`;
 };
 export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(function ReplayPlayer(
-    { src, poster, title, captions },
+    { src, poster, title, captions, fallbackDurationSeconds },
     ref,
 ): JSX.Element {
     const rootRef = useRef<HTMLDivElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const hideTimerRef = useRef<number | null>(null);
-    const durationProbeRef = useRef<number | null>(null);
-    const durationFallbackRef = useRef<number | null>(null);
     const [playing, setPlaying] = useState(false);
     const [waiting, setWaiting] = useState(false);
-    const [probingDuration, setProbingDuration] = useState(false);
-    const [duration, setDuration] = useState(0);
+    const [duration, setDuration] = useState(() => validDuration(fallbackDurationSeconds ?? 0));
     const [currentTime, setCurrentTime] = useState(0);
     const [volume, setVolume] = useState(1);
     const [muted, setMuted] = useState(false);
@@ -106,59 +91,16 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
         document.addEventListener('fullscreenchange', onFullscreenChange);
         return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
     }, []);
-    const finishDurationProbe = useCallback(
-        (video: HTMLVideoElement, resolvedDuration: number): void => {
-            if (durationFallbackRef.current !== null) {
-                window.clearTimeout(durationFallbackRef.current);
-                durationFallbackRef.current = null;
-            }
-            setDuration(resolvedDuration);
-            const restoreTime = durationProbeRef.current;
-            if (restoreTime === null) return;
-            video.currentTime = restoreTime;
-            durationProbeRef.current = null;
-            setCurrentTime(restoreTime);
-            setProbingDuration(false);
-        },
-        [],
-    );
-    const syncDuration = useCallback(
-        (video: HTMLVideoElement, probeUnknown = false): void => {
-            const resolved = readDuration(video);
-            if (resolved > 0) {
-                finishDurationProbe(video, resolved);
-                return;
-            }
-            if (durationProbeRef.current !== null) {
-                const probed = readProbedDuration(video);
-                if (probed > 0) finishDurationProbe(video, probed);
-                return;
-            }
-            if (!probeUnknown) return;
-            durationProbeRef.current = video.currentTime;
-            setProbingDuration(true);
-            if (!startDurationProbe(video)) {
-                finishDurationProbe(video, 0);
-                return;
-            }
-            durationFallbackRef.current = window.setTimeout(() => {
-                finishDurationProbe(video, readProbedDuration(video));
-            }, 4000);
-        },
-        [finishDurationProbe],
-    );
+    const syncDuration = useCallback((video: HTMLVideoElement): void => {
+        const resolved = readDuration(video);
+        if (resolved > 0) setDuration(resolved);
+    }, []);
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
         setMediaError(null);
         setCurrentTime(0);
-        durationProbeRef.current = null;
-        if (durationFallbackRef.current !== null) {
-            window.clearTimeout(durationFallbackRef.current);
-            durationFallbackRef.current = null;
-        }
-        setProbingDuration(false);
-        setDuration(0);
+        setDuration(validDuration(fallbackDurationSeconds ?? 0));
         if (src.toLowerCase().split(/[?#]/, 1)[0]?.endsWith('.m3u8') && Hls.isSupported()) {
             const hls = new Hls();
             hls.loadSource(src);
@@ -169,22 +111,15 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
             return () => hls.destroy();
         }
         video.src = src;
-        const durationTimer = window.setTimeout(() => syncDuration(video, true), 500);
         return () => {
-            window.clearTimeout(durationTimer);
-            if (durationFallbackRef.current !== null) {
-                window.clearTimeout(durationFallbackRef.current);
-                durationFallbackRef.current = null;
-            }
             video.removeAttribute('src');
             video.load();
         };
-    }, [src, syncDuration]);
+    }, [fallbackDurationSeconds, src]);
     const seekTo = useCallback(
         (seconds: number): void => {
             const video = videoRef.current;
             if (!video) return;
-            if (durationProbeRef.current !== null) return;
             const limit = duration || readDuration(video);
             video.currentTime = Math.max(0, Math.min(seconds, limit > 0 ? limit : seconds));
             setCurrentTime(video.currentTime);
@@ -196,7 +131,6 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
     const togglePlayback = useCallback((): void => {
         const video = videoRef.current;
         if (!video) return;
-        if (durationProbeRef.current !== null) return;
         if (video.paused) {
             if (video.ended) seekTo(0);
             void video.play().catch(() => setMediaError('Playback could not start.'));
@@ -285,31 +219,15 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
                 onClick={togglePlayback}
                 onDoubleClick={toggleFullscreen}
                 onDurationChange={(event) => syncDuration(event.currentTarget)}
-                onSeeked={(event) => {
-                    if (durationProbeRef.current !== null) syncDuration(event.currentTarget);
-                }}
                 onTimeUpdate={(event) => {
                     const video = event.currentTarget;
-                    if (durationProbeRef.current !== null) {
-                        syncDuration(video);
-                        return;
-                    }
                     setCurrentTime(video.currentTime);
                     const resolved = readDuration(video);
                     if (resolved > 0) setDuration(resolved);
                 }}
                 onProgress={(event) => {
-                    const video = event.currentTarget;
-                    const resolved =
-                        durationProbeRef.current === null
-                            ? readDuration(video)
-                            : readProbedDuration(video);
-                    if (resolved <= 0) return;
-                    if (durationProbeRef.current !== null) {
-                        finishDurationProbe(video, resolved);
-                        return;
-                    }
-                    setDuration(resolved);
+                    const resolved = readDuration(event.currentTarget);
+                    if (resolved > 0) setDuration(resolved);
                 }}
                 onPlay={() => {
                     setPlaying(true);
@@ -333,7 +251,7 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
                 onWaiting={() => setWaiting(true)}
                 onCanPlay={(event) => {
                     setWaiting(false);
-                    syncDuration(event.currentTarget, true);
+                    syncDuration(event.currentTarget);
                 }}
                 onVolumeChange={(event) => {
                     setVolume(event.currentTarget.volume);
@@ -365,7 +283,7 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
                 </div>
             )}
 
-            {(probingDuration || (waiting && playing)) && mediaError === null && (
+            {waiting && playing && mediaError === null && (
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                     <LoaderCircle
                         className="h-9 w-9 animate-spin text-white"
@@ -374,7 +292,7 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
                 </div>
             )}
 
-            {!playing && !probingDuration && mediaError === null && (
+            {!playing && mediaError === null && (
                 <button
                     type="button"
                     aria-label={currentTime > 0 ? 'Resume replay' : 'Play replay'}
@@ -437,7 +355,6 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
                     <button
                         type="button"
                         aria-label={playing ? 'Pause replay' : 'Play replay'}
-                        disabled={probingDuration}
                         onClick={togglePlayback}
                         className="flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-50"
                     >

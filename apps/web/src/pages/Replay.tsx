@@ -193,6 +193,12 @@ const Replay = (): JSX.Element => {
             </div>
         );
     }
+    const startedAtMs = Date.parse(session.startedAt ?? '');
+    const endedAtMs = Date.parse(session.endedAt ?? '');
+    const recordingDurationSeconds =
+        Number.isFinite(startedAtMs) && Number.isFinite(endedAtMs) && endedAtMs > startedAtMs
+            ? (endedAtMs - startedAtMs) / 1000
+            : null;
     const summary = session.transcriptSummary ?? transcript.data?.summary ?? null;
     const closedPolls = (polls.data ?? []).filter((poll) => poll.options.length > 0);
     const displayedTranscript = search ? searchResults : transcript;
@@ -247,6 +253,7 @@ const Replay = (): JSX.Element => {
                             poster={session.coverImageUrl}
                             title={session.title}
                             captions={transcript.data?.lines ?? []}
+                            fallbackDurationSeconds={recordingDurationSeconds}
                         />
                     ) : (
                         <MissingRecording recordingStatus={session.recordingStatus} />

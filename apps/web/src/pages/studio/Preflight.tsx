@@ -6,11 +6,18 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 
 import { RoleGate } from '../../components/seller/RoleGate';
 import { writePreflightHandoff } from '../../hooks/useHostBroadcast';
-import { api } from '../../lib/api';
+import { ApiError, api } from '../../lib/api';
 import { useSession } from '../../state/session';
 
 type PermissionState = 'idle' | 'checking' | 'ready' | 'blocked';
-type CoHostInviteState = 'checking' | 'none' | 'redeeming' | 'accepted' | 'invalid';
+type CoHostInviteState =
+    | 'checking'
+    | 'none'
+    | 'redeeming'
+    | 'accepted'
+    | 'invalid'
+    | 'wrong-account'
+    | 'failed';
 const SOURCES: {
     id: BroadcastSource;
     label: string;
@@ -70,8 +77,16 @@ const Preflight = (): JSX.Element => {
                     token: inviteToken,
                 });
                 setCohostInviteState('accepted');
-            } catch {
-                setCohostInviteState(inviteToken === null ? 'none' : 'invalid');
+            } catch (err) {
+                if (inviteToken === null) {
+                    setCohostInviteState('none');
+                } else if (err instanceof ApiError && err.code === 'cohost_is_host') {
+                    setCohostInviteState('wrong-account');
+                } else if (err instanceof ApiError && err.code === 'cohost_invite_invalid') {
+                    setCohostInviteState('invalid');
+                } else {
+                    setCohostInviteState('failed');
+                }
             }
         })();
     }, [slug, user, inviteToken]);
@@ -144,6 +159,43 @@ const Preflight = (): JSX.Element => {
                     className="card mx-auto h-32 max-w-lg animate-pulse"
                     aria-label="Accepting co-host invite"
                 />
+            </RoleGate>
+        );
+    }
+    if (inviteToken !== null && cohostInviteState === 'wrong-account') {
+        return (
+            <RoleGate
+                roles={['shopper', 'seller', 'support', 'admin']}
+                title="Open this link as the co-host"
+                subtitle="You are currently signed in as the show host."
+                theme="light"
+            >
+                <div className="card mx-auto max-w-lg p-6 text-center">
+                    <p className="text-14 text-t2">
+                        Send this link to your co-host, or open it in a private window or another
+                        browser where the host account is not signed in.
+                    </p>
+                </div>
+            </RoleGate>
+        );
+    }
+    if (inviteToken !== null && cohostInviteState === 'failed') {
+        return (
+            <RoleGate
+                roles={['shopper', 'seller', 'support', 'admin']}
+                title="Could not accept co-host link"
+                subtitle="The invite could not be checked. Try again."
+                theme="light"
+            >
+                <div className="card mx-auto max-w-lg p-6 text-center">
+                    <button
+                        type="button"
+                        className="btn-commit"
+                        onClick={() => window.location.reload()}
+                    >
+                        Try again
+                    </button>
+                </div>
             </RoleGate>
         );
     }
