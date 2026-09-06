@@ -109,7 +109,7 @@ const Preflight = (): JSX.Element => {
     if (cohostInvite && slug) {
         return (
             <RoleGate
-                roles={['seller', 'support', 'admin']}
+                roles={['shopper', 'seller', 'support', 'admin']}
                 title="Join as co-host"
                 subtitle="You were invited to publish on this show."
                 theme="light"
