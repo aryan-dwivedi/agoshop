@@ -45,6 +45,8 @@ export const demoPersona = (role: Role): DemoPersona => {
     if (!persona) throw new Error(`no demo persona for role ${role}`);
     return persona;
 };
+export const demoPersonasForRole = (role: Role): readonly DemoPersona[] =>
+    DEMO_PERSONAS.filter((p) => p.role === role);
 export type ReservedTab = {
     show: () => 'popup' | 'self';
     cancel: () => void;

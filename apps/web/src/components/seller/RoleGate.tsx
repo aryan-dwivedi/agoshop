@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 
 import { api } from '../../lib/api';
-import { DEMO_PASSWORD, demoPersona } from '../../lib/demoPersonas';
+import { DEMO_PASSWORD, demoPersonasForRole } from '../../lib/demoPersonas';
 import { useSession } from '../../state/session';
 import { ShieldIcon } from '../icons';
 
@@ -15,9 +15,9 @@ const Denied = ({ roles, current }: { roles: Role[]; current: Role | null }): JS
     const [error, setError] = useState<string | null>(null);
     const offered = roles.includes('seller') || roles.includes('support');
     const demoRole: Role = roles.includes('support') ? 'support' : 'seller';
-    const signInAs = async (): Promise<void> => {
-        const { email } = demoPersona(demoRole);
-        setPending(demoRole);
+    const personas = demoPersonasForRole(demoRole);
+    const signInAs = async (email: string): Promise<void> => {
+        setPending(email);
         setError(null);
         try {
             const { user } = await api.post<{ user: PublicUser }>('/api/auth/login', {
@@ -43,16 +43,21 @@ const Denied = ({ roles, current }: { roles: Role[]; current: Role | null }): JS
                     : `This ${current} account does not have access to the seller panel.`}
             </p>
             {offered && (
-                <button
-                    type="button"
-                    className="btn-commit mt-5"
-                    disabled={pending !== null}
-                    onClick={() => void signInAs()}
-                >
-                    {pending === demoRole
-                        ? 'Signing in…'
-                        : `Sign in as ${demoPersona(demoRole).email}`}
-                </button>
+                <div className="mt-5 flex flex-col gap-2">
+                    {personas.map((persona, index) => (
+                        <button
+                            key={persona.email}
+                            type="button"
+                            className={index === 0 ? 'btn-commit' : 'btn-standard'}
+                            disabled={pending !== null}
+                            onClick={() => void signInAs(persona.email)}
+                        >
+                            {pending === persona.email
+                                ? 'Signing in…'
+                                : `Sign in as ${persona.email}`}
+                        </button>
+                    ))}
+                </div>
             )}
             {error !== null && <p className="field-error mt-3">{error}</p>}
         </div>

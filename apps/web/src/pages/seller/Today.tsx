@@ -9,7 +9,7 @@ import { formatInr } from '@shop/shared';
 
 import { Metric } from '../../components/seller/Metric';
 import { RoleGate } from '../../components/seller/RoleGate';
-import { api } from '../../lib/api';
+import { ApiError, api } from '../../lib/api';
 import { useSellerOverview, useSellerSessions } from '../../lib/sellerApi';
 import { useSession } from '../../state/session';
 
@@ -179,6 +179,8 @@ const Today = (): JSX.Element => {
             })
             .sort((a, b) => Date.parse(a.scheduledFor!) - Date.parse(b.scheduledFor!))[0] ?? null;
     const data = overview.data;
+    const cohostOnly =
+        overview.error instanceof ApiError && overview.error.code === 'no_seller_profile';
     const emptyLineUps = rows.filter(
         (row) => row.status === 'scheduled' && row.productCount === 0,
     ).length;
@@ -220,7 +222,20 @@ const Today = (): JSX.Element => {
                       }
             }
         >
-            {sessions.isError && (
+            {cohostOnly && (
+                <div className="card mb-5 max-w-xl p-5">
+                    <h2 className="text-16 font-semibold text-t1">Co-host account</h2>
+                    <p className="mt-2 text-14 leading-relaxed text-t2">
+                        This account does not own a storefront. After the host invites you from the
+                        broadcast sidebar, open the show link they share — for example{' '}
+                        <code className="rounded-chip bg-bg px-1.5 py-0.5 text-13">
+                            /live/&lt;slug&gt;/preflight
+                        </code>{' '}
+                        on this Studio origin — to publish your camera beside them.
+                    </p>
+                </div>
+            )}
+            {!cohostOnly && sessions.isError && (
                 <p
                     role="alert"
                     className="card mb-4 px-3 py-2 text-13 text-danger"
@@ -236,19 +251,21 @@ const Today = (): JSX.Element => {
                 </p>
             )}
 
-            {nextUp !== null && (
+            {!cohostOnly && nextUp !== null && (
                 <NextUp
                     show={nextUp}
                     now={now}
                 />
             )}
-            {live.length > 0 && (
+            {!cohostOnly && live.length > 0 && (
                 <LiveNow
                     shows={live}
                     now={now}
                 />
             )}
 
+            {!cohostOnly && (
+            <>
             <section className="mb-5">
                 <h2 className="eyebrow mb-2">Across every show you have run</h2>
                 {overview.isLoading ? (
@@ -399,6 +416,8 @@ const Today = (): JSX.Element => {
                     </div>
                 )}
             </section>
+            </>
+            )}
         </RoleGate>
     );
 };
