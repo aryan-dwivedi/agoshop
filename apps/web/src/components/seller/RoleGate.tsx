@@ -1,36 +1,12 @@
 import type { SellerRef } from '../../lib/sellerApi';
-import type { PublicUser, Role } from '@shop/shared';
+import type { Role } from '@shop/shared';
 import type { ReactNode } from 'react';
 
-import { useState } from 'react';
-
-import { api } from '../../lib/api';
-import { DEMO_PASSWORD, demoPersonasForRole } from '../../lib/demoPersonas';
 import { useSession } from '../../state/session';
 import { ShieldIcon } from '../icons';
+import { StudioDemoSignIn } from './StudioDemoSignIn';
 
 const Denied = ({ roles, current }: { roles: Role[]; current: Role | null }): JSX.Element => {
-    const { applyUser } = useSession();
-    const [pending, setPending] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const offered = roles.includes('seller') || roles.includes('support');
-    const demoRole: Role = roles.includes('support') ? 'support' : 'seller';
-    const personas = demoPersonasForRole(demoRole);
-    const signInAs = async (email: string): Promise<void> => {
-        setPending(email);
-        setError(null);
-        try {
-            const { user } = await api.post<{ user: PublicUser }>('/api/auth/login', {
-                email,
-                password: DEMO_PASSWORD,
-            });
-            applyUser(user);
-        } catch {
-            setError(`Could not sign in as ${email}.`);
-        } finally {
-            setPending(null);
-        }
-    };
     return (
         <div className="studio-empty mx-auto mt-16 max-w-md animate-slide-up">
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-wash text-accent">
@@ -42,24 +18,10 @@ const Denied = ({ roles, current }: { roles: Role[]; current: Role | null }): JS
                     ? 'Sign in with a seller account to continue.'
                     : `This ${current} account does not have access to the seller panel.`}
             </p>
-            {offered && (
-                <div className="mt-5 flex flex-col gap-2">
-                    {personas.map((persona, index) => (
-                        <button
-                            key={persona.email}
-                            type="button"
-                            className={index === 0 ? 'btn-commit' : 'btn-standard'}
-                            disabled={pending !== null}
-                            onClick={() => void signInAs(persona.email)}
-                        >
-                            {pending === persona.email
-                                ? 'Signing in…'
-                                : `Sign in as ${persona.email}`}
-                        </button>
-                    ))}
-                </div>
-            )}
-            {error !== null && <p className="field-error mt-3">{error}</p>}
+            <StudioDemoSignIn
+                roles={roles}
+                currentRole={current}
+            />
         </div>
     );
 };

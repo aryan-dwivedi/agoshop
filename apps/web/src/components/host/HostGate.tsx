@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 
+import { StudioDemoSignIn } from '../seller/StudioDemoSignIn';
 import { customerUrl } from '../../lib/origins';
+import { useSession } from '../../state/session';
 
 export const HostLoading = (): JSX.Element => (
     <div
@@ -31,7 +33,9 @@ export const HostLoadError = ({ message }: { message?: string }): JSX.Element =>
         </div>
     </div>
 );
-export const HostRoleGate = ({ slug }: { slug: string }): JSX.Element => (
+export const HostRoleGate = ({ slug }: { slug: string }): JSX.Element => {
+    const { user } = useSession();
+    return (
     <div
         data-surface="studio"
         data-room="broadcast"
@@ -44,12 +48,17 @@ export const HostRoleGate = ({ slug }: { slug: string }): JSX.Element => (
             <p className="mt-1 text-14 text-t2">
                 Sign in with a seller account, or accept a co-host invite from the host.
             </p>
+            <StudioDemoSignIn
+                roles={['seller', 'support', 'admin']}
+                currentRole={user?.role ?? null}
+            />
             <a
                 href={customerUrl(`/live/${slug}`)}
-                className="btn-standard mt-4"
+                className="btn-standard mt-4 inline-flex"
             >
                 Watch as a shopper
             </a>
         </div>
     </div>
-);
+    );
+};

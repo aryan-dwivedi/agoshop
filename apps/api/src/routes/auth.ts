@@ -103,7 +103,7 @@ router.post('/api/auth/register', async (req, res, next) => {
         const row = rows[0];
         if (!row) throw conflict('email_taken');
         const guestId = await currentGuestId(req);
-        if (req.session) await destroySession(req, res, false);
+        if (req.session) await destroySession(req, res);
         await createSession(res, { userId: row.id, role: row.role });
         if (guestId) await adoptGuestCart(guestId, row.id);
         res.status(201).json({ user: toPublicUser(row) });
@@ -123,7 +123,7 @@ router.post('/api/auth/login', rateLimit('login', BUDGETS.login), async (req, re
         if (row.deleted_at) throw unauthorized('invalid_credentials');
         if (row.banned_at) throw forbidden('account_banned');
         const guestId = await currentGuestId(req);
-        if (req.session) await destroySession(req, res, false);
+        if (req.session) await destroySession(req, res);
         await createSession(res, { userId: row.id, role: row.role });
         if (guestId) await adoptGuestCart(guestId, row.id);
         res.json({ user: toPublicUser(row) });

@@ -1,5 +1,6 @@
-import type { Role } from '@shop/shared';
+import type { PublicUser, Role } from '@shop/shared';
 
+import { api } from './api';
 import { sellerUrl, supportUrl } from './origins';
 
 export const DEMO_PASSWORD = 'demo1234';
@@ -47,6 +48,23 @@ export const demoPersona = (role: Role): DemoPersona => {
 };
 export const demoPersonasForRole = (role: Role): readonly DemoPersona[] =>
     DEMO_PERSONAS.filter((p) => p.role === role);
+export const signInWithDemoAccount = async (
+    email: string,
+    { logoutFirst = false }: { logoutFirst?: boolean } = {},
+): Promise<PublicUser> => {
+    if (logoutFirst) {
+        try {
+            await api.post('/api/auth/logout');
+        } catch {
+            /* switching accounts — ignore logout failures */
+        }
+    }
+    const { user } = await api.post<{ user: PublicUser }>('/api/auth/login', {
+        email,
+        password: DEMO_PASSWORD,
+    });
+    return user;
+};
 export type ReservedTab = {
     show: () => 'popup' | 'self';
     cancel: () => void;
