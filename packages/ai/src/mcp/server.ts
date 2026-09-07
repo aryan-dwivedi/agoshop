@@ -15,7 +15,8 @@ import { isMcpProbeMethod, parseMcpRpcMethod } from './request.js';
 const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
     get_conversation_context:
         'Live commerce context: session, offers, product in context, promotion rules.',
-    search_products: 'Search the catalog by keyword.',
+    search_products:
+        'Search the catalog and immediately display these exact products. Preserve every requested qualifier in query. audience is required: use men, women, or unisex when requested, otherwise any; never broaden it. Describe only returned results.',
     get_product_details: 'Full product details by product_id.',
     compare_products: 'Compare two to four products.',
     check_delivery: 'Check pincode serviceability.',

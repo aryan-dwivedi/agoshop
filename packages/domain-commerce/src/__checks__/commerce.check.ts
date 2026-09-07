@@ -26,7 +26,7 @@ import { closeRedis, keys, redis } from '@shop/platform/lib/redis.js';
 import { drainAnalyticsOnce } from '@shop/worker/background.js';
 
 import { addItem, clearCartWithin } from '../cart.js';
-import { compareProducts } from '../catalog.js';
+import { compareProducts, listProducts } from '../catalog.js';
 import { resolveLineContext } from '../eligibility.js';
 import { priceCart } from '../orders.js';
 import { captureOrder, createOrderIntent, expireStaleOrders } from '../ordersAsync.js';
@@ -425,6 +425,25 @@ const run = async (): Promise<void> => {
             );
         }
         pass('GET /api/products?q= also matches seller, category, and variant SKU');
+        const mensTshirts = await listProducts({
+            q: 'tshirt',
+            audience: 'men',
+            sort: 'relevance',
+            page: 1,
+            pageSize: 10,
+        });
+        assert.ok(mensTshirts.items.length > 0, 'men tshirt search must return matching products');
+        assert.ok(
+            mensTshirts.items.every(
+                (item) =>
+                    !['female', 'unisex'].includes(item.specs.Gender?.toLowerCase() ?? '') &&
+                    !/\b(?:boys?|kids?|children|women|womens|woman|female)\b/i.test(item.title),
+            ),
+            `men tshirt search crossed its audience filter: ${mensTshirts.items
+                .map((item) => `${item.title} (${item.specs.Gender ?? 'unknown'})`)
+                .join(', ')}`,
+        );
+        pass('catalog audience filter keeps men tshirt results adult and male');
         const first = await api.request<CartDto>(
             'POST',
             '/api/cart/items',

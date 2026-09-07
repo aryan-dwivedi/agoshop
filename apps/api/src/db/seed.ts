@@ -1460,6 +1460,7 @@ const PRODUCTS: SeedProduct[] = [
             'Neck Style': 'Crew Neck',
             'Sleeve Type': 'Short Sleeve',
             Pattern: 'Solid',
+            Gender: 'Male',
         },
         images: [
             'https://m.media-amazon.com/images/I/51SpOiouDYL._SL900_.jpg',
@@ -1518,6 +1519,7 @@ const PRODUCTS: SeedProduct[] = [
             'Neck Style': 'Crew Neck',
             'Sleeve Type': 'Short Sleeve',
             Pattern: 'Solid',
+            Gender: 'Male',
             'Item Weight': '200 Grams',
         },
         images: [
@@ -1583,6 +1585,7 @@ const PRODUCTS: SeedProduct[] = [
             'Neck Style': 'Crew Neck',
             'Sleeve Type': 'Short Sleeve',
             Pattern: 'Geometric',
+            Gender: 'Male',
         },
         images: [
             'https://m.media-amazon.com/images/I/61K7+r5+oOL._SL900_.jpg',
@@ -1647,6 +1650,7 @@ const PRODUCTS: SeedProduct[] = [
             'Neck Style': 'Collared Neck',
             'Sleeve Type': 'Raglan Sleeve',
             Pattern: 'Printed',
+            Gender: 'Male',
         },
         images: [
             'https://m.media-amazon.com/images/I/71Y9AbJ1yCL._SL900_.jpg',

@@ -9,7 +9,7 @@ import {
     listProducts,
 } from '@shop/domain-commerce/catalog.js';
 import { recommend } from '@shop/domain-commerce/recommendations.js';
-import { minorUnitsToDecimalString } from '@shop/shared';
+import { MAX_AI_PRODUCT_CARDS, minorUnitsToDecimalString } from '@shop/shared';
 
 import { speakableProduct, toolError } from '../speakable.js';
 
@@ -19,6 +19,12 @@ type CatalogToolInvocation = Extract<
         name: 'search_products' | 'get_product_details' | 'compare_products' | 'recommend_products';
     }
 >;
+const audienceFromQuery = (query: string): 'men' | 'women' | 'unisex' | undefined => {
+    if (/\bunisex\b/iu.test(query)) return 'unisex';
+    if (/\b(?:women|womens|woman|ladies|female)(?:'s)?\b/iu.test(query)) return 'women';
+    if (/\b(?:men|mens|man|male)(?:'s)?\b/iu.test(query)) return 'men';
+    return undefined;
+};
 export const runCatalogTool = async (
     conversation: ConversationRecord,
     call: CatalogToolInvocation,
@@ -27,8 +33,9 @@ export const runCatalogTool = async (
     const userId = conversation.userId;
     switch (call.name) {
         case 'search_products': {
-            const { query, category, max_price_inr, min_rating, limit } = call.args;
+            const { query, audience, category, max_price_inr, min_rating, limit } = call.args;
             const found = await listProducts({
+                audience: audience === 'any' ? audienceFromQuery(query) : audience,
                 q: query,
                 ...(category === undefined ? {} : { categorySlug: category }),
                 ...(max_price_inr === undefined
@@ -37,10 +44,16 @@ export const runCatalogTool = async (
                 ...(min_rating === undefined ? {} : { minRating: min_rating }),
                 sort: 'relevance',
                 page: 1,
-                pageSize: limit ?? 5,
+                pageSize: Math.min(limit ?? MAX_AI_PRODUCT_CARDS, MAX_AI_PRODUCT_CARDS),
             });
             surfaced.add(found.items);
-            return { total: found.total, results: found.items.map(speakableProduct) };
+            return {
+                total_matches: found.total,
+                displayed_count: found.items.length,
+                results: found.items.map(speakableProduct),
+                display_note:
+                    'These exact results are visible to the shopper. Describe only these products and do not imply that another audience is included.',
+            };
         }
         case 'get_product_details': {
             const product = await getProductById(call.args.product_id);

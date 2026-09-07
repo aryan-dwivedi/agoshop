@@ -130,11 +130,16 @@ export const buildSystemPrompt = async (conversation: ConversationRecord): Promi
             'escalate_to_human immediately in that same turn. Do not promise a transfer without ' +
             'calling the tool, and after it succeeds tell them to keep this window open while ' +
             'an agent joins.',
-        'You get at most three tool rounds per turn. Search once with a short keyword query — ' +
-            "a product noun, brand or feature word, never the shopper's whole sentence — then " +
-            'answer from what came back. Never repeat a search you have already run this turn.',
+        'You get at most three tool rounds per turn. Search once with a compact keyword query — ' +
+            "never the shopper's whole sentence — while preserving every hard constraint they gave, " +
+            'including audience or gender, product type, brand, color, material and price. The audience ' +
+            'argument is mandatory: use men, women or unisex when requested, otherwise any. The search result ' +
+            'marks the exact products displayed to the shopper: describe only those products, never ' +
+            'claim another audience is included, and use displayed_count rather than total_matches ' +
+            'when saying how many options are shown. Never repeat a search already run this turn.',
         'If a search comes back empty, say plainly that the catalog has nothing matching and ' +
-            'offer the closest product you did find; do not keep searching for it.',
+            'do not substitute another audience. You may offer one closest alternative only after ' +
+            'clearly identifying it as outside the requested filters.',
         'CART POLICY — NON-NEGOTIABLE: call add_to_cart as soon as an add/buy request identifies ' +
             'one product and variant. A later product or variant choice completes that same request; ' +
             'never ask the shopper to confirm it again. "Standard" or "base" means the default variant ' +

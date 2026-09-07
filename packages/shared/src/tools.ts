@@ -1,14 +1,27 @@
 import { z } from 'zod';
 
+import { MAX_AI_PRODUCT_CARDS } from './aiCards.js';
+
 const productIdSchema = z.string().uuid();
 const variantIdSchema = z.string().uuid();
 export const toolSchemas = {
     search_products: z.object({
-        query: z.string().min(1).max(200),
+        query: z
+            .string()
+            .min(1)
+            .max(200)
+            .describe(
+                'Compact product keywords. Preserve every requested qualifier, including audience, color, material, and product type.',
+            ),
+        audience: z
+            .enum(['any', 'men', 'women', 'unisex'])
+            .describe(
+                'Use men, women, or unisex when requested; otherwise use any. Never broaden a requested audience.',
+            ),
         category: z.string().max(64).optional(),
         max_price_inr: z.number().positive().optional(),
         min_rating: z.number().min(0).max(5).optional(),
-        limit: z.number().int().min(1).max(10).optional(),
+        limit: z.number().int().min(1).max(MAX_AI_PRODUCT_CARDS).optional(),
     }),
     get_product_details: z.object({ product_id: productIdSchema }),
     compare_products: z.object({
@@ -91,23 +104,33 @@ const variantId = {
 } as const;
 const num = { type: 'number' } as const;
 const int = { type: 'integer' } as const;
+const searchLimit = {
+    ...int,
+    minimum: 1,
+    maximum: MAX_AI_PRODUCT_CARDS,
+} as const;
 export const SHOPPING_TOOLS: OpenAiToolSchema[] = [
     {
         type: 'function',
         function: {
             name: 'search_products',
             description:
-                'Search the store catalog, optionally filtered by category, maximum price in rupees, or minimum rating. Matching covers title, brand, description, highlights and specifications, so `query` works best as a short keyword phrase — a product noun, brand or feature word ("earbuds", "battery life") rather than the shopper\'s whole sentence. Use this before answering any "what do you have" question.',
+                'Search the store catalog and return the exact products immediately displayed to the shopper. Preserve all requested qualifiers in `query`. `audience` is required: use men, women, or unisex when requested, otherwise any; never broaden one audience to another. Matching covers title, brand, description, highlights and specifications, so use a compact keyword phrase ("men t-shirt", "black cotton shirt"), not the shopper’s whole sentence. Use this before answering any "what do you have" question, then describe only the returned products.',
             parameters: {
                 type: 'object',
                 properties: {
                     query: str,
+                    audience: {
+                        type: 'string',
+                        enum: ['any', 'men', 'women', 'unisex'],
+                        description: 'Use men, women, or unisex when requested; otherwise use any.',
+                    },
                     category: str,
                     max_price_inr: num,
                     min_rating: num,
-                    limit: int,
+                    limit: searchLimit,
                 },
-                required: ['query'],
+                required: ['query', 'audience'],
             },
         },
     },

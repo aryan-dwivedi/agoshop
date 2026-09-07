@@ -62,6 +62,12 @@ const DELIVERY_INTENT =
     /\b(?:deliver(?:y|ies)?|ship(?:ping)?|pin\s*code|pincode|serviceable|serviceability)\b/iu;
 const PAYMENT_INTENT =
     /\b(?:pay(?:ment)?|upi|cod|cash(?:\s+on\s+delivery)?|credit\s+card|debit\s+card|card|emi|net\s*banking)\b/iu;
+const audienceForQuery = (query: string): 'any' | 'men' | 'women' | 'unisex' => {
+    if (/\bunisex\b/iu.test(query)) return 'unisex';
+    if (/\b(?:women|womens|woman|ladies|female)(?:'s)?\b/iu.test(query)) return 'women';
+    if (/\b(?:men|mens|man|male)(?:'s)?\b/iu.test(query)) return 'men';
+    return 'any';
+};
 const lastUserText = (messages: ChatMessage[]): string => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
         const message = messages[i]!;
@@ -311,7 +317,11 @@ async function* run(req: LlmRequest): AsyncGenerator<LlmChunk> {
             return;
         }
         if (script.kind === 'search') {
-            const args = JSON.stringify({ query: script.query, limit: 5 });
+            const args = JSON.stringify({
+                query: script.query,
+                audience: audienceForQuery(script.query),
+                limit: 5,
+            });
             yield* emitToolCall('search_products', args, req.signal);
             mockStats.completed += 1;
             return;

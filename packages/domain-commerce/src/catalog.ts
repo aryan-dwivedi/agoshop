@@ -8,10 +8,12 @@ import { db } from '@shop/db/client.js';
 import { cacheKeys, cached, invalidate } from '@shop/platform/lib/cache.js';
 
 export type ProductSort = 'relevance' | 'price_asc' | 'price_desc' | 'rating';
+export type ProductAudience = 'men' | 'women' | 'unisex';
 export type ProductQuery = {
     categoryId?: string;
     categorySlug?: string;
     q?: string;
+    audience?: ProductAudience;
     maxPriceMinorUnits?: number;
     minRating?: number;
     sellerId?: string;
@@ -145,11 +147,33 @@ const resolveTextMatch = async (term: string | undefined): Promise<TextMatch> =>
         return match;
     });
 };
+const buildAudienceWhere = (audience: ProductAudience): SQL => {
+    const title = sql`to_tsvector('english', coalesce(p.title, ''))`;
+    const gender = sql`lower(coalesce(p.specs ->> 'Gender', ''))`;
+    switch (audience) {
+        case 'men':
+            return sql`(
+                ${gender} in ('male', 'man', 'men', 'mens', 'men''s')
+                or ${title} @@ to_tsquery('english', 'man | men')
+            ) and not (${title} @@ to_tsquery('english', 'boy | kid | child'))`;
+        case 'women':
+            return sql`(
+                ${gender} in ('female', 'woman', 'women', 'womens', 'women''s')
+                or ${title} @@ to_tsquery('english', 'woman | women | lady')
+            ) and not (${title} @@ to_tsquery('english', 'girl | kid | child'))`;
+        case 'unisex':
+            return sql`(
+                ${gender} = 'unisex'
+                or ${title} @@ to_tsquery('english', 'unisex')
+            )`;
+    }
+};
 const buildWhere = (q: ProductQuery, mode: MatchMode, match: TextMatch): SQL => {
     const clauses: SQL[] = [];
     if (q.categoryId) clauses.push(sql`p.category_id = cast(${q.categoryId} as uuid)`);
     if (q.categorySlug) clauses.push(sql`c.slug = ${q.categorySlug}`);
     if (q.sellerId) clauses.push(sql`p.seller_id = cast(${q.sellerId} as uuid)`);
+    if (q.audience) clauses.push(buildAudienceWhere(q.audience));
     if (q.q) {
         const any: SQL[] = [sql`${FTS} @@ ${tsQuery(q.q, mode)}`];
         if (match.categoryIds.length > 0) {

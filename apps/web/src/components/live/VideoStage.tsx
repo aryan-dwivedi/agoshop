@@ -1,6 +1,11 @@
 import type { HlsOrigin } from '../../hooks/useLiveSession';
 import type { JoinSessionDto } from '@shop/shared';
-import type { IAgoraRTCClient, IAgoraRTCRemoteUser, IRemoteAudioTrack } from 'agora-rtc-sdk-ng';
+import type {
+    IAgoraRTCClient,
+    IAgoraRTCRemoteUser,
+    IRemoteAudioTrack,
+    IRemoteVideoTrack,
+} from 'agora-rtc-sdk-ng';
 import type { ReactNode, RefObject } from 'react';
 
 import AgoraRTC, { RemoteStreamFallbackType, RemoteStreamType } from 'agora-rtc-sdk-ng';
@@ -38,6 +43,10 @@ type Props = {
     onStreamAspect?: (ratio: number) => void;
     className?: string;
 };
+type RemoteVideo = {
+    uid: string;
+    track: IRemoteVideoTrack;
+};
 type StageState = 'idle' | 'connecting' | 'waiting-for-host' | 'playing' | 'error';
 const STATE_LABEL: Record<StageState, string> = {
     idle: 'Not connected',
@@ -47,6 +56,37 @@ const STATE_LABEL: Record<StageState, string> = {
     error: 'Stream unavailable',
 };
 const FULL_VOLUME = 100;
+const RemoteVideoTile = ({
+    publisher,
+    contentFit,
+    watchAspect,
+}: {
+    publisher: RemoteVideo;
+    contentFit: 'cover' | 'contain';
+    watchAspect: (key: string, element: HTMLVideoElement | null) => void;
+}): JSX.Element => {
+    const containerRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const container = containerRef.current;
+        if (container === null) return;
+        publisher.track.play(container, { fit: contentFit });
+        const captureAspect = (): void =>
+            watchAspect(`rtc-${publisher.uid}`, container.querySelector<HTMLVideoElement>('video'));
+        captureAspect();
+        const frame = window.requestAnimationFrame(captureAspect);
+        return () => {
+            window.cancelAnimationFrame(frame);
+            publisher.track.stop();
+        };
+    }, [contentFit, publisher.track, publisher.uid, watchAspect]);
+    return (
+        <div
+            ref={containerRef}
+            aria-label="Live presenter"
+            className="relative h-full min-h-0 w-full min-w-0 overflow-hidden bg-black"
+        />
+    );
+};
 const shortestDrift = (position: number, target: number, durationSeconds: number): number => {
     const raw = position - target;
     const half = durationSeconds / 2;
@@ -160,10 +200,10 @@ export const VideoStage = ({
     onStreamAspect,
     className,
 }: Props): JSX.Element => {
-    const rtcContainerRef = useRef<HTMLDivElement>(null);
     const videoElementRef = useRef<HTMLVideoElement>(null);
     const standbyVideoRef = useRef<HTMLVideoElement>(null);
-    const audioTrackRef = useRef<IRemoteAudioTrack | null>(null);
+    const audioTracksRef = useRef<Map<string, IRemoteAudioTrack>>(new Map());
+    const remoteVideoTracksRef = useRef<Map<string, IRemoteVideoTrack>>(new Map());
     const rtcClientRef = useRef<IAgoraRTCClient | null>(null);
     const hlsRef = useRef<Hls | null>(null);
     const qualityRef = useRef(quality);
@@ -175,14 +215,16 @@ export const VideoStage = ({
     const [cdnState, setCdnState] = useState<StageState>('idle');
     const [error, setError] = useState<string | null>(null);
     const [cdnPlaying, setCdnPlaying] = useState(false);
+    const [remoteVideos, setRemoteVideos] = useState<RemoteVideo[]>([]);
     const [audioEnabled, setAudioEnabled] = useState(false);
     const audioEnabledRef = useRef(audioEnabled);
     audioEnabledRef.current = audioEnabled;
     useEffect(() => {
-        const track = audioTrackRef.current;
-        if (!track) return;
-        track.setVolume(audioEnabled ? FULL_VOLUME : 0);
-        audioCallbackRef.current?.(audioEnabled ? track : null);
+        for (const track of audioTracksRef.current.values()) {
+            track.setVolume(audioEnabled ? FULL_VOLUME : 0);
+        }
+        const primaryTrack = audioTracksRef.current.values().next().value ?? null;
+        audioCallbackRef.current?.(audioEnabled ? primaryTrack : null);
     }, [audioEnabled]);
     useEffect(() => {
         const target = rtcClientRef.current;
@@ -210,6 +252,8 @@ export const VideoStage = ({
     const rtcShouldRun = Boolean(appId && join) && (deliveryTier === 'rtc' || !cdnPlaying);
     useEffect(() => {
         if (!rtcShouldRun || !appId || !join) return;
+        remoteVideoTracksRef.current.clear();
+        setRemoteVideos([]);
         let client: IAgoraRTCClient | null = null;
         let cancelled = false;
         void (async () => {
@@ -236,37 +280,63 @@ export const VideoStage = ({
                                 await rtc.setRemoteVideoStreamType(user.uid, selected);
                                 await rtc.setStreamFallbackOption(user.uid, fallback);
                             }
-                            if (mediaType === 'video' && rtcContainerRef.current) {
-                                const container = rtcContainerRef.current;
-                                user.videoTrack?.play(container, { fit: contentFit });
+                            if (mediaType === 'video' && user.videoTrack) {
+                                const uid = String(user.uid);
+                                remoteVideoTracksRef.current.set(uid, user.videoTrack);
+                                setRemoteVideos(
+                                    Array.from(
+                                        remoteVideoTracksRef.current,
+                                        ([remoteUid, track]) => ({
+                                            uid: remoteUid,
+                                            track,
+                                        }),
+                                    ),
+                                );
                                 setRtcState('playing');
-                                const captureAspect = (): void =>
-                                    watchAspect(
-                                        `rtc-${user.uid}`,
-                                        container.querySelector<HTMLVideoElement>('video'),
-                                    );
-                                captureAspect();
-                                requestAnimationFrame(captureAspect);
                             }
                             if (mediaType === 'audio' && user.audioTrack) {
+                                const uid = String(user.uid);
                                 const track = user.audioTrack;
                                 track.play();
                                 track.setVolume(audioEnabledRef.current ? FULL_VOLUME : 0);
-                                audioTrackRef.current = track;
-                                audioCallbackRef.current?.(audioEnabledRef.current ? track : null);
+                                audioTracksRef.current.set(uid, track);
+                                const primaryTrack =
+                                    audioTracksRef.current.values().next().value ?? null;
+                                audioCallbackRef.current?.(
+                                    audioEnabledRef.current ? primaryTrack : null,
+                                );
                             }
                         } catch (err) {
                             setError(err instanceof Error ? err.message : 'subscribe_failed');
                         }
                     })();
                 });
-                rtc.on('user-unpublished', (_user, mediaType) => {
-                    if (mediaType === 'audio') {
-                        audioTrackRef.current = null;
-                        audioCallbackRef.current?.(null);
+                const forgetRemote = (
+                    user: IAgoraRTCRemoteUser,
+                    mediaType?: 'audio' | 'video',
+                ): void => {
+                    const uid = String(user.uid);
+                    if (mediaType === undefined || mediaType === 'audio') {
+                        audioTracksRef.current.get(uid)?.stop();
+                        audioTracksRef.current.delete(uid);
+                        const primaryTrack = audioTracksRef.current.values().next().value ?? null;
+                        audioCallbackRef.current?.(audioEnabledRef.current ? primaryTrack : null);
                     }
-                    if (mediaType === 'video') setRtcState('waiting-for-host');
-                });
+                    if (mediaType === undefined || mediaType === 'video') {
+                        remoteVideoTracksRef.current.delete(uid);
+                        setRemoteVideos(
+                            Array.from(remoteVideoTracksRef.current, ([remoteUid, track]) => ({
+                                uid: remoteUid,
+                                track,
+                            })),
+                        );
+                        setRtcState(
+                            remoteVideoTracksRef.current.size > 0 ? 'playing' : 'waiting-for-host',
+                        );
+                    }
+                };
+                rtc.on('user-unpublished', forgetRemote);
+                rtc.on('user-left', (user) => forgetRemote(user));
                 await rtc.setClientRole('audience', { level: 2 });
                 await rtc.setRemoteDefaultVideoStreamType(
                     qualityRef.current === 'low'
@@ -286,7 +356,9 @@ export const VideoStage = ({
         return () => {
             cancelled = true;
             rtcClientRef.current = null;
-            audioTrackRef.current = null;
+            for (const track of audioTracksRef.current.values()) track.stop();
+            audioTracksRef.current.clear();
+            remoteVideoTracksRef.current.clear();
             audioCallbackRef.current?.(null);
             const leaving = client;
             if (leaving) {
@@ -364,9 +436,19 @@ export const VideoStage = ({
                 className={`relative w-full ${fit === 'fill' ? 'h-full' : 'aspect-video'} ${blurred ? 'blur-2xl' : ''}`}
             >
                 <div
-                    ref={rtcContainerRef}
-                    className={`absolute inset-0 h-full w-full ${deliveryTier === 'cdn' && cdnPlaying ? 'hidden' : ''}`}
-                />
+                    className={`absolute inset-0 grid h-full w-full gap-px bg-black ${
+                        remoteVideos.length > 1 ? 'grid-cols-2' : 'grid-cols-1'
+                    } ${deliveryTier === 'cdn' && cdnPlaying ? 'hidden' : ''}`}
+                >
+                    {remoteVideos.map((publisher) => (
+                        <RemoteVideoTile
+                            key={publisher.uid}
+                            publisher={publisher}
+                            contentFit={contentFit}
+                            watchAspect={watchAspect}
+                        />
+                    ))}
+                </div>
                 <video
                     ref={videoElementRef}
                     playsInline
