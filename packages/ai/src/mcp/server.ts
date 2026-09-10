@@ -16,7 +16,7 @@ const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
     get_conversation_context:
         'Live commerce context: session, offers, product in context, promotion rules.',
     search_products:
-        'Search the catalog and immediately display these exact products. Preserve every requested qualifier in query. audience is required: use men, women, or unisex when requested, otherwise any; never broaden it. Describe only returned results.',
+        'Search the catalog and immediately display these exact products. Preserve every requested qualifier in query. audience is required: use men, women, or unisex when requested, otherwise any; never broaden it. Describe only returned results. Use displayed_count when speaking a total; never invent a count. When the shopper asks to show or list all options, reuse the most recent search results instead of searching again with a vague query.',
     get_product_details: 'Full product details by product_id.',
     compare_products: 'Compare two to four products.',
     check_delivery: 'Check pincode serviceability.',

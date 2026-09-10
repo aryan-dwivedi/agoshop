@@ -11,6 +11,8 @@ import { errorHandler, notFoundHandler } from '@shop/platform/middleware/errorHa
 import { loadSession } from '@shop/platform/middleware/session.js';
 
 const STREAMING_PATHS = ['/api/events', '/api/ai/', '/mcp'];
+const skipCompression = (path: string): boolean =>
+    STREAMING_PATHS.some((prefix) => path.startsWith(prefix)) || path.endsWith('/recording/play');
 export const createApp = (routers: Router[]): Express => {
     const app = express();
     app.disable('x-powered-by');
@@ -26,7 +28,7 @@ export const createApp = (routers: Router[]): Express => {
     app.use(
         compression({
             filter: (req, res) => {
-                if (STREAMING_PATHS.some((p) => req.path.startsWith(p))) return false;
+                if (skipCompression(req.path)) return false;
                 return compression.filter(req, res);
             },
         }),

@@ -347,8 +347,9 @@ try {
                     'never write or say tool names, <tool_call> tags, JSON or tool arguments',
                 ) &&
                 policy.includes(
-                    'short replies such as "yes", "no", "okay" and "thanks" as complete turns',
-                ),
+                    'single-word product choices and "thanks" as complete turns',
+                ) &&
+                policy.includes('never say you found products or state a count until that tool succeeds'),
             policy,
         );
     }

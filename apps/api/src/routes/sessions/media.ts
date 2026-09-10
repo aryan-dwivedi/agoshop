@@ -17,11 +17,15 @@ import {
     keyFromUrl,
     mirrorRecording,
 } from '@shop/platform/lib/objectStore.js';
+import {
+    recordingPlaybackPath,
+    streamRecording,
+} from '@shop/platform/lib/recordingPlayback.js';
 import { publishToSession } from '@shop/platform/lib/sse.js';
 import { requireSessionHost } from '@shop/platform/middleware/session.js';
 import { EVENTS } from '@shop/shared';
 
-import { idParam } from './schemas.js';
+import { idParam, slugParam } from './schemas.js';
 
 const EXT_BY_MIME: Record<string, string> = {
     'video/webm': 'webm',
@@ -97,6 +101,33 @@ const unlinkMedia = async (url: string | null): Promise<void> => {
     await unlink(join(env.RECORDING_LOCAL_DIR, filename)).catch(() => undefined);
 };
 export const registerMediaRoutes = (router: Router): void => {
+    router.get('/api/sessions/:slug/recording/play', async (req, res, next) => {
+        try {
+            const parsed = slugParam.safeParse(req.params.slug);
+            if (!parsed.success) throw badRequest('invalid_session_slug');
+            const sessionKey = parsed.data;
+            const [row] = await db
+                .select({
+                    recordingUrl: liveSessions.recordingUrl,
+                    recordingStatus: liveSessions.recordingStatus,
+                })
+                .from(liveSessions)
+                .where(
+                    idParam.safeParse(sessionKey).success
+                        ? eq(liveSessions.id, sessionKey)
+                        : eq(liveSessions.slug, sessionKey),
+                );
+            if (!row?.recordingUrl || row.recordingStatus !== 'ready') throw notFound('recording_not_found');
+            const served = await streamRecording(
+                row.recordingUrl,
+                typeof req.headers.range === 'string' ? req.headers.range : undefined,
+                res,
+            );
+            if (!served) throw notFound('recording_not_found');
+        } catch (err) {
+            next(err);
+        }
+    });
     router.post(
         '/api/sessions/:id/recording',
         requireSessionHost,
@@ -133,7 +164,7 @@ export const registerMediaRoutes = (router: Router): void => {
                     `sessions/${sessionId}/${req.file.filename}`,
                     req.file.mimetype || 'video/webm',
                 );
-                const recordingUrl = mirror.mirrored ? mirror.url : localUrl;
+                const recordingUrl = localUrl;
                 const updated = await db
                     .update(liveSessions)
                     .set({
@@ -143,14 +174,16 @@ export const registerMediaRoutes = (router: Router): void => {
                         recordingUrl,
                     })
                     .where(eq(liveSessions.id, sessionId))
-                    .returning({ id: liveSessions.id });
-                if (updated.length === 0) throw notFound('session_not_found');
+                    .returning({ id: liveSessions.id, slug: liveSessions.slug });
+                const saved = updated[0];
+                if (!saved) throw notFound('session_not_found');
+                const playbackUrl = recordingPlaybackPath(saved.slug);
                 await publishToSession(sessionId, EVENTS.recordingReady, {
                     sessionId,
-                    recordingUrl,
+                    recordingUrl: playbackUrl,
                 });
                 res.status(201).json({
-                    recordingUrl,
+                    recordingUrl: playbackUrl,
                     localUrl,
                     storage: mirror.mirrored ? 'object-store' : 'shared-volume',
                     storageReason: mirror.mirrored ? undefined : mirror.reason,

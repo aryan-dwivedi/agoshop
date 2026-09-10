@@ -2,7 +2,13 @@ import type { VoiceTranscriptItem } from './voiceTranscript';
 
 import { describe, expect, it } from 'vitest';
 
-import { orderVoiceTranscript, voiceTranscriptKey } from './voiceTranscript';
+import {
+    isVoiceTranscriptFinal,
+    orderVoiceTranscript,
+    voiceTranscriptKey,
+} from './voiceTranscript';
+
+import { TurnStatus } from 'agora-agent-client-toolkit';
 
 const item = (
     uid: string,
@@ -14,6 +20,13 @@ const item = (
     turn_id: turnId,
     stream_id: streamId,
     metadata: { object },
+});
+describe('voice transcript finality', () => {
+    it('treats completed and interrupted turns as final', () => {
+        expect(isVoiceTranscriptFinal(TurnStatus.END)).toBe(true);
+        expect(isVoiceTranscriptFinal(TurnStatus.INTERRUPTED)).toBe(true);
+        expect(isVoiceTranscriptFinal(TurnStatus.IN_PROGRESS)).toBe(false);
+    });
 });
 describe('voice transcript ordering', () => {
     it('puts a late greeting first and each user utterance before its answer', () => {

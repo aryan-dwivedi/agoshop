@@ -46,6 +46,8 @@ export const AssistantMessageList = ({
     onPrompt,
     promptsDisabled,
     showPrivateHint,
+    hideEmptyState = false,
+    voicePlaceholder = null,
 }: {
     lines: readonly AssistantLine[];
     firstName: string;
@@ -60,9 +62,17 @@ export const AssistantMessageList = ({
     onPrompt: (text: string) => void;
     promptsDisabled: boolean;
     showPrivateHint: boolean;
+    hideEmptyState?: boolean;
+    voicePlaceholder?: string | null;
 }): JSX.Element => (
     <div className="space-y-4">
-        {lines.length === 0 && (
+        {lines.length === 0 && hideEmptyState && voicePlaceholder ? (
+            <div className="flex items-start gap-2.5 px-1 pt-2">
+                <AgoAvatar size="sm" />
+                <p className="pt-1 text-14 text-t2">{voicePlaceholder}</p>
+            </div>
+        ) : null}
+        {lines.length === 0 && !hideEmptyState && (
             <div className="animate-fade-in px-1 pt-2">
                 <div className="flex items-start gap-3">
                     <AgoAvatar size="lg" />

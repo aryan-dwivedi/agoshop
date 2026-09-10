@@ -17,6 +17,7 @@ import {
 import { LOW_STOCK_THRESHOLD } from '@shop/domain-commerce/analytics.js';
 import { loadActivePromotions, withSessionLiveRule } from '@shop/domain-commerce/promotions.js';
 import { env } from '@shop/platform/env.js';
+import { recordingPlaybackPath } from '@shop/platform/lib/recordingPlayback.js';
 import {
     SAMPLE_LIVE_SOURCE_URL,
     buildPriceLadder,
@@ -155,7 +156,10 @@ const toDto = (
         hlsUrl: origin.hlsUrl,
         hlsOriginKind: origin.hlsOriginKind,
         recordingStatus: row.recordingStatus,
-        recordingUrl: row.recordingUrl,
+        recordingUrl:
+            row.recordingStatus === 'ready' && row.recordingUrl
+                ? recordingPlaybackPath(row.slug)
+                : null,
         rttStatus: row.rttStatus,
         transcriptSummary: row.transcriptSummary,
         viewerCount: viewers,

@@ -72,6 +72,7 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
     const [fullscreen, setFullscreen] = useState(false);
     const [controlsVisible, setControlsVisible] = useState(true);
     const [mediaError, setMediaError] = useState<string | null>(null);
+    const [reloadToken, setReloadToken] = useState(0);
     const clearHideTimer = useCallback(() => {
         if (hideTimerRef.current === null) return;
         window.clearTimeout(hideTimerRef.current);
@@ -115,7 +116,7 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
             video.removeAttribute('src');
             video.load();
         };
-    }, [fallbackDurationSeconds, src]);
+    }, [fallbackDurationSeconds, reloadToken, src]);
     const seekTo = useCallback(
         (seconds: number): void => {
             const video = videoRef.current;
@@ -323,7 +324,7 @@ export const ReplayPlayer = forwardRef<ReplayPlayerHandle, ReplayPlayerProps>(fu
                         className="rounded-full bg-white px-4 py-2 text-13 font-semibold text-black"
                         onClick={() => {
                             setMediaError(null);
-                            videoRef.current?.load();
+                            setReloadToken((current) => current + 1);
                         }}
                     >
                         Try again

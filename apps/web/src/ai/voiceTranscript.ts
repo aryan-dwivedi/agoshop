@@ -1,4 +1,8 @@
+import { TurnStatus } from 'agora-agent-client-toolkit';
+
 const USER_TRANSCRIPTION = 'user.transcription';
+export const isVoiceTranscriptFinal = (status: TurnStatus): boolean =>
+    status === TurnStatus.END || status === TurnStatus.INTERRUPTED;
 export type VoiceTranscriptItem = {
     uid: string;
     turn_id: number;

@@ -10,6 +10,8 @@ export default defineConfig({
             'apps/api/src/__tests__/**/*.test.ts',
             'apps/web/src/**/*.test.ts',
             'packages/shared/**/*.test.ts',
+            'packages/ai/**/*.test.ts',
+            'packages/platform/**/*.test.ts',
         ],
         environment: 'node',
         testTimeout: 180000,

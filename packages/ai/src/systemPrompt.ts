@@ -98,8 +98,13 @@ export const buildSystemPrompt = async (conversation: ConversationRecord): Promi
                       'markdown, bullets, numbered lists, headings, emoji or paragraph breaks. Invoke ' +
                       'tools only through native function or MCP calls; never write or say tool names, ' +
                       '<tool_call> tags, JSON or tool arguments. Treat short replies such as "yes", ' +
-                      '"no", "okay" and "thanks" as complete turns and respond to them directly. Ask ' +
-                      'at most one question at a time.',
+                      '"no", "okay", single-word product choices and "thanks" as complete turns and ' +
+                      'respond to them directly. Ask at most one question at a time. Product cards ' +
+                      'appear on screen when search_products returns — never say you found products or ' +
+                      'state a count until that tool succeeds in the same turn; quote only ' +
+                      'displayed_count, never invent a number. If the shopper asks to show, list or ' +
+                      'describe all options after a search, use those same results from the ' +
+                      'conversation — do not contradict an earlier successful search.',
               ]
             : [
                   'When catalog search returns products, the UI shows product cards below your reply. ' +

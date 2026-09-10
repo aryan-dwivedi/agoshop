@@ -17,7 +17,7 @@ const endpointUrl = (): string | undefined => {
         : `https://${env.RECORDING_STORAGE_ENDPOINT}`;
 };
 let client: S3Client | null = null;
-const s3 = (): S3Client => {
+export const s3Client = (): S3Client => {
     if (client) return client;
     client = new S3Client({
         region: env.RECORDING_STORAGE_REGION || 'us-east-1',
@@ -54,7 +54,7 @@ export const mirrorRecording = async (
     if (!objectStoreConfigured) return { mirrored: false, reason: 'object_store_not_configured' };
     try {
         const { size } = await stat(localPath);
-        await s3().send(
+        await s3Client().send(
             new PutObjectCommand({
                 Bucket: env.RECORDING_STORAGE_BUCKET,
                 Key: key,
@@ -78,7 +78,7 @@ export const mirrorRecording = async (
 export const deleteRecordingObject = async (key: string): Promise<boolean> => {
     if (!objectStoreConfigured) return false;
     try {
-        await s3().send(
+        await s3Client().send(
             new DeleteObjectCommand({
                 Bucket: env.RECORDING_STORAGE_BUCKET,
                 Key: key,

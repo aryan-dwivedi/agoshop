@@ -205,10 +205,11 @@ export const AssistantPanel = ({
         (agent.mode === 'voice' && (agent.phase === 'starting' || agent.phase === 'active'));
     const voiceCall = agent.mode === 'voice' && (agent.phase === 'active' || humanActive);
     const micLive = voiceBusy || dictation.listening;
+    const agoraThinking =
+        (agent.phase === 'active' || agent.phase === 'starting') &&
+        agent.agentState === AgentState.THINKING;
     const thinking =
-        agent.textPending ||
-        agent.textAssist.pending ||
-        (agent.phase === 'active' && agent.agentState === AgentState.THINKING);
+        agent.textPending || agent.textAssist.pending || agoraThinking;
     const listening =
         dictation.listening ||
         (voiceBusy && (agent.agentState === null || agent.agentState === AgentState.LISTENING));
@@ -304,6 +305,15 @@ export const AssistantPanel = ({
         agent.phase === 'starting' ||
         agent.phase === 'active'
             ? agent.phase
+            : null;
+    const hideEmptyState = voiceBusy || voiceConnecting;
+    const voicePlaceholder =
+        lines.length === 0 && hideEmptyState
+            ? voiceConnecting
+                ? 'Ago is getting ready…'
+                : agent.agentState === AgentState.SPEAKING
+                  ? 'Ago is saying hello…'
+                  : null
             : null;
 
     return (
@@ -408,6 +418,8 @@ export const AssistantPanel = ({
                     onPrompt={(text) => void sendText(text)}
                     promptsDisabled={agent.textPending || agent.textAssist.pending}
                     showPrivateHint={surface === 'live' || surface === 'replay'}
+                    hideEmptyState={hideEmptyState}
+                    voicePlaceholder={voicePlaceholder}
                 />
             </div>
 

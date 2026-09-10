@@ -43,6 +43,7 @@ const schema = z
         CONVOAI_ENABLED: bool.default('true'),
         CONVOAI_MAX_CONCURRENT_AGENTS: int(15),
         CONVOAI_IDLE_TIMEOUT_SECONDS: int(120),
+        CONVOAI_LATENCY_PROFILE: z.enum(['fast', 'balanced']).default('fast'),
         CONVOAI_SUPPORTED_LANGUAGES: csv('en-US,hi-IN,es-ES'),
         CONVO_LLM_SHARED_SECRET: z.string().min(16),
         CONVO_CALLBACK_TTL_SECONDS: int(7200),

@@ -6,17 +6,23 @@ import { and, desc, eq, gt, isNotNull } from 'drizzle-orm';
 import { interruptConvoAiAgent, joinConvoAiAgent, leaveConvoAiAgent } from '@shop/agora/convoai.js';
 import { mintRtcToken, nextAgoraUid } from '@shop/agora/tokens.js';
 import { db } from '@shop/db/client.js';
-import { aiConversations, aiMessages, liveSessions } from '@shop/db/schema.js';
+import { aiConversations, aiMessages, liveSessions, users } from '@shop/db/schema.js';
 import { env, features } from '@shop/platform/env.js';
 import { track } from '@shop/platform/lib/analytics.js';
 import { AppError, badRequest, conflict, forbidden, notFound } from '@shop/platform/lib/errors.js';
 import { logger } from '@shop/platform/lib/logger.js';
 import { keys, redis } from '@shop/platform/lib/redis.js';
-import { LANGUAGE_AUTO, aiChannelForConversation, resolveSpokenLanguage } from '@shop/shared';
+import {
+    LANGUAGE_AUTO,
+    aiChannelForConversation,
+    isGuestEmail,
+    resolveSpokenLanguage,
+} from '@shop/shared';
 
 import { acquireSlot, refreshSlot, releaseSlot } from './admission.js';
 import { signCallback } from './callbackAuth.js';
 import { buildSystemPrompt } from './systemPrompt.js';
+import { formatVoiceGreeting } from './voiceGreeting.js';
 
 export type ConversationRecord = {
     id: string;
@@ -33,16 +39,6 @@ export type ConversationRecord = {
     agoraAgentId: string | null;
     callbackExpiresAt: Date;
     status: 'created' | 'running' | 'stopped' | 'failed';
-};
-const GREETINGS: Record<string, string> = {
-    'en-US':
-        'Hi! I can help you compare these products, check delivery, and add anything to your cart. What are you looking for?',
-    'en-IN':
-        'Hi! I can help you compare these products, check delivery, and add anything to your cart. What are you looking for?',
-    'hi-IN':
-        'नमस्ते! मैं इन प्रोडक्ट्स की तुलना कर सकता हूँ, डिलीवरी देख सकता हूँ और कार्ट में जोड़ सकता हूँ। आप क्या ढूंढ रहे हैं?',
-    'es-ES':
-        '¡Hola! Puedo comparar estos productos, comprobar la entrega y añadir lo que quieras al carrito. ¿Qué estás buscando?',
 };
 export const loadConversation = async (id: string): Promise<ConversationRecord | null> => {
     const [row] = await db
@@ -176,6 +172,16 @@ export const createConversation = async (
         surface: input.surface,
     };
 };
+const shopperFirstName = async (userId: string): Promise<string | null> => {
+    const [row] = await db
+        .select({ displayName: users.displayName, email: users.email })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+    if (!row || isGuestEmail(row.email)) return null;
+    const first = row.displayName.trim().split(/\s+/)[0];
+    return first && first.length > 0 ? first : null;
+};
 const buildConvoAiJoinParams = async (
     conversation: ConversationRecord,
 ): Promise<Parameters<typeof joinConvoAiAgent>[0]> => {
@@ -197,7 +203,11 @@ const buildConvoAiJoinParams = async (
         viewerUid: conversation.viewerUid,
         language: spokenLanguage,
         systemPrompt: await buildSystemPrompt(conversation),
-        greeting: GREETINGS[spokenLanguage] ?? GREETINGS['en-US']!,
+        greeting: formatVoiceGreeting({
+            surface: conversation.surface,
+            spokenLanguage,
+            firstName: await shopperFirstName(conversation.userId),
+        }),
         signature: signCallback(conversation.id, expires),
         expires,
     };

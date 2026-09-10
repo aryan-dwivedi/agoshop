@@ -15,9 +15,89 @@ const MANAGED_TTS = {
     url: 'wss://api.minimax.io/ws/v1/t2a_v2',
     model: 'speech-2.8-turbo',
     voiceId: 'English_captivating_female1',
-    speed: 1.0,
+    speed: 1.15,
     sampleRate: 44100,
 } as const;
+const BALANCED_TTS_SPEED = 1.0;
+const latencyProfile = (): 'fast' | 'balanced' => {
+    const raw = process.env.CONVOAI_LATENCY_PROFILE?.trim();
+    if (raw === 'balanced' || raw === 'fast') return raw;
+    return env.CONVOAI_LATENCY_PROFILE;
+};
+export const buildConvoAiTurnDetection = (
+    profile: 'fast' | 'balanced' = latencyProfile(),
+): Record<string, unknown> => {
+    if (profile === 'balanced') {
+        return {
+            mode: 'default',
+            config: {
+                speech_threshold: 0.4,
+                start_of_speech: {
+                    mode: 'vad',
+                    vad_config: {
+                        interrupt_duration_ms: 120,
+                        speaking_interrupt_duration_ms: 320,
+                        prefix_padding_ms: 480,
+                    },
+                },
+                end_of_speech: {
+                    mode: 'semantic',
+                    semantic_config: {
+                        silence_duration_ms: 400,
+                        max_wait_ms: 800,
+                        pause_state_enabled: true,
+                    },
+                },
+            },
+        };
+    }
+    return {
+        mode: 'default',
+        config: {
+            speech_threshold: 0.5,
+            start_of_speech: {
+                mode: 'vad',
+                vad_config: {
+                    interrupt_duration_ms: 100,
+                    speaking_interrupt_duration_ms: 240,
+                    prefix_padding_ms: 300,
+                },
+            },
+            end_of_speech: {
+                mode: 'vad',
+                vad_config: {
+                    silence_duration_ms: 280,
+                },
+            },
+        },
+    };
+};
+export const buildConvoAiLlmParams = (
+    profile: 'fast' | 'balanced' = latencyProfile(),
+): Record<string, unknown> => ({
+    model: env.AGORA_MANAGED_LLM_MODEL,
+    temperature: profile === 'fast' ? 0.2 : 0.3,
+    max_tokens: profile === 'fast' ? 72 : 120,
+    stream: true,
+});
+export const buildConvoAiTtsBlock = (
+    _language: string,
+    profile: 'fast' | 'balanced' = latencyProfile(),
+): Record<string, unknown> => ({
+    vendor: MANAGED_TTS.vendor,
+    credential_mode: 'managed',
+    params: {
+        url: MANAGED_TTS.url,
+        model: MANAGED_TTS.model,
+        voice_setting: {
+            voice_id: MANAGED_TTS.voiceId,
+            speed: profile === 'fast' ? MANAGED_TTS.speed : BALANCED_TTS_SPEED,
+        },
+        audio_setting: {
+            sample_rate: MANAGED_TTS.sampleRate,
+        },
+    },
+});
 export type ConvoAiJoinInput = {
     conversationId: string;
     channel: string;
@@ -29,21 +109,6 @@ export type ConvoAiJoinInput = {
     signature: string;
     expires: number;
 };
-export const buildConvoAiTtsBlock = (_language: string): Record<string, unknown> => ({
-    vendor: MANAGED_TTS.vendor,
-    credential_mode: 'managed',
-    params: {
-        url: MANAGED_TTS.url,
-        model: MANAGED_TTS.model,
-        voice_setting: {
-            voice_id: MANAGED_TTS.voiceId,
-            speed: MANAGED_TTS.speed,
-        },
-        audio_setting: {
-            sample_rate: MANAGED_TTS.sampleRate,
-        },
-    },
-});
 const studioPipelineId = (): string => {
     if (process.env.AGORA_STUDIO_PIPELINE_ID !== undefined) {
         return process.env.AGORA_STUDIO_PIPELINE_ID.trim();
@@ -128,11 +193,7 @@ const buildProgrammaticLlmBlock = (input: ConvoAiJoinInput): Record<string, unkn
         vendor: 'openai',
         style: 'openai',
         url: 'https://api.openai.com/v1/chat/completions',
-        params: {
-            model: env.AGORA_MANAGED_LLM_MODEL,
-            temperature: 0.4,
-            max_tokens: 160,
-        },
+        params: buildConvoAiLlmParams(),
         mcp_servers: buildProgrammaticMcpServers(input),
         system_messages: [
             {
@@ -142,7 +203,7 @@ const buildProgrammaticLlmBlock = (input: ConvoAiJoinInput): Record<string, unkn
         ],
         greeting_message: input.greeting,
         greeting_configs: {
-            interruptable: false,
+            interruptable: true,
         },
         failure_message: CONVOAI_FAILURE_MESSAGE,
         max_history: 24,
@@ -160,28 +221,7 @@ const buildProgrammaticProperties = (input: ConvoAiJoinInput): Record<string, un
         enable_metrics: true,
         enable_error_message: true,
     },
-    turn_detection: {
-        mode: 'default',
-        config: {
-            speech_threshold: 0.5,
-            start_of_speech: {
-                mode: 'vad',
-                vad_config: {
-                    interrupt_duration_ms: 120,
-                    speaking_interrupt_duration_ms: 320,
-                    prefix_padding_ms: 800,
-                },
-            },
-            end_of_speech: {
-                mode: 'semantic',
-                semantic_config: {
-                    silence_duration_ms: 320,
-                    max_wait_ms: 1200,
-                    pause_state_enabled: true,
-                },
-            },
-        },
-    },
+    turn_detection: buildConvoAiTurnDetection(),
     interruption: {
         enable: true,
         mode: 'start_of_speech',

@@ -3,6 +3,10 @@ import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 import { db } from '@shop/db/client.js';
 import { liveSessions } from '@shop/db/schema.js';
 import { env, isRecordingViaAgora } from '@shop/platform/env.js';
+import {
+    normalizeStoredRecordingUrl,
+    recordingPlaybackPath,
+} from '@shop/platform/lib/recordingPlayback.js';
 import { logger } from '@shop/platform/lib/logger.js';
 import { redis } from '@shop/platform/lib/redis.js';
 import { publishToSession } from '@shop/platform/lib/sse.js';
@@ -178,6 +182,7 @@ export const stopRecording = async (sessionId: string): Promise<void> => {
     if (!isRecordingViaAgora) return;
     const [row] = await db
         .select({
+            slug: liveSessions.slug,
             channel: liveSessions.rtcChannel,
             resourceId: liveSessions.recordingResourceId,
             sid: liveSessions.recordingSid,
@@ -212,13 +217,14 @@ export const stopRecording = async (sessionId: string): Promise<void> => {
             .where(eq(liveSessions.id, sessionId));
         return;
     }
+    const recordingUrl = normalizeStoredRecordingUrl(file);
     await db
         .update(liveSessions)
-        .set({ recordingStatus: 'ready', recordingUrl: file, recordingError: null })
+        .set({ recordingStatus: 'ready', recordingUrl, recordingError: null })
         .where(eq(liveSessions.id, sessionId));
     await publishToSession(sessionId, EVENTS.recordingReady, {
         sessionId,
-        recordingUrl: file,
+        recordingUrl: recordingPlaybackPath(row.slug),
     });
 };
 export const listPollableRecordingSessionIds = async (): Promise<string[]> => {
@@ -238,6 +244,7 @@ export const pollRecording = async (sessionId: string): Promise<void> => {
     if (!isRecordingViaAgora) return;
     const [row] = await db
         .select({
+            slug: liveSessions.slug,
             resourceId: liveSessions.recordingResourceId,
             sid: liveSessions.recordingSid,
             status: liveSessions.recordingStatus,
@@ -257,13 +264,14 @@ export const pollRecording = async (sessionId: string): Promise<void> => {
     if (!queried.ok) return;
     const file = fileListUrl(queried.json);
     if (!file) return;
+    const recordingUrl = normalizeStoredRecordingUrl(file);
     await db
         .update(liveSessions)
-        .set({ recordingStatus: 'ready', recordingUrl: file, recordingError: null })
+        .set({ recordingStatus: 'ready', recordingUrl, recordingError: null })
         .where(eq(liveSessions.id, sessionId));
     await publishToSession(sessionId, EVENTS.recordingReady, {
         sessionId,
-        recordingUrl: file,
+        recordingUrl: recordingPlaybackPath(row.slug),
     });
 };
 export const onRecordingWebhook = async (a: {
@@ -272,7 +280,11 @@ export const onRecordingWebhook = async (a: {
     payload: Record<string, unknown>;
 }): Promise<void> => {
     const [row] = await db
-        .select({ id: liveSessions.id, status: liveSessions.recordingStatus })
+        .select({
+            id: liveSessions.id,
+            slug: liveSessions.slug,
+            status: liveSessions.recordingStatus,
+        })
         .from(liveSessions)
         .where(eq(liveSessions.recordingSid, a.sid));
     if (!row) return;
@@ -280,7 +292,8 @@ export const onRecordingWebhook = async (a: {
     if (a.eventType === 31) {
         const details = a.payload['details'] as Record<string, unknown> | undefined;
         const fileName = details?.['fileName'];
-        const url = typeof fileName === 'string' ? fileName : null;
+        const raw = typeof fileName === 'string' ? fileName : null;
+        const url = raw ? normalizeStoredRecordingUrl(raw) : null;
         await db
             .update(liveSessions)
             .set({
@@ -291,7 +304,7 @@ export const onRecordingWebhook = async (a: {
         if (url) {
             await publishToSession(row.id, EVENTS.recordingReady, {
                 sessionId: row.id,
-                recordingUrl: url,
+                recordingUrl: recordingPlaybackPath(row.slug),
             });
         }
         return;

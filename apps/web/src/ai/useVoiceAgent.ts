@@ -1,6 +1,6 @@
 import type { UseTextAssistResult } from './useTextAssist';
 import type { AiProductCard, CreateConversationDto, ServerEvent, Surface } from '@shop/shared';
-import type { AgentState, RTCEngine, RTMEngine } from 'agora-agent-client-toolkit';
+import type { RTCEngine, RTMEngine } from 'agora-agent-client-toolkit';
 import type {
     IAgoraRTCClient,
     IAgoraRTCRemoteUser,
@@ -9,13 +9,13 @@ import type {
 } from 'agora-rtc-sdk-ng';
 
 import {
+    AgentState,
     AgoraVoiceAI,
     AgoraVoiceAIEvents,
     ChatMessagePriority,
     ChatMessageType,
     MessageType,
     TranscriptHelperMode,
-    TurnStatus,
 } from 'agora-agent-client-toolkit';
 import AgoraRTC from 'agora-rtc-sdk-ng';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -32,7 +32,11 @@ import { useServerEvents } from '../lib/useServerEvents';
 import { useRtm } from '../realtime/RtmProvider';
 import { useSession } from '../state/session';
 import { useTextAssist } from './useTextAssist';
-import { orderVoiceTranscript, voiceTranscriptKey } from './voiceTranscript';
+import {
+    isVoiceTranscriptFinal,
+    orderVoiceTranscript,
+    voiceTranscriptKey,
+} from './voiceTranscript';
 
 export type VoiceAgentPhase =
     'idle' | 'starting' | 'active' | 'stopping' | 'human_waiting' | 'human_active' | 'error';
@@ -79,6 +83,21 @@ const HANDOFF_BUSY =
     'You are already waiting for a support agent. Keep this window open until someone joins.';
 const DUCKED_VOLUME = 15;
 const FULL_VOLUME = 100;
+const isConvoAgentUid = (remoteUid: string | number, agentUid: number): boolean =>
+    agentUid > 0 && String(remoteUid) === String(agentUid);
+const playConvoAgentAudio = async (
+    client: IAgoraRTCClient,
+    agentUid: number,
+): Promise<void> => {
+    if (agentUid <= 0) return;
+    for (const remote of client.remoteUsers) {
+        if (!isConvoAgentUid(remote.uid, agentUid) || !remote.hasAudio) continue;
+        if (!remote.audioTrack) {
+            await client.subscribe(remote, 'audio');
+        }
+        remote.audioTrack?.play();
+    }
+};
 export type UseVoiceAgentResult = {
     phase: VoiceAgentPhase;
     mode: VoiceAgentMode;
@@ -128,6 +147,8 @@ export const useVoiceAgent = (opts: {
     const [capacityNotice, setCapacityNotice] = useState<string | null>(null);
     const [handoffNotice, setHandoffNotice] = useState<string | null>(null);
     const [agentState, setAgentState] = useState<AgentState | null>(null);
+    const agentStateRef = useRef<AgentState | null>(null);
+    agentStateRef.current = agentState;
     const [voiceLines, setVoiceLines] = useState<AssistantLine[]>([]);
     const [textPending, setTextPending] = useState(false);
     const textPendingRef = useRef(false);
@@ -231,6 +252,18 @@ export const useVoiceAgent = (opts: {
             if (mediaType !== 'audio') return;
             void (async () => {
                 try {
+                    const session = sessionRef.current;
+                    const handoff =
+                        phaseRef.current === 'human_waiting' ||
+                        phaseRef.current === 'human_active';
+                    if (
+                        session &&
+                        isConvoAgentUid(remote.uid, session.agentUid) &&
+                        !session.mic &&
+                        !handoff
+                    ) {
+                        return;
+                    }
                     await client.subscribe(remote, 'audio');
                     const track = remote.audioTrack;
                     track?.play();
@@ -306,13 +339,25 @@ export const useVoiceAgent = (opts: {
                                 : 'assistant',
                         text: item.text,
                         language: item.metadata?.language ?? spokenLanguageRef.current,
-                        final: item.status === TurnStatus.END,
+                        final: isVoiceTranscriptFinal(item.status),
                         products: [],
                         turnId: item.turn_id,
                     })),
             );
         });
+        toolkit.on(AgoraVoiceAIEvents.AGENT_INTERRUPTED, (_agentUserId, event) => {
+            agentStateRef.current = AgentState.LISTENING;
+            setAgentState(AgentState.LISTENING);
+            setVoiceLines((lines) =>
+                lines.map((line) =>
+                    line.role === 'assistant' && line.turnId === event.turnID && !line.final
+                        ? { ...line, final: true }
+                        : line,
+                ),
+            );
+        });
         toolkit.on(AgoraVoiceAIEvents.AGENT_STATE_CHANGED, (_agentUserId, event) => {
+            agentStateRef.current = event.state;
             setAgentState(event.state);
         });
     }, []);
@@ -333,6 +378,7 @@ export const useVoiceAgent = (opts: {
                     existing.mic = mic;
                     setMicTrack(mic);
                     duckRef.current?.setVolume(DUCKED_VOLUME);
+                    await playConvoAgentAudio(existing.client, existing.agentUid);
                 }
                 if (opts.withMic) setMode('voice');
                 return existing;
@@ -367,28 +413,54 @@ export const useVoiceAgent = (opts: {
                         conversation.rtcToken,
                         conversation.viewerUid,
                     );
+                    const startPromise = api.post(
+                        `/api/ai/conversations/${conversation.conversationId}/start`,
+                    );
+                    const setup = await Promise.all([
+                        startPromise,
+                        (async (): Promise<{
+                            mic: IMicrophoneAudioTrack | null;
+                            releaseRtm: () => void;
+                            toolkit: AgoraVoiceAI;
+                        }> => {
+                            let localMic: IMicrophoneAudioTrack | null = null;
+                            if (opts.withMic) {
+                                localMic = await AgoraRTC.createMicrophoneAudioTrack({
+                                    AEC: true,
+                                    ANS: true,
+                                    AGC: true,
+                                    encoderConfig: 'speech_standard',
+                                });
+                                await client!.publish([localMic]);
+                                setMicTrack(localMic);
+                                duckRef.current?.setVolume(DUCKED_VOLUME);
+                            }
+                            const subscribed = await rtmRef.current.subscribe(
+                                channel,
+                                () => undefined,
+                            );
+                            const rtmClient = rtmRef.current.client;
+                            if (!rtmClient) throw new Error('rtm_unavailable');
+                            const voiceToolkit = await AgoraVoiceAI.init({
+                                rtcEngine: client as RTCEngine,
+                                rtmEngine: rtmClient as RTMEngine,
+                                renderMode: TranscriptHelperMode.TEXT,
+                            });
+                            bindToolkitHandlers(voiceToolkit);
+                            voiceToolkit.subscribeMessage(channel);
+                            return {
+                                mic: localMic,
+                                releaseRtm: subscribed,
+                                toolkit: voiceToolkit,
+                            };
+                        })(),
+                    ]);
+                    mic = setup[1].mic;
+                    releaseRtm = setup[1].releaseRtm;
+                    toolkit = setup[1].toolkit;
                     if (opts.withMic) {
-                        mic = await AgoraRTC.createMicrophoneAudioTrack({
-                            AEC: true,
-                            ANS: true,
-                            AGC: true,
-                            encoderConfig: 'speech_standard',
-                        });
-                        await client.publish([mic]);
-                        setMicTrack(mic);
-                        duckRef.current?.setVolume(DUCKED_VOLUME);
+                        await playConvoAgentAudio(client, conversation.agentUid);
                     }
-                    releaseRtm = await rtmRef.current.subscribe(channel, () => undefined);
-                    const rtmClient = rtmRef.current.client;
-                    if (!rtmClient) throw new Error('rtm_unavailable');
-                    toolkit = await AgoraVoiceAI.init({
-                        rtcEngine: client as RTCEngine,
-                        rtmEngine: rtmClient as RTMEngine,
-                        renderMode: TranscriptHelperMode.TEXT,
-                    });
-                    bindToolkitHandlers(toolkit);
-                    toolkit.subscribeMessage(channel);
-                    await api.post(`/api/ai/conversations/${conversation.conversationId}/start`);
                     const heartbeat = window.setInterval(() => {
                         void api
                             .post(`/api/ai/conversations/${conversation?.conversationId}/heartbeat`)
@@ -585,6 +657,29 @@ export const useVoiceAgent = (opts: {
         setPhase('idle');
         setVoiceLines([]);
     }, [teardownMedia]);
+    const sendTextViaToolkit = async (session: ActiveSession, body: string): Promise<void> => {
+        if (!session.toolkit) throw new Error('toolkit_unavailable');
+        const agentUid = String(session.agentUid);
+        if (agentStateRef.current === AgentState.SPEAKING) {
+            await session.toolkit.interrupt(agentUid).catch(() => undefined);
+        }
+        await session.toolkit.sendText(agentUid, {
+            messageType: ChatMessageType.TEXT,
+            priority: ChatMessagePriority.INTERRUPTED,
+            responseInterruptable: true,
+            text: body,
+        });
+    };
+    const sendTextFallback = useCallback(
+        async (body: string): Promise<void> => {
+            try {
+                await textAssist.send(body);
+            } catch {
+                setError(ACTION_FAILED);
+            }
+        },
+        [textAssist],
+    );
     const sendText = useCallback(
         async (text: string): Promise<void> => {
             const body = text.trim();
@@ -593,40 +688,40 @@ export const useVoiceAgent = (opts: {
                 setHandoffNotice(HANDOFF_BUSY);
                 return;
             }
-            const voiceCallActive = Boolean(sessionRef.current?.mic);
-            if (!agoraAvailable || !voiceCallActive) {
-                await textAssist.send(body);
+            if (!agoraAvailable) {
+                await sendTextFallback(body);
                 return;
             }
             textPendingRef.current = true;
             setTextPending(true);
             setError(null);
+            const bootstrapping = phaseRef.current === 'idle';
+            if (bootstrapping) {
+                phaseRef.current = 'starting';
+                setPhase('starting');
+            }
             try {
-                const session = sessionRef.current;
-                if (!session?.toolkit) {
-                    await textAssist.send(body);
-                    return;
-                }
-                await session.toolkit.sendText(String(session.agentUid), {
-                    messageType: ChatMessageType.TEXT,
-                    priority: ChatMessagePriority.INTERRUPTED,
-                    responseInterruptable: true,
-                    text: body,
-                });
+                const withMic = Boolean(sessionRef.current?.mic);
+                const session = await ensureAgoraSession({ withMic });
+                await sendTextViaToolkit(session, body);
             } catch (err) {
                 const capacityExhausted =
                     err instanceof ApiError && err.status === 503 && err.code === 'ai_capacity';
                 if (capacityExhausted) {
                     setCapacityNotice(VOICE_BUSY);
-                    setPhase('idle');
+                }
+                if (bootstrapping || capacityExhausted) {
                     await teardownMedia();
-                    try {
-                        await textAssist.send(body);
-                        return;
-                    } catch {
-                        setError(ACTION_FAILED);
-                        return;
-                    }
+                    conversationIdRef.current = null;
+                    setConversationId(null);
+                    setAgentState(null);
+                    setMode('text');
+                    phaseRef.current = 'idle';
+                    setPhase('idle');
+                }
+                if (capacityExhausted || bootstrapping) {
+                    await sendTextFallback(body);
+                    return;
                 }
                 setError(ACTION_FAILED);
             } finally {
@@ -634,7 +729,7 @@ export const useVoiceAgent = (opts: {
                 setTextPending(false);
             }
         },
-        [agoraAvailable, teardownMedia, textAssist],
+        [agoraAvailable, ensureAgoraSession, sendTextFallback, teardownMedia],
     );
     const start = useCallback(async (): Promise<void> => {
         if (phase === 'starting') return;

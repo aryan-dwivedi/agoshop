@@ -46,7 +46,7 @@ describe('ConvoAI speech handling', () => {
                 advanced_features: { enable_tools?: boolean };
             };
         };
-        expect(body.properties.llm.greeting_configs).toEqual({ interruptable: false });
+        expect(body.properties.llm.greeting_configs).toEqual({ interruptable: true });
         expect(body.properties.parameters).toMatchObject({
             data_channel: 'rtm',
             audio_scenario: 'chorus',
@@ -56,9 +56,45 @@ describe('ConvoAI speech handling', () => {
         expect(body.properties.tts?.credential_mode).toBe('managed');
         expect(body.properties.tts?.params).toMatchObject({
             model: 'speech-2.8-turbo',
-            voice_setting: { speed: 1.0 },
+            voice_setting: { speed: 1.15 },
         });
-        expect(body.properties.llm).toMatchObject({ params: { max_tokens: 160 } });
+        expect(body.properties.llm).toMatchObject({
+            params: { max_tokens: 72, temperature: 0.2, stream: true },
+        });
+        expect(body.properties.turn_detection).toMatchObject({
+            config: {
+                speech_threshold: 0.5,
+                end_of_speech: {
+                    mode: 'vad',
+                    vad_config: {
+                        silence_duration_ms: 280,
+                    },
+                },
+            },
+        });
+    });
+    it('uses balanced latency settings when CONVOAI_LATENCY_PROFILE=balanced', () => {
+        vi.stubEnv('CONVOAI_LATENCY_PROFILE', 'balanced');
+        const body = buildConvoAiJoinBody(input) as {
+            properties: {
+                llm: { params?: { max_tokens?: number; stream?: boolean } };
+                tts?: { params?: { voice_setting?: { speed?: number } } };
+                turn_detection: {
+                    config?: {
+                        end_of_speech?: { mode?: string; semantic_config?: { max_wait_ms?: number } };
+                    };
+                };
+            };
+        };
+        expect(body.properties.llm.params).toMatchObject({
+            max_tokens: 120,
+            stream: true,
+        });
+        expect(body.properties.tts?.params?.voice_setting?.speed).toBe(1);
+        expect(body.properties.turn_detection.config?.end_of_speech).toMatchObject({
+            mode: 'semantic',
+            semantic_config: { max_wait_ms: 800 },
+        });
     });
     it('configures the MCP LLM with Agora-managed OpenAI credentials', () => {
         const body = buildConvoAiJoinBody(input) as {
@@ -78,7 +114,7 @@ describe('ConvoAI speech handling', () => {
                 model: 'speech-2.8-turbo',
                 voice_setting: {
                     voice_id: 'English_captivating_female1',
-                    speed: 1.0,
+                    speed: 1.15,
                 },
             },
         });
