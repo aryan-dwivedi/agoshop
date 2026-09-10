@@ -58,7 +58,7 @@ export const buildConvoAiTurnDetection = (
             start_of_speech: {
                 mode: 'vad',
                 vad_config: {
-                    interrupt_duration_ms: 100,
+                    interrupt_duration_ms: 120,
                     speaking_interrupt_duration_ms: 240,
                     prefix_padding_ms: 300,
                 },
