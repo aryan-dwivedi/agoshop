@@ -69,10 +69,17 @@ const MAX_PAGE_SIZE = 48;
 const JSON_TEXT = (column: SQL): SQL => sql`translate(${column}::text, '[]{}",:', '       ')`;
 const FTS = sql`to_tsvector('english', coalesce(p.title, '') || ' ' || coalesce(p.brand, '') || ' ' || coalesce(p.description, '') || ' ' || ${JSON_TEXT(sql`p.highlights`)} || ' ' || ${JSON_TEXT(sql`p.specs`)})`;
 type MatchMode = 'all' | 'any';
+
+const searchTermCount = (raw: string): number =>
+    raw
+        .trim()
+        .split(/\s+/)
+        .filter((word) => word.length > 0)
+        .reduce((count, word) => count + word.split('-').filter((part) => part.length > 0).length, 0);
 const tsQuery = (text: string, mode: MatchMode): SQL =>
     mode === 'all'
-        ? sql`plainto_tsquery('english', ${text})`
-        : sql`replace(plainto_tsquery('english', ${text})::text, ' & ', ' | ')::tsquery`;
+        ? sql`websearch_to_tsquery('english', ${text})`
+        : sql`replace(websearch_to_tsquery('english', ${text})::text, ' & ', ' | ')::tsquery`;
 const JOINS = sql`
   from products p
   join categories c on c.id = p.category_id
@@ -246,18 +253,23 @@ export const listCategories = async (): Promise<CategoryDto[]> =>
         }));
     });
 const resolveMatchMode = async (q: ProductQuery, match: TextMatch): Promise<MatchMode> => {
-    if (!q.q) return 'all';
+    const text = q.q;
+    if (!text) return 'all';
     const probe: ProductQuery = {
         ...q,
         page: undefined,
         pageSize: undefined,
         sort: undefined,
     };
+    const terms = searchTermCount(text);
     return cached<MatchMode>(cacheKeys.productQuery(`match:${queryHash(probe)}`), 60, async () => {
         const { rows } = await db.execute(
             sql`select 1${FROM_LEAN}${buildWhere(probe, 'all', match)} limit 1`,
         );
-        return rows.length > 0 ? 'all' : 'any';
+        if (rows.length > 0) return 'all';
+        // Relaxing to OR on longer queries matches unrelated products on individual
+        // colour or material tokens. Only widen the shortest searches.
+        return terms <= 2 ? 'any' : 'all';
     });
 };
 const normalizePageQuery = (

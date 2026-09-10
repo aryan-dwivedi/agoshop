@@ -444,6 +444,19 @@ const run = async (): Promise<void> => {
                 .join(', ')}`,
         );
         pass('catalog audience filter keeps men tshirt results adult and male');
+        const looseGlasses = await listProducts({
+            q: 'blue-ray glasses',
+            audience: 'women',
+            sort: 'relevance',
+            page: 1,
+            pageSize: 6,
+        });
+        assert.equal(
+            looseGlasses.total,
+            0,
+            'multi-word searches must not widen to unrelated colour matches',
+        );
+        pass('multi-word catalog search stays strict when every term does not match');
         const first = await api.request<CartDto>(
             'POST',
             '/api/cart/items',
