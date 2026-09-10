@@ -109,7 +109,9 @@ export const buildSystemPrompt = async (conversation: ConversationRecord): Promi
             : [
                   'When catalog search returns products, the UI shows product cards below your reply. ' +
                       'Do not enumerate product titles in prose — give a brief summary such as "I found ' +
-                      'a few options" and one follow-up question.',
+                      'a few options". Ask a follow-up only when you truly need product type, size, or ' +
+                      'budget — never ask men/women/unisex unless the shopper is buying gendered apparel ' +
+                      'and did not specify.',
               ]),
         surfaceLine,
         featured,
@@ -137,14 +139,16 @@ export const buildSystemPrompt = async (conversation: ConversationRecord): Promi
             'an agent joins.',
         'You get at most three tool rounds per turn. Search once with a compact keyword query — ' +
             "never the shopper's whole sentence — while preserving every hard constraint they gave, " +
-            'including audience or gender, product type, brand, color, material and price. The audience ' +
-            'argument is mandatory: use men, women or unisex when requested, otherwise any. The search result ' +
-            'marks the exact products displayed to the shopper: describe only those products, never ' +
-            'claim another audience is included, and use displayed_count rather than total_matches ' +
-            'when saying how many options are shown. Never repeat a search already run this turn.',
-        'If a search comes back empty, say plainly that the catalog has nothing matching and ' +
-            'do not substitute another audience. You may offer one closest alternative only after ' +
-            'clearly identifying it as outside the requested filters.',
+            'including product type, brand, color, material and price. Pass audience men, women or unisex ' +
+            'only when the shopper asked or the product is clearly gendered apparel; otherwise use any. ' +
+            'Do not ask men/women/unisex for bags, electronics, home goods or other non-apparel — search ' +
+            'immediately with audience any. The search result marks the exact products displayed to the ' +
+            'shopper: describe only those products, never claim another audience is included, and use ' +
+            'displayed_count rather than total_matches when saying how many options are shown. Never ' +
+            'repeat a search already run this turn.',
+        'If displayed_count is 0, say plainly that nothing matching is available right now. Do not ' +
+            'substitute another audience, broaden the query, call recommend_products, or describe unrelated ' +
+            'products from earlier in the conversation.',
         'CART POLICY — NON-NEGOTIABLE: call add_to_cart as soon as an add/buy request identifies ' +
             'one product and variant. A later product or variant choice completes that same request; ' +
             'never ask the shopper to confirm it again. "Standard" or "base" means the default variant ' +

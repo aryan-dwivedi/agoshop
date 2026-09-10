@@ -16,7 +16,7 @@ export const toolSchemas = {
         audience: z
             .enum(['any', 'men', 'women', 'unisex'])
             .describe(
-                'Use men, women, or unisex when requested; otherwise use any. Never broaden a requested audience.',
+                'Default any. Use men, women, or unisex only when the shopper specified or the product is gendered apparel. Never broaden a requested audience.',
             ),
         category: z.string().max(64).optional(),
         max_price_inr: z.number().positive().optional(),
@@ -115,7 +115,7 @@ export const SHOPPING_TOOLS: OpenAiToolSchema[] = [
         function: {
             name: 'search_products',
             description:
-                'Search the store catalog and return the exact products immediately displayed to the shopper. Preserve all requested qualifiers in `query`. `audience` is required: use men, women, or unisex when requested, otherwise any; never broaden one audience to another. Matching covers title, brand, description, highlights and specifications, so use a compact keyword phrase ("men t-shirt", "black cotton shirt"), not the shopper’s whole sentence. Use this before answering any "what do you have" question, then describe only the returned products.',
+                'Search the store catalog and return the exact products immediately displayed to the shopper. Preserve all requested qualifiers in `query`. `audience` defaults to any — use men, women, or unisex only when the shopper specified or the product is gendered apparel; never broaden one audience to another. Matching covers title, brand, description, highlights and specifications, so use a compact keyword phrase ("backpack", "men t-shirt", "black cotton shirt"), not the shopper’s whole sentence. Use this before answering any "what do you have" question, then describe only the returned products. When displayed_count is 0, tell the shopper nothing matched — do not call recommend_products or suggest unrelated items.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -123,7 +123,8 @@ export const SHOPPING_TOOLS: OpenAiToolSchema[] = [
                     audience: {
                         type: 'string',
                         enum: ['any', 'men', 'women', 'unisex'],
-                        description: 'Use men, women, or unisex when requested; otherwise use any.',
+                        description:
+                            'Default any. Use men, women, or unisex only when the shopper specified or the product is gendered apparel.',
                     },
                     category: str,
                     max_price_inr: num,
@@ -215,7 +216,7 @@ export const SHOPPING_TOOLS: OpenAiToolSchema[] = [
         function: {
             name: 'recommend_products',
             description:
-                'Recommend catalog products, optionally similar to a given product or based on the shopper’s wishlist or recently viewed items.',
+                'Recommend catalog products when the shopper explicitly asks for suggestions, optionally similar to a given product or based on the shopper’s wishlist or recently viewed items. Never use as a fallback when search_products returned no matches.',
             parameters: {
                 type: 'object',
                 properties: {

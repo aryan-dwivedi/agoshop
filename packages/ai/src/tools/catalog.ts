@@ -46,13 +46,17 @@ export const runCatalogTool = async (
                 page: 1,
                 pageSize: Math.min(limit ?? MAX_AI_PRODUCT_CARDS, MAX_AI_PRODUCT_CARDS),
             });
-            surfaced.add(found.items);
+            if (found.items.length === 0) surfaced.markSearchEmpty();
+            else surfaced.add(found.items);
             return {
                 total_matches: found.total,
                 displayed_count: found.items.length,
+                no_matches: found.items.length === 0,
                 results: found.items.map(speakableProduct),
                 display_note:
-                    'These exact results are visible to the shopper. Describe only these products and do not imply that another audience is included.',
+                    found.items.length === 0
+                        ? 'Nothing matched. Tell the shopper plainly that nothing is available. Do not suggest unrelated products.'
+                        : 'These exact results are visible to the shopper. Describe only these products and do not imply that another audience is included.',
             };
         }
         case 'get_product_details': {

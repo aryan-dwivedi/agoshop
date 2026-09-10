@@ -267,9 +267,10 @@ const resolveMatchMode = async (q: ProductQuery, match: TextMatch): Promise<Matc
             sql`select 1${FROM_LEAN}${buildWhere(probe, 'all', match)} limit 1`,
         );
         if (rows.length > 0) return 'all';
-        // Relaxing to OR on longer queries matches unrelated products on individual
-        // colour or material tokens. Only widen the shortest searches.
-        return terms <= 2 ? 'any' : 'all';
+        // Relaxing to OR on multi-term or audience-filtered queries matches unrelated
+        // products on a single token (e.g. "unisex backpack" matching only unisex).
+        if (q.audience || terms >= 2) return 'all';
+        return 'any';
     });
 };
 const normalizePageQuery = (

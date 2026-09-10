@@ -4,10 +4,18 @@ import { MAX_AI_PRODUCT_CARDS, toAiProductCard } from '@shop/shared';
 
 export class SurfacedProducts {
     private readonly groups: AiProductCard[][] = [];
+    private latestSearchEmpty = false;
     add(products: readonly ProductDto[]): void {
-        if (products.length > 0) this.groups.push(products.map(toAiProductCard));
+        if (products.length > 0) {
+            this.groups.push(products.map(toAiProductCard));
+            this.latestSearchEmpty = false;
+        }
+    }
+    markSearchEmpty(): void {
+        this.latestSearchEmpty = true;
     }
     cards(answer: string): AiProductCard[] {
+        if (this.latestSearchEmpty) return [];
         const spoken = answer.toLowerCase();
         const named = this.groups
             .flat()

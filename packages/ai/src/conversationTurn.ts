@@ -186,9 +186,9 @@ const CLOSING_INSTRUCTION: ChatMessage = {
     role: 'system',
     content:
         'Tool calls are disabled for this reply. Answer the shopper now, in their language, ' +
-        'using only the tool results already in this conversation. If the results contain ' +
-        'nothing that matches what they asked for, say so plainly and offer the closest ' +
-        'product you did find. Do not promise to check again.',
+        'using only the tool results already in this conversation. If displayed_count is 0 or ' +
+        'nothing matches what they asked for, say plainly that nothing is available — do not ' +
+        'suggest unrelated products. Do not promise to check again.',
 };
 const forceClosingAnswer = async (
     provider: LlmProvider,
