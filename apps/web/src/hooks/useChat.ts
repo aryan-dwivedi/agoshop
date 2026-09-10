@@ -131,7 +131,13 @@ export const useChat = (opts: {
                 const batch = channels.slice(i, i + SUBSCRIBE_BATCH);
                 try {
                     const released = await Promise.all(
-                        batch.map((channel) => subscribeRef.current(channel, handleRtmMessage)),
+                        batch.map(async (channel) => {
+                            const { release } = await subscribeRef.current(
+                                channel,
+                                handleRtmMessage,
+                            );
+                            return release;
+                        }),
                     );
                     if (cancelled) {
                         for (const release of released) release();

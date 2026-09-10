@@ -21,11 +21,15 @@ type RtmTokenResponse = {
     account: string;
     rtmToken: string;
 };
+type RtmSubscription = {
+    release: () => void;
+    client: RTMClient;
+};
 type RtmContextValue = {
     client: RTMClient | null;
     loggedIn: boolean;
     error: string | null;
-    subscribe: (channel: string, handler: MessageHandler) => Promise<() => void>;
+    subscribe: (channel: string, handler: MessageHandler) => Promise<RtmSubscription>;
 };
 const RtmContext = createContext<RtmContextValue | null>(null);
 type Subscription = {
@@ -85,7 +89,7 @@ export const RtmProvider = ({
         }
     }, [appId, userId, loggedIn]);
     const subscribe = useCallback(
-        async (channel: string, handler: MessageHandler): Promise<() => void> => {
+        async (channel: string, handler: MessageHandler): Promise<RtmSubscription> => {
             const client = await ensureLogin();
             const existing = subscriptionsRef.current.get(channel);
             if (existing) {
@@ -100,17 +104,20 @@ export const RtmProvider = ({
                 });
             }
             let released = false;
-            return () => {
-                if (released) return;
-                released = true;
-                const sub = subscriptionsRef.current.get(channel);
-                if (!sub) return;
-                sub.handlers.delete(handler);
-                sub.refs -= 1;
-                if (sub.refs <= 0) {
-                    subscriptionsRef.current.delete(channel);
-                    void client.unsubscribe(channel).catch(() => undefined);
-                }
+            return {
+                client,
+                release: () => {
+                    if (released) return;
+                    released = true;
+                    const sub = subscriptionsRef.current.get(channel);
+                    if (!sub) return;
+                    sub.handlers.delete(handler);
+                    sub.refs -= 1;
+                    if (sub.refs <= 0) {
+                        subscriptionsRef.current.delete(channel);
+                        void client.unsubscribe(channel).catch(() => undefined);
+                    }
+                },
             };
         },
         [ensureLogin],

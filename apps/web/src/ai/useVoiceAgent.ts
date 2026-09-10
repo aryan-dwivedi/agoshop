@@ -435,12 +435,8 @@ export const useVoiceAgent = (opts: {
                                 setMicTrack(localMic);
                                 duckRef.current?.setVolume(DUCKED_VOLUME);
                             }
-                            const subscribed = await rtmRef.current.subscribe(
-                                channel,
-                                () => undefined,
-                            );
-                            const rtmClient = rtmRef.current.client;
-                            if (!rtmClient) throw new Error('rtm_unavailable');
+                            const { release: subscribed, client: rtmClient } =
+                                await rtmRef.current.subscribe(channel, () => undefined);
                             const voiceToolkit = await AgoraVoiceAI.init({
                                 rtcEngine: client as RTCEngine,
                                 rtmEngine: rtmClient as RTMEngine,
@@ -582,7 +578,7 @@ export const useVoiceAgent = (opts: {
                 await client.publish([mic]);
                 setMicTrack(mic);
                 duckRef.current?.setVolume(DUCKED_VOLUME);
-                const releaseRtm = await rtmRef.current.subscribe(
+                const { release: releaseRtm } = await rtmRef.current.subscribe(
                     handoff.rtcChannel,
                     () => undefined,
                 );
