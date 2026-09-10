@@ -19,6 +19,8 @@ const { getTransport } = await import('../transports/index.js');
 const { streamOpenAiSse } = await import('../providers/openaiCompatible.js');
 const { LlmProviderError } = await import('../providers/index.js');
 const { buildLiveContextMessage, buildSystemPrompt } = await import('../systemPrompt.js');
+const { runTool } = await import('../tools/index.js');
+const { SurfacedProducts } = await import('../surfacedProducts.js');
 let failures = 0;
 let checks = 0;
 const ok = (label: string, condition: boolean, detail?: unknown): void => {
@@ -317,7 +319,8 @@ try {
         ok(
             'live state reports the absence of a pinned product and supplies the line-up',
             contextText.includes('No product is currently pinned on screen') &&
-                contextText.includes('OnePlus N6 5G'),
+                contextText.includes('OnePlus N6 5G') &&
+                contextText.includes('product_id'),
             contextText,
         );
         ok(
@@ -336,6 +339,11 @@ try {
             'assistant policy declines coding and other off-topic requests without tools',
             policy.includes('coding help, homework, jokes, trivia') &&
                 policy.includes('do not call any tools'),
+            policy,
+        );
+        ok(
+            'assistant policy routes comparison requests through compare_products',
+            policy.includes('Never refuse a comparison request'),
             policy,
         );
         ok(
@@ -398,6 +406,32 @@ try {
             'the assistant names payment methods in plain language',
             /upi|cash on delivery|credit card/i.test(payment.reply),
             payment.reply,
+        );
+    }
+    console.log('\n9d. compare_products resolves product names into a comparison');
+    {
+        const surfaced = new SurfacedProducts();
+        const result = await runTool(
+            conversation,
+            {
+                name: 'compare_products',
+                args: {
+                    queries: ['boAt Rockerz 512 ANC', 'boAt Rockerz Plus 550'],
+                },
+            },
+            surfaced,
+        );
+        ok(
+            'compare_products resolves named products',
+            !('error' in result) &&
+                Array.isArray(result.rows) &&
+                result.rows.length === 2,
+            result,
+        );
+        ok(
+            'compare_products surfaces both products as cards',
+            surfaced.cards('').length === 2,
+            surfaced.cards(''),
         );
     }
     console.log('\n10. the HTTP providers survive OpenRouter\u2019s documented SSE quirks');

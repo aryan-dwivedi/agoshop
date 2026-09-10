@@ -9,9 +9,71 @@ import {
     listProducts,
 } from '@shop/domain-commerce/catalog.js';
 import { recommend } from '@shop/domain-commerce/recommendations.js';
-import { MAX_AI_PRODUCT_CARDS, minorUnitsToDecimalString } from '@shop/shared';
+import { MAX_AI_PRODUCT_CARDS, minorUnitsToDecimalString, type ProductDto } from '@shop/shared';
 
 import { speakableProduct, toolError } from '../speakable.js';
+
+const pickBestProductMatch = (query: string, items: ProductDto[]): ProductDto | null => {
+    if (items.length === 0) return null;
+    const normalized = query.trim().toLowerCase();
+    const exact = items.find((item) => item.title.toLowerCase() === normalized);
+    if (exact) return exact;
+    const partial = items.find(
+        (item) =>
+            item.title.toLowerCase().includes(normalized) ||
+            normalized.includes(item.title.toLowerCase()),
+    );
+    return partial ?? items[0] ?? null;
+};
+const resolveCompareProductIds = async (
+    productIds: string[] | undefined,
+    queries: string[] | undefined,
+): Promise<{ ids: string[] } | { error: Record<string, unknown> }> => {
+    if (productIds && productIds.length >= 2) {
+        return { ids: [...new Set(productIds)].slice(0, 4) };
+    }
+    if (!queries || queries.length < 2) {
+        return {
+            error: toolError(
+                'invalid_compare',
+                'provide product_ids or queries with 2–4 items',
+            ),
+        };
+    }
+    const resolved: string[] = [];
+    const unresolved: string[] = [];
+    for (const query of queries) {
+        const found = await listProducts({
+            q: query,
+            sort: 'relevance',
+            page: 1,
+            pageSize: 5,
+        });
+        const match = pickBestProductMatch(query, found.items);
+        if (!match) {
+            unresolved.push(query);
+            continue;
+        }
+        if (!resolved.includes(match.id)) resolved.push(match.id);
+    }
+    if (unresolved.length > 0) {
+        return {
+            error: toolError(
+                'products_not_found',
+                `could not find: ${unresolved.join(', ')}`,
+            ),
+        };
+    }
+    if (resolved.length < 2) {
+        return {
+            error: toolError(
+                'not_enough_products',
+                'need at least two distinct products to compare',
+            ),
+        };
+    }
+    return { ids: resolved.slice(0, 4) };
+};
 
 type CatalogToolInvocation = Extract<
     ToolInvocation,
@@ -77,9 +139,14 @@ export const runCatalogTool = async (
             };
         }
         case 'compare_products': {
+            const resolved = await resolveCompareProductIds(
+                call.args.product_ids,
+                call.args.queries,
+            );
+            if ('error' in resolved) return resolved.error;
             const [comparison, products] = await Promise.all([
-                compareProducts(call.args.product_ids),
-                getProductsByIds(call.args.product_ids),
+                compareProducts(resolved.ids),
+                getProductsByIds(resolved.ids),
             ]);
             surfaced.add(products);
             return {
@@ -88,6 +155,8 @@ export const runCatalogTool = async (
                     ...row,
                     priceInr: minorUnitsToDecimalString(row.priceMinorUnits),
                 })),
+                display_note:
+                    'These products are shown in a comparison table. Summarise the key differences in price, rating and one or two specs — do not read every attribute aloud.',
             };
         }
         case 'recommend_products': {

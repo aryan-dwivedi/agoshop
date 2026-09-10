@@ -133,6 +133,9 @@ export const buildSystemPrompt = async (conversation: ConversationRecord): Promi
             'delivery serviceability, payment options, offers and the cart. If you do not have ' +
             'a tool result for something, say that you cannot verify it right now rather than promising ' +
             'to check later or guessing.',
+        'When the shopper asks to compare products, call compare_products in this same turn. Pass ' +
+            'queries with the product names when product_ids are not yet known, or product_ids from ' +
+            'search results or the live show line-up. Never refuse a comparison request.',
         'When the shopper asks to speak with a human, support agent, or live person, call ' +
             'escalate_to_human immediately in that same turn. Do not promise a transfer without ' +
             'calling the tool, and after it succeeds tell them to keep this window open while ' +
@@ -216,7 +219,7 @@ export const buildLiveContextMessage = async (
         if (!pinnedId) {
             const lineup = session.products
                 .slice(0, 8)
-                .map((item) => `"${item.title}"`)
+                .map((item) => `"${item.title}" (product_id ${item.productId})`)
                 .join(', ');
             lines.push(
                 'No product is currently pinned on screen.' +

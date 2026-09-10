@@ -24,9 +24,23 @@ export const toolSchemas = {
         limit: z.number().int().min(1).max(MAX_AI_PRODUCT_CARDS).optional(),
     }),
     get_product_details: z.object({ product_id: productIdSchema }),
-    compare_products: z.object({
-        product_ids: z.array(productIdSchema).min(2).max(4),
-    }),
+    compare_products: z
+        .object({
+            product_ids: z.array(productIdSchema).min(2).max(4).optional(),
+            queries: z
+                .array(z.string().min(1).max(200))
+                .min(2)
+                .max(4)
+                .optional()
+                .describe(
+                    'Product names or compact search phrases when product_ids are not yet known — one entry per product.',
+                ),
+        })
+        .refine(
+            (value) =>
+                (value.product_ids?.length ?? 0) >= 2 || (value.queries?.length ?? 0) >= 2,
+            { message: 'Provide either product_ids or queries with 2–4 items' },
+        ),
     check_delivery: z.object({
         pincode: z.string().regex(/^\d{6}$/),
     }),
@@ -153,7 +167,7 @@ export const SHOPPING_TOOLS: OpenAiToolSchema[] = [
         function: {
             name: 'compare_products',
             description:
-                'Compare two to four catalog products attribute by attribute, including price, rating and specifications.',
+                'Compare two to four catalog products attribute by attribute, including price, rating and specifications. Pass queries with the product names when product_ids are not yet known — for example when the shopper says "compare X and Y". Use product_ids from search results or the live show line-up when available.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -163,8 +177,15 @@ export const SHOPPING_TOOLS: OpenAiToolSchema[] = [
                         minItems: 2,
                         maxItems: 4,
                     },
+                    queries: {
+                        type: 'array',
+                        items: str,
+                        minItems: 2,
+                        maxItems: 4,
+                        description:
+                            'Product names or compact search phrases — one per product — when product_ids are not yet known.',
+                    },
                 },
-                required: ['product_ids'],
             },
         },
     },

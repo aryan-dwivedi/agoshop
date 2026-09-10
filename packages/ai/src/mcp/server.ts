@@ -18,7 +18,8 @@ const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
     search_products:
         'Search the catalog and immediately display these exact products. Preserve every requested qualifier in query. audience defaults to any — use men, women, or unisex only when the shopper specified or the product is gendered apparel; never broaden it. Do not ask gender for bags, electronics, or home goods. Describe only returned results. Use displayed_count when speaking a total; never invent a count. When displayed_count is 0, say nothing matched — do not suggest unrelated products. When the shopper asks to show or list all options, reuse the most recent search results instead of searching again with a vague query.',
     get_product_details: 'Full product details by product_id.',
-    compare_products: 'Compare two to four products.',
+    compare_products:
+        'Compare two to four products by name (queries) or product_id. Use queries when the shopper names products directly.',
     check_delivery: 'Check pincode serviceability.',
     get_payment_options: 'Payment methods for checkout.',
     get_live_offer: 'Active live-session discount for this conversation.',
