@@ -131,19 +131,73 @@ export type TextMatch = {
 };
 const EMPTY_TEXT_MATCH: TextMatch = { categoryIds: [], sellerIds: [], productIds: [] };
 const uuidArray = (ids: string[]): SQL => sql`cast(${`{${ids.join(',')}}`} as uuid[])`;
+const CATEGORY_SLUG_ALIASES: Record<string, string> = {
+    beauty: 'cosmetics',
+    skincare: 'cosmetics',
+    'skin-care': 'cosmetics',
+    makeup: 'cosmetics',
+    cosmetic: 'cosmetics',
+    cosmetics: 'cosmetics',
+};
+const queryTerms = (raw: string): string[] => {
+    const seen = new Set<string>();
+    const terms: string[] = [];
+    for (const word of raw.trim().toLowerCase().split(/\s+/)) {
+        for (const part of word.split('-')) {
+            if (part.length >= 2 && !seen.has(part)) {
+                seen.add(part);
+                terms.push(part);
+            }
+        }
+    }
+    return terms;
+};
+export const resolveCategorySlug = async (raw: string | undefined): Promise<string | undefined> => {
+    if (!raw?.trim()) return undefined;
+    const term = raw.trim().toLowerCase();
+    const alias = CATEGORY_SLUG_ALIASES[term];
+    if (alias) return alias;
+    return cached(cacheKeys.productQuery(`cat:${term}`), 300, async () => {
+        const categories = await listCategories();
+        const exact = categories.find((category) => category.slug === term);
+        if (exact) return exact.slug;
+        const byName = categories.find(
+            (category) =>
+                category.name.toLowerCase().includes(term) || category.slug.includes(term),
+        );
+        return byName?.slug ?? term;
+    });
+};
+const resolveProductQuery = async (q: ProductQuery): Promise<ProductQuery> => {
+    if (!q.categorySlug) return q;
+    return { ...q, categorySlug: await resolveCategorySlug(q.categorySlug) };
+};
 const resolveTextMatch = async (term: string | undefined): Promise<TextMatch> => {
     if (!term) return EMPTY_TEXT_MATCH;
     return cached(cacheKeys.productQuery(`text:${queryHash(term)}`), 300, async () => {
-        const contains = `%${term}%`;
+        const terms = queryTerms(term);
+        if (terms.length === 0) return EMPTY_TEXT_MATCH;
+        const categoryConditions = terms.map((part) => {
+            const contains = `%${part}%`;
+            return sql`(name ilike ${contains} or slug ilike ${contains})`;
+        });
+        const sellerConditions = terms.map((part) => {
+            const contains = `%${part}%`;
+            return sql`(display_name ilike ${contains} or slug ilike ${contains})`;
+        });
+        const variantConditions = terms.map((part) => {
+            const contains = `%${part}%`;
+            return sql`(sku ilike ${contains} or label ilike ${contains} or attrs::text ilike ${contains})`;
+        });
         const { rows } = await db.execute<{ kind: string; id: string }>(sql`
       select 'category' as kind, id::text as id from categories
-       where name ilike ${contains} or slug ilike ${contains}
+       where ${sql.join(categoryConditions, sql` or `)}
       union all
       select 'seller' as kind, id::text as id from sellers
-       where display_name ilike ${contains} or slug ilike ${contains}
+       where ${sql.join(sellerConditions, sql` or `)}
       union all
       select distinct 'product' as kind, product_id::text as id from product_variants
-       where sku ilike ${contains} or label ilike ${contains} or attrs::text ilike ${contains}
+       where ${sql.join(variantConditions, sql` or `)}
     `);
         const match: TextMatch = { categoryIds: [], sellerIds: [], productIds: [] };
         for (const row of rows) {
@@ -314,7 +368,7 @@ export const listProducts = async (
     items: ProductDto[];
     total: number;
 }> => {
-    const { normalized } = normalizePageQuery(q);
+    const { normalized } = normalizePageQuery(await resolveProductQuery(q));
     const match = await resolveTextMatch(normalized.q);
     const mode = await resolveMatchMode(normalized, match);
     return listProductsWithMode(normalized, mode, match);
@@ -405,8 +459,9 @@ const productFacetsWithMode = async (
         };
     });
 export const productFacets = async (q: ProductQuery): Promise<ProductFacets> => {
-    const match = await resolveTextMatch(q.q);
-    return productFacetsWithMode(q, await resolveMatchMode(q, match), match);
+    const normalized = await resolveProductQuery(q);
+    const match = await resolveTextMatch(normalized.q);
+    return productFacetsWithMode(normalized, await resolveMatchMode(normalized, match), match);
 };
 export type ProductListPage = {
     items: ProductDto[];
@@ -425,7 +480,7 @@ export const listProductsPage = async (
         }>;
     },
 ): Promise<ProductListPage> => {
-    const { normalized, page, pageSize } = normalizePageQuery(q);
+    const { normalized, page, pageSize } = normalizePageQuery(await resolveProductQuery(q));
     const match = await resolveTextMatch(normalized.q);
     const mode = await resolveMatchMode(normalized, match);
     const [listPage, facets] = await Promise.all([

@@ -457,6 +457,20 @@ const run = async (): Promise<void> => {
             'multi-word searches must not widen to unrelated colour matches',
         );
         pass('multi-word catalog search stays strict when every term does not match');
+        for (const category of ['skincare', 'beauty'] as const) {
+            const beauty = await listProducts({
+                q: 'serum',
+                categorySlug: category,
+                sort: 'relevance',
+                page: 1,
+                pageSize: 6,
+            });
+            assert.ok(
+                beauty.total > 0,
+                `category filter ${category} must resolve to cosmetics and return products`,
+            );
+        }
+        pass('catalog category filters accept beauty and skincare aliases for cosmetics');
         const first = await api.request<CartDto>(
             'POST',
             '/api/cart/items',

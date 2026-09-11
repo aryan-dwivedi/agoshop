@@ -135,7 +135,11 @@ export const buildSystemPrompt = async (conversation: ConversationRecord): Promi
             'to check later or guessing.',
         'When the shopper asks to compare products, call compare_products in this same turn. Pass ' +
             'queries with the product names when product_ids are not yet known, or product_ids from ' +
-            'search results or the live show line-up. Never refuse a comparison request.',
+            'search results or the live show line-up. Never refuse a comparison request and never ' +
+            'answer a comparison with get_product_details on a single product.',
+        'When the shopper is giving a delivery PIN code, call check_delivery only after you have ' +
+            'exactly six digits. Partial numeric fragments are often incomplete speech-to-text — ' +
+            'ask them to say the full PIN in one phrase instead of acting on 3–5 digit snippets.',
         'When the shopper asks to speak with a human, support agent, or live person, call ' +
             'escalate_to_human immediately in that same turn. Do not promise a transfer without ' +
             'calling the tool, and after it succeeds tell them to keep this window open while ' +
@@ -216,15 +220,18 @@ export const buildLiveContextMessage = async (
                 (session.coHostName ? ` with ${session.coHostName}` : '') +
                 '. The named host is the presenter, not the shopper; never address the shopper by the host name.',
         );
-        if (!pinnedId) {
-            const lineup = session.products
-                .slice(0, 8)
-                .map((item) => `"${item.title}" (product_id ${item.productId})`)
-                .join(', ');
+        const lineup = session.products
+            .slice(0, 8)
+            .map((item) => `"${item.title}" (product_id ${item.productId})`)
+            .join(', ');
+        if (lineup.length > 0) {
             lines.push(
-                'No product is currently pinned on screen.' +
-                    (lineup.length > 0 ? ` The show line-up is ${lineup}.` : '') +
-                    ' Do not claim to inspect the camera feed; say that no product is pinned if asked what is being shown.',
+                `Show line-up on air: ${lineup}. Prefer these product_ids for compare_products when the shopper names products from this session.`,
+            );
+        }
+        if (!pinnedId) {
+            lines.push(
+                'No product is currently pinned on screen. Do not claim to inspect the camera feed; say that no product is pinned if asked what is being shown.',
             );
         }
     } else {

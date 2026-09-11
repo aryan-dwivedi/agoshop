@@ -13,17 +13,31 @@ import { MAX_AI_PRODUCT_CARDS, minorUnitsToDecimalString, type ProductDto } from
 
 import { speakableProduct, toolError } from '../speakable.js';
 
+const scoreProductMatch = (query: string, item: ProductDto): number => {
+    const normalized = query.trim().toLowerCase();
+    const title = item.title.toLowerCase();
+    if (title === normalized) return 1000;
+    if (title.includes(normalized) || normalized.includes(title)) return 500;
+    const queryTokens = normalized.split(/\s+/u).filter((token) => token.length > 0);
+    if (queryTokens.length === 0) return 0;
+    let matched = 0;
+    for (const token of queryTokens) {
+        if (title.includes(token)) matched += 1;
+    }
+    return matched;
+};
 const pickBestProductMatch = (query: string, items: ProductDto[]): ProductDto | null => {
     if (items.length === 0) return null;
-    const normalized = query.trim().toLowerCase();
-    const exact = items.find((item) => item.title.toLowerCase() === normalized);
-    if (exact) return exact;
-    const partial = items.find(
-        (item) =>
-            item.title.toLowerCase().includes(normalized) ||
-            normalized.includes(item.title.toLowerCase()),
-    );
-    return partial ?? items[0] ?? null;
+    let best: ProductDto | null = null;
+    let bestScore = -1;
+    for (const item of items) {
+        const score = scoreProductMatch(query, item);
+        if (score > bestScore) {
+            bestScore = score;
+            best = item;
+        }
+    }
+    return bestScore > 0 ? best : null;
 };
 const resolveCompareProductIds = async (
     productIds: string[] | undefined,

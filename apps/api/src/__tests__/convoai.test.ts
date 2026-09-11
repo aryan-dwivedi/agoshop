@@ -67,7 +67,7 @@ describe('ConvoAI speech handling', () => {
                 end_of_speech: {
                     mode: 'vad',
                     vad_config: {
-                        silence_duration_ms: 280,
+                        silence_duration_ms: 480,
                     },
                 },
             },

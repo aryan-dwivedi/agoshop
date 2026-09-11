@@ -74,6 +74,7 @@ export const useTextAssist = (opts: {
     const messagesRef = useRef<TextAssistMessage[]>([]);
     messagesRef.current = messages;
     const recognizerRef = useRef<SpeechRecognizer | null>(null);
+    const dictationTextRef = useRef('');
     const supported = useMemo(() => recognizerConstructor() !== null, []);
     const send = useCallback(
         async (text: string): Promise<void> => {
@@ -154,23 +155,19 @@ export const useTextAssist = (opts: {
         if (!Recognizer || recognizerRef.current) return;
         const recognizer = new Recognizer();
         recognizerRef.current = recognizer;
+        dictationTextRef.current = '';
         recognizer.lang = resolveLanguage();
-        recognizer.continuous = false;
+        recognizer.continuous = true;
         recognizer.interimResults = true;
         recognizer.onresult = (event) => {
-            let finalText = '';
             let draft = '';
             for (let i = event.resultIndex; i < event.results.length; i += 1) {
                 const result = event.results[i];
                 if (!result) continue;
-                if (result.isFinal) finalText += result[0].transcript;
+                if (result.isFinal) dictationTextRef.current += result[0].transcript;
                 else draft += result[0].transcript;
             }
-            setInterim(draft);
-            if (finalText.trim().length > 0) {
-                setInterim('');
-                void sendRef.current(finalText);
-            }
+            setInterim(`${dictationTextRef.current}${draft}`.trim());
         };
         recognizer.onerror = (event) => {
             setError(
@@ -180,9 +177,12 @@ export const useTextAssist = (opts: {
             );
         };
         recognizer.onend = () => {
+            const spoken = dictationTextRef.current.trim();
+            dictationTextRef.current = '';
             recognizerRef.current = null;
             setListening(false);
             setInterim('');
+            if (spoken.length > 0) void sendRef.current(spoken);
         };
         recognizer.start();
         setListening(true);
